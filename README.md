@@ -124,7 +124,7 @@ Counter Card สามารถถูกเล่นระหว่างเท�
 
 ผู้เล่นแต่ละคนใช้โทรศัพท์มือถือของตัวเอง:
 
-```text
+
 Player A ──┐
 Player B ──┤
 Player C ──┼── Game Room
