@@ -37,6 +37,11 @@ describe('addPlayer', () => {
     }
     expect(() => addPlayer(room, 'p9', 'P9')).toThrow();
   });
+
+  it('throws if the player id is already in the room', () => {
+    const room = createRoom('host1', 'Ploy');
+    expect(() => addPlayer(room, 'host1', 'Someone Else')).toThrow();
+  });
 });
 
 describe('startGame', () => {
@@ -58,5 +63,14 @@ describe('startGame', () => {
     let room = createRoom('host1', 'P1');
     room = addPlayer(room, 'p2', 'P2');
     expect(() => startGame(room, ['A1'])).toThrow();
+  });
+
+  it('throws if the room has already started', () => {
+    let room = createRoom('host1', 'P1');
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    expect(() => startGame(started, allCodes, () => 0)).toThrow();
   });
 });

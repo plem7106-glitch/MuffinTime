@@ -31,6 +31,9 @@ export function addPlayer(state, playerId, name) {
   if (Object.keys(state.players).length >= 8) {
     throw new Error('room is full');
   }
+  if (state.players[playerId]) {
+    throw new Error('player already in room');
+  }
   const next = cloneState(state);
   next.players[playerId] = {
     name,
@@ -44,6 +47,9 @@ export function addPlayer(state, playerId, name) {
 }
 
 export function startGame(state, allCardCodes, rng = Math.random) {
+  if (state.status !== 'lobby') {
+    throw new Error('game already started');
+  }
   const playerIds = Object.keys(state.players);
   if (playerIds.length < 3) {
     throw new Error('need at least 3 players to start');
