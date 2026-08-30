@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cloneState, shuffle, pickRandomIndices } from './util.js';
+import { cloneState, shuffle, pickRandomIndices } from './util';
 
 describe('cloneState', () => {
   it('returns a deep copy that does not share references', () => {
