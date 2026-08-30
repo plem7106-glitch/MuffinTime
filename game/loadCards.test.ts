@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { loadCards, indexCardsByCode, DEFAULT_SHEET_CSV_URL, DEFAULT_FALLBACK_URL } from './loadCards.js';
+import { loadCards, indexCardsByCode, DEFAULT_SHEET_CSV_URL, DEFAULT_FALLBACK_URL } from './loadCards';
+import type { FetchLikeResponse, FetchLike } from './loadCards';
 
 const CSV_TEXT = 'type,name_en,name_th,effect_th,code\naction,Alien Invasion,เอเลี่ยนบุก,มอบการ์ดทั้งหมด,A02\n';
 
-function fakeFetch(responses) {
+function fakeFetch(responses: Array<(url: string) => Promise<FetchLikeResponse>>): FetchLike {
   let call = 0;
-  return async (url) => {
+  return async (url: string) => {
     const r = responses[call];
     call++;
     return r(url);
@@ -76,8 +77,8 @@ describe('loadCards', () => {
   });
 
   it('uses the real published sheet URL and local fallback URL by default', async () => {
-    const seenUrls = [];
-    const fetchImpl = async (url) => {
+    const seenUrls: string[] = [];
+    const fetchImpl: FetchLike = async (url: string) => {
       seenUrls.push(url);
       return { ok: true, status: 200, text: async () => CSV_TEXT };
     };
