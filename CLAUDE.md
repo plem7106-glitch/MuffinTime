@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repository is currently pre-implementation: it contains the design spec and game content data, but no application code yet (no `package.json`, build tooling, or source directory exists). There are no build/lint/test commands to run until implementation starts.
+The stack is Next.js (App Router) + React + TypeScript + Tailwind CSS v4, with Supabase (Postgres + Realtime) replacing the originally-planned Firebase backend — see
+`docs/superpowers/specs/2026-08-31-nextjs-supabase-foundation-design.md` for why and how.
+
+The game engine (`game/*.ts`) and card-loading pipeline are ported and tested (Vitest). The Supabase schema
+(`supabase/migrations/0001_create_rooms.sql`) and the multiplayer read/write/realtime layer (`multiplayer/`) exist.
+UI components, the lobby/room-flow screens, and `multiplayer/player.ts` (localStorage player identity) are NOT built
+yet — they're deferred to a follow-up design spec, per the foundation spec's own scope section.
 
 ## What this project is
 
@@ -13,7 +19,7 @@ A mobile-friendly web adaptation of the **Muffin Time** card game (asdfmovie × 
 Design decisions (architecture, data model, turn/effect handling, v1 scope) are fully specified in:
 `docs/superpowers/specs/2026-08-31-muffin-time-web-design.md`
 
-Read that file before making any architectural choice — it already answers most "how should this work" questions (e.g. Firebase Realtime Database + Firebase Hosting with no custom backend, client-authoritative game logic, no accounts, Thai-only UI, 3–8 players per room).
+Read that file for game rules, data model, turn/effect handling, and v1 scope (client-authoritative game logic, no accounts, Thai-only UI, 3–8 players per room). Its backend/hosting choice (Firebase Realtime Database + Firebase Hosting) is superseded — see "Project status" above for the current stack.
 
 ## Game content data
 
