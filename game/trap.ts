@@ -1,6 +1,7 @@
-import { cloneState } from './util.js';
+import { cloneState } from './util';
+import type { RoomState, PlayerId, CardCode } from './types';
 
-export function placeTrap(state, playerId, cardCode) {
+export function placeTrap(state: RoomState, playerId: PlayerId, cardCode: CardCode): RoomState {
   const next = cloneState(state);
   const player = next.players[playerId];
   if (player.traps.length >= 3) {
@@ -15,7 +16,7 @@ export function placeTrap(state, playerId, cardCode) {
   return next;
 }
 
-export function removeTrap(state, playerId, cardCode) {
+export function removeTrap(state: RoomState, playerId: PlayerId, cardCode: CardCode): RoomState {
   const next = cloneState(state);
   const player = next.players[playerId];
   const pos = player.traps.indexOf(cardCode);
