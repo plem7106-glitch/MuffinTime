@@ -6,6 +6,8 @@ export function advanceTurn(state) {
   const count = order.length;
   let index = next.currentTurnIndex;
   let attempts = 0;
+  // attempts <= count is a defensive backstop; in practice the loop always exits via the
+  // inner `break` once it revisits a player whose flag it already cleared this call.
   do {
     index = ((index + next.direction) % count + count) % count;
     attempts++;
@@ -36,4 +38,10 @@ export function declareMuffinTime(state, playerId) {
 export function checkWinnerAtTurnStart(state, playerId) {
   const player = state.players[playerId];
   return player.hasCalledMuffinTime && player.hand.length === state.muffinTimeTarget;
+}
+
+export function clearMuffinTimeDeclaration(state, playerId) {
+  const next = cloneState(state);
+  next.players[playerId].hasCalledMuffinTime = false;
+  return next;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { advanceTurn, isMuffinTimeEligible, declareMuffinTime, checkWinnerAtTurnStart } from './turn.js';
+import { advanceTurn, isMuffinTimeEligible, declareMuffinTime, checkWinnerAtTurnStart, clearMuffinTimeDeclaration } from './turn.js';
 
 describe('advanceTurn', () => {
   it('moves to the next player in turn order', () => {
@@ -46,6 +46,20 @@ describe('advanceTurn', () => {
     expect(next.currentTurnIndex).toBe(2);
     expect(next.players.p2.skipNextTurn).toBe(false);
   });
+
+  it('terminates and clears every flag when all players are skipped', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: { p1: { skipNextTurn: true }, p2: { skipNextTurn: true }, p3: { skipNextTurn: true } },
+    };
+    const next = advanceTurn(state);
+    expect(next.currentTurnIndex).toBe(1);
+    expect(next.players.p1.skipNextTurn).toBe(false);
+    expect(next.players.p2.skipNextTurn).toBe(false);
+    expect(next.players.p3.skipNextTurn).toBe(false);
+  });
 });
 
 describe('isMuffinTimeEligible', () => {
@@ -87,5 +101,19 @@ describe('checkWinnerAtTurnStart', () => {
   it('is false if the hand count changed since declaring', () => {
     const state = { muffinTimeTarget: 10, players: { p1: { hand: Array(9).fill('A01'), hasCalledMuffinTime: true } } };
     expect(checkWinnerAtTurnStart(state, 'p1')).toBe(false);
+  });
+});
+
+describe('clearMuffinTimeDeclaration', () => {
+  it('resets hasCalledMuffinTime to false', () => {
+    const state = { players: { p1: { hasCalledMuffinTime: true } } };
+    const next = clearMuffinTimeDeclaration(state, 'p1');
+    expect(next.players.p1.hasCalledMuffinTime).toBe(false);
+  });
+
+  it('does not mutate the original state', () => {
+    const state = { players: { p1: { hasCalledMuffinTime: true } } };
+    clearMuffinTimeDeclaration(state, 'p1');
+    expect(state.players.p1.hasCalledMuffinTime).toBe(true);
   });
 });
