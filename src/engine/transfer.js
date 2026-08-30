@@ -1,6 +1,7 @@
 import { cloneState, pickRandomIndices } from './util.js';
 
 export function stealRandom(state, fromId, toId, n, rng = Math.random) {
+  if (n <= 0) return cloneState(state);
   const next = cloneState(state);
   const fromHand = next.players[fromId].hand;
   const count = Math.min(n, fromHand.length);

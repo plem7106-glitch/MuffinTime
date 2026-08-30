@@ -22,6 +22,12 @@ describe('stealRandom', () => {
     expect(next.players.p2.hand).toEqual([]);
     expect(next.players.p1.hand.length).toBe(4);
   });
+
+  it('does nothing when n is negative or zero', () => {
+    const next = stealRandom(baseState(), 'p1', 'p2', -1, () => 0);
+    expect(next.players.p1.hand).toEqual(['A01', 'A02', 'A03']);
+    expect(next.players.p2.hand).toEqual(['B01']);
+  });
 });
 
 describe('stealChosen', () => {
