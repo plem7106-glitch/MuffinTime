@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRoom, addPlayer, startGame } from './room.js';
+import { createRoom, addPlayer, startGame } from './room';
 
 describe('createRoom', () => {
   it('creates a lobby room with the host as the first player', () => {
@@ -26,7 +26,7 @@ describe('addPlayer', () => {
   });
 
   it('throws if the room already started', () => {
-    const room = { ...createRoom('host1', 'Ploy'), status: 'playing' };
+    const room = { ...createRoom('host1', 'Ploy'), status: 'playing' as const };
     expect(() => addPlayer(room, 'p2', 'Nam')).toThrow();
   });
 

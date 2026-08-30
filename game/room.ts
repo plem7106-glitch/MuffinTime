@@ -1,6 +1,7 @@
-import { cloneState, shuffle } from './util.js';
+import { cloneState, shuffle } from './util';
+import type { RoomState, PlayerId, CardCode, Rng } from './types';
 
-export function createRoom(hostId, hostName) {
+export function createRoom(hostId: PlayerId, hostName: string): RoomState {
   return {
     status: 'lobby',
     hostId,
@@ -10,7 +11,6 @@ export function createRoom(hostId, hostName) {
     muffinTimeTarget: 10,
     drawPile: [],
     discardPile: [],
-    log: [],
     players: {
       [hostId]: {
         name: hostName,
@@ -24,7 +24,7 @@ export function createRoom(hostId, hostName) {
   };
 }
 
-export function addPlayer(state, playerId, name) {
+export function addPlayer(state: RoomState, playerId: PlayerId, name: string): RoomState {
   if (state.status !== 'lobby') {
     throw new Error('cannot join a room that has already started');
   }
@@ -46,7 +46,7 @@ export function addPlayer(state, playerId, name) {
   return next;
 }
 
-export function startGame(state, allCardCodes, rng = Math.random) {
+export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng = Math.random): RoomState {
   if (state.status !== 'lobby') {
     throw new Error('game already started');
   }
@@ -59,7 +59,7 @@ export function startGame(state, allCardCodes, rng = Math.random) {
   next.drawPile = shuffle(allCardCodes, rng);
   for (const playerId of next.turnOrder) {
     for (let i = 0; i < 3; i++) {
-      next.players[playerId].hand.push(next.drawPile.pop());
+      next.players[playerId].hand.push(next.drawPile.pop()!);
     }
   }
   next.status = 'playing';
