@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { draw, drawFromBottom, discard, reshuffleDiscardIntoDraw } from './pile.js';
+import { draw, drawFromBottom, discard, reshuffleDiscardIntoDraw } from './pile';
+import type { RoomState } from './types';
 
-function baseState() {
+function baseState(): RoomState {
   return {
     drawPile: ['A01', 'A02', 'A03'],
     discardPile: ['A10'],
     players: { p1: { hand: [] } },
-  };
+  } as unknown as RoomState;
 }
 
 describe('draw', () => {
@@ -17,14 +18,18 @@ describe('draw', () => {
   });
 
   it('reshuffles the discard pile into the draw pile when it runs out', () => {
-    const state = { drawPile: ['A01'], discardPile: ['A10', 'A11', 'A12'], players: { p1: { hand: [] } } };
+    const state = {
+      drawPile: ['A01'],
+      discardPile: ['A10', 'A11', 'A12'],
+      players: { p1: { hand: [] } },
+    } as unknown as RoomState;
     const next = draw(state, 'p1', 3, () => 0);
     expect(next.players.p1.hand.length).toBe(3);
     expect(next.discardPile).toEqual(['A12']);
   });
 
   it('stops drawing early if both piles are exhausted', () => {
-    const state = { drawPile: [], discardPile: [], players: { p1: { hand: [] } } };
+    const state = { drawPile: [], discardPile: [], players: { p1: { hand: [] } } } as unknown as RoomState;
     const next = draw(state, 'p1', 3);
     expect(next.players.p1.hand).toEqual([]);
   });
@@ -40,46 +45,62 @@ describe('drawFromBottom', () => {
 
 describe('discard', () => {
   it('discards specific chosen cards from the hand', () => {
-    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02', 'A03'] } } };
+    const state = {
+      drawPile: [],
+      discardPile: [],
+      players: { p1: { hand: ['A01', 'A02', 'A03'] } },
+    } as unknown as RoomState;
     const next = discard(state, 'p1', 2, ['A01', 'A03']);
     expect(next.players.p1.hand).toEqual(['A02']);
     expect(next.discardPile).toEqual(['A01', 'A03']);
   });
 
   it('discards n random cards when no cards are specified', () => {
-    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02', 'A03'] } } };
+    const state = {
+      drawPile: [],
+      discardPile: [],
+      players: { p1: { hand: ['A01', 'A02', 'A03'] } },
+    } as unknown as RoomState;
     const next = discard(state, 'p1', 2, null, () => 0);
     expect(next.players.p1.hand.length).toBe(1);
     expect(next.discardPile.length).toBe(2);
   });
 
   it('does nothing when n is negative or zero', () => {
-    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02', 'A03', 'A04'] } } };
+    const state = {
+      drawPile: [],
+      discardPile: [],
+      players: { p1: { hand: ['A01', 'A02', 'A03', 'A04'] } },
+    } as unknown as RoomState;
     const next = discard(state, 'p1', -1, null, () => 0);
     expect(next.players.p1.hand).toEqual(['A01', 'A02', 'A03', 'A04']);
   });
 
   it('throws when cardCodes length does not match n', () => {
-    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02', 'A03'] } } };
+    const state = {
+      drawPile: [],
+      discardPile: [],
+      players: { p1: { hand: ['A01', 'A02', 'A03'] } },
+    } as unknown as RoomState;
     expect(() => discard(state, 'p1', 3, ['A01'])).toThrow();
   });
 
   it('throws when a card in cardCodes is not actually in the hand (e.g. a duplicate)', () => {
-    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02'] } } };
+    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02'] } } } as unknown as RoomState;
     expect(() => discard(state, 'p1', 2, ['A01', 'A01'])).toThrow();
   });
 });
 
 describe('reshuffleDiscardIntoDraw', () => {
   it('keeps the top discard card in place and shuffles the rest into the draw pile', () => {
-    const state = { drawPile: [], discardPile: ['A10', 'A11', 'A12'] };
+    const state = { drawPile: [], discardPile: ['A10', 'A11', 'A12'] } as unknown as RoomState;
     const next = reshuffleDiscardIntoDraw(state, () => 0);
     expect(next.discardPile).toEqual(['A12']);
     expect(next.drawPile.sort()).toEqual(['A10', 'A11']);
   });
 
   it('does nothing when the discard pile has 0 or 1 cards', () => {
-    const state = { drawPile: [], discardPile: ['A10'] };
+    const state = { drawPile: [], discardPile: ['A10'] } as unknown as RoomState;
     const next = reshuffleDiscardIntoDraw(state);
     expect(next).toEqual(state);
   });

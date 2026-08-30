@@ -1,6 +1,7 @@
-import { cloneState, shuffle, pickRandomIndices } from './util.js';
+import { cloneState, shuffle, pickRandomIndices } from './util';
+import type { RoomState, PlayerId, CardCode, Rng } from './types';
 
-export function reshuffleDiscardIntoDraw(state, rng = Math.random) {
+export function reshuffleDiscardIntoDraw(state: RoomState, rng: Rng = Math.random): RoomState {
   const next = cloneState(state);
   if (next.discardPile.length <= 1) return next;
   const top = next.discardPile[next.discardPile.length - 1];
@@ -10,34 +11,40 @@ export function reshuffleDiscardIntoDraw(state, rng = Math.random) {
   return next;
 }
 
-export function draw(state, playerId, n, rng = Math.random) {
+export function draw(state: RoomState, playerId: PlayerId, n: number, rng: Rng = Math.random): RoomState {
   let next = cloneState(state);
   for (let i = 0; i < n; i++) {
     if (next.drawPile.length === 0) {
       next = reshuffleDiscardIntoDraw(next, rng);
       if (next.drawPile.length === 0) break;
     }
-    const card = next.drawPile.pop();
+    const card = next.drawPile.pop()!;
     next.players[playerId].hand.push(card);
   }
   return next;
 }
 
-export function drawFromBottom(state, playerId, n) {
+export function drawFromBottom(state: RoomState, playerId: PlayerId, n: number): RoomState {
   const next = cloneState(state);
   for (let i = 0; i < n; i++) {
     if (next.drawPile.length === 0) break;
-    const card = next.drawPile.shift();
+    const card = next.drawPile.shift()!;
     next.players[playerId].hand.push(card);
   }
   return next;
 }
 
-export function discard(state, playerId, n, cardCodes = null, rng = Math.random) {
+export function discard(
+  state: RoomState,
+  playerId: PlayerId,
+  n: number,
+  cardCodes: CardCode[] | null = null,
+  rng: Rng = Math.random
+): RoomState {
   if (n <= 0) return cloneState(state);
   const next = cloneState(state);
   const hand = next.players[playerId].hand;
-  let toDiscard;
+  let toDiscard: CardCode[];
   if (cardCodes) {
     if (cardCodes.length !== n) {
       throw new Error(`discard: cardCodes length (${cardCodes.length}) does not match n (${n})`);
