@@ -1,6 +1,6 @@
-export function parseCsv(text) {
-  const rows = [];
-  let row = [];
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let field = '';
   let inQuotes = false;
 
