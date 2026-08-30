@@ -17,6 +17,11 @@ describe('shuffle', () => {
     expect(result).toEqual([2, 3, 4, 1]);
     expect(input).toEqual([1, 2, 3, 4]);
   });
+
+  it('uses an inclusive upper bound so every position can stay in place', () => {
+    const result = shuffle([1, 2, 3, 4], () => 0.999999);
+    expect(result).toEqual([1, 2, 3, 4]);
+  });
 });
 
 describe('pickRandomIndices', () => {
