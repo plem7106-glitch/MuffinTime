@@ -7,7 +7,7 @@ export interface RoomRow {
 }
 
 export async function fetchRoom(client: SupabaseClient, code: string): Promise<RoomRow> {
-  const { data, error } = await client.from('rooms').select('code, state, version').eq('code', code).single();
+  const { data, error } = await client.from('rooms').select('state, version').eq('code', code).single();
   if (error) throw new Error(`fetchRoom failed: ${error.message}`);
   return data as RoomRow;
 }

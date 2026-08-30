@@ -11,6 +11,8 @@ export interface PlayerState {
   skipNextTurn: boolean;
 }
 
+// No `log` field: the original design's Firebase sketch mentioned one, but no
+// engine function reads or writes it — add it when a real producer exists.
 export interface RoomState {
   status: 'lobby' | 'playing' | 'ended';
   hostId: PlayerId;
