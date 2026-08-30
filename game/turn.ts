@@ -1,6 +1,7 @@
-import { cloneState } from './util.js';
+import { cloneState } from './util';
+import type { RoomState, PlayerId } from './types';
 
-export function advanceTurn(state) {
+export function advanceTurn(state: RoomState): RoomState {
   const next = cloneState(state);
   const order = next.turnOrder;
   const count = order.length;
@@ -9,7 +10,7 @@ export function advanceTurn(state) {
   // attempts <= count is a defensive backstop; in practice the loop always exits via the
   // inner `break` once it revisits a player whose flag it already cleared this call.
   do {
-    index = ((index + next.direction) % count + count) % count;
+    index = (((index + next.direction) % count) + count) % count;
     attempts++;
     const playerId = order[index];
     if (next.players[playerId].skipNextTurn) {
@@ -22,11 +23,11 @@ export function advanceTurn(state) {
   return next;
 }
 
-export function isMuffinTimeEligible(state, playerId) {
+export function isMuffinTimeEligible(state: RoomState, playerId: PlayerId): boolean {
   return state.players[playerId].hand.length === state.muffinTimeTarget;
 }
 
-export function declareMuffinTime(state, playerId) {
+export function declareMuffinTime(state: RoomState, playerId: PlayerId): RoomState {
   if (!isMuffinTimeEligible(state, playerId)) {
     throw new Error('player does not have the target hand count');
   }
@@ -35,12 +36,12 @@ export function declareMuffinTime(state, playerId) {
   return next;
 }
 
-export function checkWinnerAtTurnStart(state, playerId) {
+export function checkWinnerAtTurnStart(state: RoomState, playerId: PlayerId): boolean {
   const player = state.players[playerId];
   return player.hasCalledMuffinTime && player.hand.length === state.muffinTimeTarget;
 }
 
-export function clearMuffinTimeDeclaration(state, playerId) {
+export function clearMuffinTimeDeclaration(state: RoomState, playerId: PlayerId): RoomState {
   const next = cloneState(state);
   next.players[playerId].hasCalledMuffinTime = false;
   return next;
