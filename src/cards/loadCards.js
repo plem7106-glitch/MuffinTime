@@ -29,8 +29,9 @@ function fallbackJsonToCards(json) {
 export async function loadCards({
   sheetUrl = DEFAULT_SHEET_CSV_URL,
   fallbackUrl = DEFAULT_FALLBACK_URL,
-  fetchImpl = fetch,
+  fetchImpl = (...args) => fetch(...args),
 } = {}) {
+  let sheetError;
   try {
     const res = await fetchImpl(sheetUrl);
     if (!res.ok) throw new Error(`sheet fetch failed with status ${res.status}`);
@@ -38,11 +39,19 @@ export async function loadCards({
     const cards = rowsToCards(parseCsv(text));
     if (cards.length === 0) throw new Error('sheet returned no cards');
     return { cards, source: 'sheet' };
-  } catch {
+  } catch (err) {
+    sheetError = err;
+  }
+  try {
     const res = await fetchImpl(fallbackUrl);
     if (!res.ok) throw new Error(`fallback fetch failed with status ${res.status}`);
     const json = await res.json();
     return { cards: fallbackJsonToCards(json), source: 'fallback' };
+  } catch (fallbackError) {
+    throw new Error(
+      `failed to load cards from sheet (${sheetError?.message}) and fallback (${fallbackError.message})`,
+      { cause: fallbackError }
+    );
   }
 }
 

@@ -51,6 +51,30 @@ describe('loadCards', () => {
     expect(source).toBe('fallback');
   });
 
+  it('falls back when the sheet CSV has a valid header but zero data rows', async () => {
+    const fallbackJson = {
+      action: [{ en: 'Alien Invasion', th: 'เอเลี่ยนบุก', effect: 'มอบการ์ดทั้งหมด', code: 'A02' }],
+      counter: [],
+      trap: [],
+    };
+    const fetchImpl = fakeFetch([
+      async () => ({ ok: true, status: 200, text: async () => 'type,name_en,name_th,effect_th,code\n' }),
+      async () => ({ ok: true, status: 200, json: async () => fallbackJson }),
+    ]);
+    const { source } = await loadCards({ fetchImpl });
+    expect(source).toBe('fallback');
+  });
+
+  it('throws an error mentioning both failures when the sheet and the fallback both fail', async () => {
+    const makeFetchImpl = () =>
+      fakeFetch([
+        async () => ({ ok: false, status: 503 }),
+        async () => ({ ok: false, status: 404 }),
+      ]);
+    await expect(loadCards({ fetchImpl: makeFetchImpl() })).rejects.toThrow(/503/);
+    await expect(loadCards({ fetchImpl: makeFetchImpl() })).rejects.toThrow(/404/);
+  });
+
   it('uses the real published sheet URL and local fallback URL by default', async () => {
     const seenUrls = [];
     const fetchImpl = async (url) => {
