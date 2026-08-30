@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { stealRandom, stealChosen, giveCard, swapHands } from './transfer.js';
+import { stealRandom, stealChosen, giveCard, swapHands } from './transfer';
+import type { RoomState } from './types';
 
-function baseState() {
+function baseState(): RoomState {
   return {
     players: {
       p1: { hand: ['A01', 'A02', 'A03'] },
       p2: { hand: ['B01'] },
     },
-  };
+  } as unknown as RoomState;
 }
 
 describe('stealRandom', () => {
