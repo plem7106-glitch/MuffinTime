@@ -52,6 +52,22 @@ describe('discard', () => {
     expect(next.players.p1.hand.length).toBe(1);
     expect(next.discardPile.length).toBe(2);
   });
+
+  it('does nothing when n is negative or zero', () => {
+    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02', 'A03', 'A04'] } } };
+    const next = discard(state, 'p1', -1, null, () => 0);
+    expect(next.players.p1.hand).toEqual(['A01', 'A02', 'A03', 'A04']);
+  });
+
+  it('throws when cardCodes length does not match n', () => {
+    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02', 'A03'] } } };
+    expect(() => discard(state, 'p1', 3, ['A01'])).toThrow();
+  });
+
+  it('throws when a card in cardCodes is not actually in the hand (e.g. a duplicate)', () => {
+    const state = { drawPile: [], discardPile: [], players: { p1: { hand: ['A01', 'A02'] } } };
+    expect(() => discard(state, 'p1', 2, ['A01', 'A01'])).toThrow();
+  });
 });
 
 describe('reshuffleDiscardIntoDraw', () => {

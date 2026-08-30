@@ -34,21 +34,26 @@ export function drawFromBottom(state, playerId, n) {
 }
 
 export function discard(state, playerId, n, cardCodes = null, rng = Math.random) {
+  if (n <= 0) return cloneState(state);
   const next = cloneState(state);
   const hand = next.players[playerId].hand;
   let toDiscard;
   if (cardCodes) {
-    toDiscard = cardCodes.slice(0, n);
+    if (cardCodes.length !== n) {
+      throw new Error(`discard: cardCodes length (${cardCodes.length}) does not match n (${n})`);
+    }
+    toDiscard = cardCodes;
   } else {
     const indices = pickRandomIndices(hand.length, Math.min(n, hand.length), rng);
     toDiscard = indices.map((i) => hand[i]);
   }
   for (const code of toDiscard) {
     const pos = hand.indexOf(code);
-    if (pos !== -1) {
-      hand.splice(pos, 1);
-      next.discardPile.push(code);
+    if (pos === -1) {
+      throw new Error(`discard: card ${code} not found in hand`);
     }
+    hand.splice(pos, 1);
+    next.discardPile.push(code);
   }
   return next;
 }
