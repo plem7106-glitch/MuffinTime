@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { everyoneDraws, everyoneDiscards, passHands } from './group.js';
+import { everyoneDraws, everyoneDiscards, passHands } from './group';
+import type { RoomState } from './types';
 
-function baseState() {
+function baseState(): RoomState {
   return {
     turnOrder: ['p1', 'p2', 'p3'],
     drawPile: ['A01', 'A02', 'A03', 'A04', 'A05', 'A06'],
@@ -11,7 +12,7 @@ function baseState() {
       p2: { hand: [] },
       p3: { hand: [] },
     },
-  };
+  } as unknown as RoomState;
 }
 
 describe('everyoneDraws', () => {

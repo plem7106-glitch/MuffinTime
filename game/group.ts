@@ -1,7 +1,13 @@
-import { cloneState } from './util.js';
-import { draw, discard } from './pile.js';
+import { cloneState } from './util';
+import { draw, discard } from './pile';
+import type { RoomState, PlayerId, Rng } from './types';
 
-export function everyoneDraws(state, n, excludeIds = [], rng = Math.random) {
+export function everyoneDraws(
+  state: RoomState,
+  n: number,
+  excludeIds: PlayerId[] = [],
+  rng: Rng = Math.random
+): RoomState {
   let next = cloneState(state);
   for (const playerId of Object.keys(next.players)) {
     if (excludeIds.includes(playerId)) continue;
@@ -10,7 +16,12 @@ export function everyoneDraws(state, n, excludeIds = [], rng = Math.random) {
   return next;
 }
 
-export function everyoneDiscards(state, n, excludeIds = [], rng = Math.random) {
+export function everyoneDiscards(
+  state: RoomState,
+  n: number,
+  excludeIds: PlayerId[] = [],
+  rng: Rng = Math.random
+): RoomState {
   let next = cloneState(state);
   for (const playerId of Object.keys(next.players)) {
     if (excludeIds.includes(playerId)) continue;
@@ -19,13 +30,13 @@ export function everyoneDiscards(state, n, excludeIds = [], rng = Math.random) {
   return next;
 }
 
-export function passHands(state, steps) {
+export function passHands(state: RoomState, steps: number): RoomState {
   const next = cloneState(state);
   const order = next.turnOrder;
   const count = order.length;
   const hands = order.map((id) => next.players[id].hand);
   for (let i = 0; i < count; i++) {
-    const targetIndex = (((i + steps) % count) + count) % count;
+    const targetIndex = ((i + steps) % count + count) % count;
     next.players[order[targetIndex]].hand = hands[i];
   }
   return next;
