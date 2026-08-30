@@ -125,12 +125,16 @@ Counter Card สามารถถูกเล่นระหว่างเท�
 ผู้เล่นแต่ละคนใช้โทรศัพท์มือถือของตัวเอง:
 
 
-Player A ──┐
-Player B ──┤
-Player C ──┼── Game Room
-Player D ──┘
+
 
 ___
+___
+___
+___
+
+
+
+
 # MUFFIN TIME [TH]
 
 Web-based multiplayer card game inspired by **Muffin Time**, designed for playing together with friends using individual mobile devices.
