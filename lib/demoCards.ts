@@ -62,7 +62,7 @@ export function resolveActionCard(
       return everyoneDiscards(state, 1, [actorId]);
     case 'A014':
       if (!targetId) throw new Error('A014 requires a target');
-      return stealRandom(state, targetId, actorId, 1);
+      return stealRandom(state, actorId, targetId, 1);
     case 'A016':
       if (!targetId) throw new Error('A016 requires a target');
       return discard(state, targetId, state.players[targetId].hand.length);

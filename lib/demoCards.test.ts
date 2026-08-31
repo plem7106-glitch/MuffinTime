@@ -74,10 +74,10 @@ describe('resolveActionCard', () => {
     expect(next.players['bot-1'].hand.length).toBe(1);
   });
 
-  it('A014 requires a target and steals 1 card from them to the actor', () => {
+  it('A014 requires a target and steals 1 card from the actor to them', () => {
     const next = resolveActionCard(baseState(), 'A014', 'me', 'bot-1');
-    expect(next.players.me.hand.length).toBe(3);
-    expect(next.players['bot-1'].hand.length).toBe(1);
+    expect(next.players.me.hand.length).toBe(1);
+    expect(next.players['bot-1'].hand.length).toBe(3);
   });
 
   it('A014 throws without a target', () => {
