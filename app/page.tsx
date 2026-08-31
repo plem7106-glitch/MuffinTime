@@ -39,7 +39,7 @@ export default function Home() {
         onClick={() => setShowHowToPlay(true)}
         className="mt-auto min-h-[44px] text-sm font-semibold text-ink-secondary underline"
       >
-        HOW TO PLAY
+        วิธีเล่น
       </button>
 
       <BottomSheet open={showHowToPlay} onClose={() => setShowHowToPlay(false)}>

@@ -15,7 +15,7 @@ export function RoomCard({ room }: { room: RoomSummary }) {
         href={`/join/${room.code}`}
         className="flex min-h-[44px] items-center rounded-card bg-primary px-4 font-bold text-white"
       >
-        JOIN
+        เข้าร่วม
       </Link>
     </div>
   );
