@@ -1159,7 +1159,7 @@ export function RoomCode({ code }: { code: string }) {
     <div className="flex items-center gap-2">
       <span className="text-sm text-ink-secondary">รหัสห้อง: {code}</span>
       <button onClick={handleCopy} className="text-sm font-semibold text-primary">
-        {copied ? 'คัดลอกแล้ว' : 'Copy'}
+        {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
       </button>
     </div>
   );
@@ -1295,7 +1295,7 @@ export function WaitingRoom() {
             เริ่มเกม
           </PrimaryButton>
         ) : (
-          <p className="text-center text-sm text-ink-secondary">รอ Host เริ่มเกม...</p>
+          <p className="text-center text-sm text-ink-secondary">รอเจ้าของห้องเริ่มเกม...</p>
         )}
         <SecondaryButton onClick={handleLeave}>ออกจากห้อง</SecondaryButton>
       </div>
