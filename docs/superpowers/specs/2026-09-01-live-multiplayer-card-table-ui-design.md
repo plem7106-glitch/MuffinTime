@@ -1,108 +1,139 @@
 # Live Multiplayer & Card Table UI — Design Spec
 
-วันที่: 2026-09-01
+วันที่: 2026-09-01 (แก้ไขระหว่างบทสนทนาหลัง pull โค้ดจาก origin)
 
 ## บริบท
 
-สเปกก่อนหน้า (`docs/superpowers/specs/2026-08-31-mobile-game-ui-demo-design.md`) สร้าง UI/UX ที่เล่นได้จริงทั้ง flow (Lobby → Create → Join → Waiting Room → Game Table → Game Over) แล้ว แต่ระบุไว้ชัดในขอบเขตว่า **ไม่ต่อ backend/Supabase/multiplayer จริง** — ทุกอย่างรันในเบราว์เซอร์เดียว ห้องเป็นของปลอมที่ seed ไว้ ผู้เล่นเป็น string `'me'` คงที่ ไม่มี persist ข้าม refresh
+สเปกก่อนหน้า (`docs/superpowers/specs/2026-08-31-mobile-game-ui-demo-design.md`) สร้าง UI/UX ที่เล่นได้จริงทั้ง flow แล้ว แต่ระบุไว้ชัดในขอบเขตว่า **ไม่ต่อ backend/Supabase/multiplayer จริง** — ทุกอย่างรันในเบราว์เซอร์เดียว ห้องเป็นของปลอมที่ seed ไว้ ผู้เล่นเป็น string `'me'` คงที่
 
-เจ้าของโปรเจกต์อยากให้เพื่อนจริงๆ สร้าง/เข้าร่วมห้องข้ามเครื่อง (คนละมือถือ) เล่นด้วยกันได้ โดยไม่ต้องมีระบบ login/account ที่รัดกุม เพราะเล่นกับเพื่อนสนิทที่ไว้ใจกันเท่านั้น และอยากปรับหน้าโต๊ะเกมให้ "เห็นการ์ดเหมือนถืออยู่ในมือจริง" แทนแถวเลื่อนเรียบๆ แบบเดิม
+เจ้าของโปรเจกต์อยากให้เพื่อนจริงๆ สร้าง/เข้าร่วมห้องข้ามเครื่องได้ และปรับหน้าโต๊ะเกมให้ "เห็นการ์ดเหมือนถืออยู่ในมือจริง"
 
-สเปกนี้คือ**การต่อสายไฟของที่มีอยู่แล้วเข้าด้วยกัน** เป็นหลัก ไม่ใช่สร้างระบบใหม่: `multiplayer/room.ts` (fetch/write ห้อง + retry เมื่อ version ชนกัน) และ `multiplayer/realtime.ts` (subscribe การเปลี่ยนแปลงสด) มีโค้ดและเทสอยู่แล้วครบ แต่ไม่มีที่ไหนในแอปเรียกใช้เลย — งานหลักคือเอา `lib/session.tsx` (ตัวขับ state ทั้งแอปตอนนี้) ไปผูกกับสองไฟล์นี้แทนที่ state ปลอมในเครื่อง บวกกับ redesign การ์ดในมือ/การ์ดคู่แข่งบนโต๊ะ
+**ระหว่างบทสนทนานี้เกิดสองเหตุการณ์ที่เปลี่ยนสเปกฉบับแรกไปมาก:**
 
-## การตัดสินใจหลักที่ตกลงกันไว้ (จากบทสนทนา brainstorm)
+1. `git pull` ดึงงานจาก origin เข้ามา 660 ไฟล์ (คนอื่นในทีมทำไว้) — หลายส่วนที่วางแผนไว้ถูกสร้างไปแล้วหรือถูกออกแบบใหม่ไปคนละทางแล้ว (ดูตารางสถานะด้านล่าง)
+2. ความต้องการเปลี่ยนจาก **"ไม่มี account เลย เก็บตัวตนแค่ใน localStorage"** เป็น **"สมัครสมาชิกจริง แล้ว login ข้ามเครื่องได้"** — เพราะอยากให้เพื่อนที่สมัครแล้วเข้าเล่นจากมือถือเครื่องไหนก็ได้แล้วยังเป็นคนเดิม
 
-- ไม่มีสิทธิ์ host พิเศษ (ปิดห้อง/เตะเพื่อนออก) — เรียบง่ายที่สุด ตรงกับกลุ่มเป้าหมายคือเพื่อนที่ไว้ใจกัน
-- คนหลุดกลางเกม/ปิดแท็บ → รอเฉยๆ ไม่มี kick อัตโนมัติ ไม่มีบอทสวมแทน ไม่มี timer — ไม่ต้องมีระบบ presence/heartbeat เพิ่ม
-- การ์ดในมือผู้เล่นเอง: ซ้อนเรียงแถวตรง (ไม่เอียงแบบพัดจริง) และแตะการ์ดเพื่อขยายดูรายละเอียด
-- การ์ดของเพื่อนคนอื่นบนโต๊ะ: โชว์เป็นพัดหลังไพ่เล็กๆ แทนตัวเลขล้วน
+สเปกนี้คือฉบับแก้ไขที่ตรงกับสถานะโค้ดจริงหลัง pull + ความต้องการ login จริง
 
-## ระบบห้อง/ตัวตนผู้เล่น ("login" แบบเบา ไม่มี account จริง)
+## สถานะปัจจุบันหลัง pull (ตรวจสอบแล้ว ก่อนวางแผนต่อ)
 
-### ตัวตนผู้เล่น — `multiplayer/player.ts` (ไฟล์ใหม่)
+| ส่วน | สถานะ |
+|---|---|
+| `lib/session.tsx` เชื่อมกับ Supabase จริง | **ยังไม่ทำ** — ยังเป็น local reducer ล้วน, `multiplayer/room.ts`/`realtime.ts` ยังไม่มีใครเรียกใช้ |
+| ตัวตนผู้เล่น (persist ข้ามเครื่อง) | **ยังไม่ทำ** — ผู้เล่นในเครื่องยังเป็น id `'me'` คงที่ ไม่มี auth ใดๆ |
+| `maxPlayers` บน `RoomState` | **ทำแล้วเต็มรูปแบบ** โดยทีมอื่น (`game/types.ts`, `game/room.ts` มี validate ครบ) — ไม่ต้องทำอะไรเพิ่ม |
+| `app/create/page.tsx`, `app/join/[code]/page.tsx` | ยังเรียก local reducer (`useGameSession()`) ล้วน ยังไม่มี network call |
+| การ์ดในมือ: แตะขยายดูรายละเอียด+ปุ่มเล่น | **มีอยู่แล้ว** ใน `components/room/HandTrayModal.tsx` (เปิดผ่านปุ่ม "ดูไพ่ในมือ" ที่แถบล่างของ `GameTable.tsx`) — เป็น panel ขยายในตัว ไม่ใช่ BottomSheet แต่ทำหน้าที่เดียวกัน |
+| มือไพ่ซ้อนทับกันแบบถือไพ่จริง | **ยังไม่ทำ** — แถวใน `HandTrayModal` ยังเรียงห่างกันเฉยๆ ไม่ซ้อน |
+| การ์ดเพื่อนคนอื่นบนโต๊ะ (พัดหลังไพ่) | **ยังไม่ทำ** — `components/room/PlayerDensityGrid.tsx` (ตัวที่ใช้งานจริงตอนนี้) โชว์แค่ badge ตัวเลข |
+| ภาพประกอบการ์ดจริง | **มีแล้ว** — `public/cards/{action,trap,counter}/{code}.jpg` ครบ 231 ใบ, `components/card/Card.tsx` render จริงผ่าน `<img>` |
+| `components/card/CardHand.tsx`, `components/room/PlayerCard.tsx` | **dead code** ไม่มีใครเรียกใช้แล้ว (ถูกแทนที่ด้วย `HandTrayModal`/`PlayerDensityGrid`) |
 
+## การตัดสินใจหลักที่ตกลงกันไว้ (อัปเดตล่าสุด)
+
+- **Login จริงผ่าน Supabase Auth แบบ Magic Link ทางอีเมล** — ไม่เขียนระบบ auth เอง ใช้ของที่มากับ `@supabase/supabase-js` อยู่แล้ว
+- ไม่มีสิทธิ์ host พิเศษ (ปิดห้อง/เตะเพื่อนออก) — เรียบง่ายที่สุด
+- คนหลุดกลางเกม/ปิดแท็บ → รอเฉยๆ ไม่มี kick/bot สวมแทน/timer
+- **มือไพ่ผู้เล่นเอง: ต่อยอดของเดิม (`HandTrayModal`) ไม่รื้อโครงสร้าง** — แค่เพิ่มการซ้อนทับกันในแถวการ์ด (ปุ่ม "ดูไพ่ในมือ" + panel แตะขยายดู ที่มีอยู่แล้วใช้ต่อได้เลย)
+- การ์ดของเพื่อนคนอื่นบนโต๊ะ: โชว์เป็นพัดหลังไพ่เล็กๆ แทน badge ตัวเลขล้วนใน `PlayerDensityGrid.tsx`
+
+## ระบบ Login จริง — Supabase Auth (Magic Link)
+
+### ทำไมเลือกทางนี้
+
+`@supabase/supabase-js` มี `.auth` ในตัวอยู่แล้ว (สมัคร/login/เก็บ session ให้อัตโนมัติผ่าน localStorage โดยไลบรารีเอง ไม่ต้องเขียนเพิ่ม) — ไม่ต้องทำตารางผู้ใช้เอง ไม่ต้อง hash รหัสผ่านเอง ไม่ต้องเพิ่ม dependency ใหม่ Magic Link ไม่ต้องให้เพื่อนจำรหัสผ่าน เหมาะกับกลุ่มเพื่อนที่ไม่ได้อยากตั้งรหัสผ่านจริงจัง
+
+### หน้าจอ Login (ใหม่) — `app/login/page.tsx`
+
+ฟอร์มเดียว: อีเมล + ชื่อที่จะโชว์ในเกม → กด "ส่งลิงก์เข้าสู่ระบบ" →
 ```ts
-interface LocalPlayer {
-  id: string;   // crypto.randomUUID()
-  name: string;
-}
-
-function getOrCreatePlayer(): LocalPlayer
-function savePlayerName(name: string): void
-function rememberActiveRoom(code: string): void
-function getActiveRoom(): string | null   // สำหรับ auto-rejoin
-function clearActiveRoom(): void
+supabase.auth.signInWithOtp({
+  email,
+  options: {
+    emailRedirectTo: `${window.location.origin}/`,
+    data: { name },   // ติดไปกับ user_metadata ตอนสมัครครั้งแรก ไม่ต้องมีตาราง profile แยก
+  },
+});
 ```
+เพื่อนกดลิงก์ในอีเมล → Supabase สร้าง session ให้อัตโนมัติ (supabase-js อ่าน token จาก URL เองตอนโหลดหน้า ไม่ต้องเขียน callback route แยก) → พากลับมาหน้าแรก ล็อกอินค้างไว้ในเครื่องนั้นจนกว่าจะ logout
 
-เก็บทุกอย่างใน localStorage ของเครื่อง/เบราว์เซอร์นั้น ไม่มีตาราง user แยกฝั่ง Supabase — ข้อมูลผู้เล่นอยู่แค่ใน `state.players` ของห้องนั้นๆ ชั่วคราวเท่านั้น ตรงกับที่ต้องการ "ไม่เก็บข้อมูลเยอะ"
+**ใช้ id เดียวกันได้ทุกเครื่อง** เพราะ `user.id` มาจาก Supabase Auth ผูกกับอีเมล ไม่ใช่สุ่มต่อเครื่องแบบเดิม — login เครื่องไหนก็ได้ id เดิม ชื่อเดิม (จาก `user_metadata.name`)
 
-### เพิ่ม `maxPlayers` เข้า `RoomState` (ของเดิมยังไม่มี)
+### `lib/auth.tsx` (ไฟล์ใหม่) — AuthProvider
 
-`game/types.ts` เดิมไม่เก็บ `maxPlayers` ไว้ใน state — ตอน demo เก็บค่านี้แยกไว้ใน local session object ได้เพราะทุกอย่างอยู่ในเครื่องเดียวกันอยู่แล้ว พอเป็น multiplayer ข้ามเครื่องจริง ผู้เล่นที่กำลังจะ join ต้องรู้ค่านี้จากห้องที่ตัวเองยังไม่เคย join (เพื่อโชว์ "3/5 คน" ในหน้า join และเช็คห้องเต็มไหมก่อนปล่อยให้เข้า) จึงต้องเป็นส่วนหนึ่งของ `state` ที่ sync ผ่าน Supabase ไปด้วย
+แยกความรับผิดชอบออกจาก `lib/session.tsx` (เรื่อง auth คนละเรื่องกับเรื่องห้อง/เกม):
+```ts
+interface AuthValue {
+  user: { id: string; name: string; email: string } | null;
+  loading: boolean;
+  signOut: () => void;
+}
+```
+ใช้ `supabase.auth.getSession()` ตอน mount + subscribe `onAuthStateChange` ห่อทั้งแอปใน `app/layout.tsx` เหนือ `GameSessionProvider`
 
-การเปลี่ยนแปลง: เพิ่มฟิลด์ `maxPlayers: number` ใน `RoomState`, ให้ `createRoom()` (`game/room.ts`) รับพารามิเตอร์นี้เพิ่ม — เป็นการเปลี่ยน engine เล็กที่สุดเท่าที่จำเป็น เทสเดิมใน `game/room.test.ts` ต้องอัปเดตให้ส่งพารามิเตอร์ใหม่ครบ
+หน้าที่ต้อง login ก่อนถึงเข้าได้ (`/create`, `/join/[code]`, `/room/[code]`) เช็ค `useAuth().user` — ถ้า `null` และโหลดเสร็จแล้ว → redirect ไป `/login`
 
-### สร้างห้อง
+### ผลกับ `lib/session.tsx`
 
-1. `getOrCreatePlayer()` → ได้ id + name (ถามชื่อถ้ายังไม่เคยตั้ง)
-2. สุ่มรหัสห้อง 4 ตัวอักษร จาก charset ตัดตัวกำกวมออก: `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (ไม่มี `0/O`, `1/I`)
-3. `createRoom(hostId, hostName, maxPlayers)` (`game/room.ts`) สร้าง `RoomState` เริ่มต้น
-4. insert แถวใหม่ที่ตาราง `rooms` (`code`, `state`, `version: 0`) — ถ้าเจอ unique violation (รหัสชนพอดี) สุ่มรหัสใหม่แล้วลองซ้ำ (ไม่กี่ครั้งพอ เพราะ collision ของ 4 ตัวอักษร 32 ตัวเลือก ~1 ล้านค่า แทบไม่ชนกัน)
-5. `rememberActiveRoom(code)` แล้วพาไป `/room/[code]`
+`myPlayerId` และชื่อผู้เล่น อ่านจาก `useAuth().user` แทนการรับ input ชื่อจากฟอร์ม create/join เอง (ฟอร์ม create/join ไม่ต้องมีช่องกรอกชื่ออีกต่อไป เพราะรู้ชื่ออยู่แล้วจาก session)
 
-### Join ห้อง
+### สิ่งที่ต้องตั้งค่าฝั่ง Supabase Dashboard (ไม่ใช่โค้ด — เช็คลิสต์ให้ผู้ใช้ทำเอง)
 
-1. รับรหัสห้อง — พิมพ์เอง หรือกดลิงก์ `/join/[code]` ที่แชร์กันในแชทเพื่อน (route นี้มีอยู่แล้ว)
-2. `fetchRoom(client, code)` (มีอยู่แล้วใน `multiplayer/room.ts`) — ถ้าไม่เจอห้อง, status ไม่ใช่ `'lobby'`, หรือ `players` เต็ม `maxPlayers` แล้ว → โชว์ error ที่หน้าจอ ไม่ให้เข้า
-3. `addPlayer(state, id, name)` (มีอยู่แล้วใน `game/room.ts`) แล้วเขียนกลับด้วย `updateRoomWithRetry` (มีอยู่แล้ว)
-4. `rememberActiveRoom(code)` แล้วพาไป `/room/[code]`
+- เปิด Email provider ใน Authentication settings (ปกติเปิดอยู่แล้วโดย default สำหรับโปรเจกต์ใหม่)
+- เพิ่ม URL ของแอป (เช่น `http://localhost:3000/`, โดเมนจริงตอน deploy) เข้า **Redirect URLs allowlist** ไม่งั้นลิงก์ magic link จะถูกปฏิเสธ
 
-### Auto-rejoin
+### RLS ของตาราง `rooms` — เพิ่มการเช็คว่า login แล้ว (เล็กน้อย ไม่ใช่ของใหม่ทั้งชุด)
 
-ตอนเข้า `/room/[code]` เช็ค `getActiveRoom()` ก่อน — ถ้ามีค่าและตรงกับ code ปัจจุบัน ให้ fetch + subscribe ห้องนั้นต่อได้เลย ไม่ต้อง join ซ้ำ (id เดิมยังอยู่ใน `state.players` เพราะไม่มีระบบเตะออก) เคสนี้ครอบคลุมทั้งรีเฟรชหน้าและปิดแท็บแล้วเปิดใหม่
+Migration เดิม (`0001_create_rooms.sql`) เปิดกว้างให้ใครก็ได้อ่าน/เขียนได้แม้ไม่ login (`using (true)`) — ตอนนี้มีระบบ login จริงแล้ว ปรับให้ต้อง login ก่อนแตะตารางนี้ได้ (migration ใหม่เล็กๆ `0002_require_auth_for_rooms.sql`):
+```sql
+drop policy "anyone can read rooms" on rooms;
+drop policy "anyone can insert rooms" on rooms;
+drop policy "anyone can update rooms" on rooms;
 
-### ปิดบอทเติมอัตโนมัติในโหมดจริง
-
-`WaitingRoom.tsx` เดิมเติมบอทให้อัตโนมัติถ้าห้องว่างเกิน 900ms (ออกแบบมาให้ demo เดี่ยวเล่นได้) — ปิดพฤติกรรมนี้เมื่อรันโหมด multiplayer จริง เพราะเป้าหมายคือรอเพื่อนจริงมาเข้าห้องเอง (โค้ดบอทใน `lib/botTurn.ts` ไม่ลบ เก็บไว้เผื่อใช้ภายหลัง)
+create policy "authenticated can read rooms" on rooms for select using (auth.uid() is not null);
+create policy "authenticated can insert rooms" on rooms for insert with check (auth.uid() is not null);
+create policy "authenticated can update rooms" on rooms for update using (auth.uid() is not null) with check (auth.uid() is not null);
+```
+ยังไม่ต้องเช็คว่า "เป็นคนในห้องนั้นจริงไหม" (ซับซ้อนเกินความจำเป็นสำหรับกลุ่มเพื่อน — รู้รหัสห้อง 4 ตัวก็เข้าได้เหมือนเดิม แค่ต้อง login ก่อน)
 
 ## เชื่อม `lib/session.tsx` เข้ากับ Supabase จริง
 
 แทนที่ reducer/state ปลอมเดิมด้วย hook ที่:
 
-- โหลด initial state ด้วย `fetchRoom`
-- subscribe การเปลี่ยนแปลงสดด้วย `subscribeToRoom` (มีอยู่แล้ว) → เซ็ต state ใหม่ทุกครั้งที่มีใครเขียนสำเร็จ (รวมตัวเอง) — ไม่ทำ optimistic local update เพิ่มความซับซ้อน ตรงกับสถาปัตยกรรมที่ออกแบบไว้แล้วในสเปกฐานราก ("apply state ทั้งก้อนจาก server เสมอ ไม่ merge เอง")
+- โหลด initial state ด้วย `fetchRoom` (`multiplayer/room.ts` มีอยู่แล้ว)
+- subscribe การเปลี่ยนแปลงสดด้วย `subscribeToRoom` (`multiplayer/realtime.ts` มีอยู่แล้ว) → เซ็ต state ใหม่ทุกครั้งที่มีใครเขียนสำเร็จ (รวมตัวเอง) — ไม่ทำ optimistic local update เพิ่มความซับซ้อน
 - action ทุกตัว (draw/discard/playCard/startGame/placeTrap/...) คำนวณ state ใหม่ด้วยฟังก์ชันจาก `game/*.ts` เดิม (ไม่แก้ engine logic) แล้วเขียนกลับด้วย `updateRoomWithRetry`
 - unsubscribe ตอน unmount
 
 Component ที่ใช้ context เดิม (`WaitingRoom`, `GameTable`, ฯลฯ) ไม่ต้องแก้โครงสร้าง เพราะ shape ของ context ที่ expose ออกไปคงเดิม เปลี่ยนแค่ข้างในจาก in-memory → Supabase
 
-## การ์ดในมือผู้เล่นเอง — ซ้อนเรียงแถวตรง + แตะขยายดู
+สร้างห้อง/join ห้อง ใช้รหัสห้อง 4 ตัว + insert/fetch แถวจริงในตาราง `rooms` ตามที่ออกแบบไว้เดิม (สุ่มรหัสจาก charset ตัดตัวกำกวม, retry ถ้าชนกัน) — ต่างจากฉบับแรกแค่ตรงที่ id/ชื่อผู้เล่นมาจาก `useAuth()` แทน localStorage ที่สร้างเอง
 
-`CardHand.tsx`: การ์ดซ้อนทับกันซ้าย→ขวา (margin ติดลบ ~1/3 ความกว้างการ์ด), z-index ไล่ตามลำดับ (ใบขวาทับใบซ้าย), ยังคง `overflow-x-auto` ไว้เผื่อมือเต็ม 10 ใบตอนใกล้ชนะ
+`WaitingRoom.tsx` เดิมเติมบอทอัตโนมัติถ้าห้องว่างเกิน 900ms — ปิดพฤติกรรมนี้ในโหมดจริง (โค้ดบอทไม่ลบ เก็บไว้เผื่อใช้ภายหลัง)
 
-แตะการ์ดใดในมือ → เปิด **BottomSheet เดิม** (reuse `components/ui/BottomSheet.tsx` ไม่สร้างใหม่) โชว์:
+## มือไพ่ผู้เล่นเอง — ต่อยอด `HandTrayModal` ที่มีอยู่แล้ว
 
-- แถบสีตามประเภท (Action/Counter/Trap — ใช้โทนสีเดิมจาก `@theme` ใน `app/globals.css`)
-- ชื่อไทยเต็ม + ข้อความเอฟเฟกต์เต็ม (ตัวใหญ่กว่าตอนซ้อนแถวมาก อ่านง่าย — แก้ปัญหาที่การ์ดซ้อนแถวเห็นแค่เสี้ยวเดียว)
-- ปุ่มหลัก: "เล่นการ์ดนี้" หรือ "วางเป็นกับดัก" (ตามประเภท) → เข้า flow เดิม (ActionModal/TargetSelector/TrapModal) ถ้าการ์ดต้องเลือกเป้าหมาย
-- ปิด (แตะข้างนอก/ลากลง) = ดูเฉยๆ ไม่เล่นการ์ด
+ไม่รื้อ ไม่สร้างใหม่ — แก้แค่ CSS ของแถวการ์ดใน `HandTrayModal.tsx`: จากเรียงห่างกัน → ซ้อนทับกันซ้าย→ขวา (margin ติดลบ ~1/3 ความกว้างการ์ด, z-index ไล่ตามลำดับ) การ์ดที่แตะเลือก (`selectedCode`) ยกขึ้น + ยกระดับ z-index เหนือใบข้างๆ ให้เห็นชัดว่าใบไหนถูกเลือกอยู่ (ของเดิมมี state `selectedCode` + panel รายละเอียดอยู่แล้ว ไม่ต้องแก้ logic ส่วนนั้น)
 
-ยุบขั้นตอนเดิม (แตะเลือก+ยกใบ แล้วกดปุ่มเล่นแยกที่ `BottomActionBar`) เหลือขั้นตอนเดียว: แตะ → เห็นเต็ม → ตัดสินใจเล่นหรือปิด
+## การ์ดของเพื่อนคนอื่น — พัดหลังไพ่ใน `PlayerDensityGrid.tsx`
 
-## การ์ดของเพื่อนคนอื่น — พัดหลังไพ่
+เพิ่มพัดหลังไพ่จิ๋ว (การ์ดหลังไพ่สีเรียบ ไม่มีลาย) ซ้อนกันโค้งเล็กๆ ข้าง/แทน badge ตัวเลขปัจจุบัน จำกัดโชว์สูงสุด ~5 ใบ ถ้ามากกว่านั้นโชว์ตัวเลขต่อท้าย (เช่น "🂠🂠🂠🂠🂠 +3") ยังคง badge ตัวเลข `CardsIcon`/`TrapIcon` เดิมไว้คู่กัน เพราะผู้เล่นต้องรู้เลขจริงเพื่อประเมินว่าใครใกล้ Muffin Time
 
-`PlayerCard.tsx`: เพิ่มพัดหลังไพ่จิ๋ว (การ์ดหลังไพ่แบบเรียบสีเดียว ไม่มีลาย เพราะยังไม่มีภาพประกอบตามสเปกเดิม) ซ้อนกันโค้งเล็กๆ ข้างชื่อผู้เล่น จำกัดโชว์สูงสุด ~5 ใบ ถ้ามือมากกว่านั้นให้โชว์ตัวเลขต่อท้าย (เช่น "🂠🂠🂠🂠🂠 +3") ยังคงข้อความจำนวนที่แน่นอนไว้คู่กัน ("N ใบ | กับดัก N ใบ") เพราะผู้เล่นต้องรู้เลขจริงเพื่อประเมินว่าใครใกล้ Muffin Time
+## Cleanup เล็กน้อย (ไม่บังคับ แต่ทำง่ายระหว่างนี้)
+
+`components/card/CardHand.tsx` และ `components/room/PlayerCard.tsx` เป็น dead code (ไม่มีใครเรียกใช้แล้วหลัง merge) — ลบทิ้งได้เพื่อลดความสับสนว่าไฟล์ไหนคือของจริงที่ใช้งานอยู่
 
 ## Testing
 
-- Logic ใหม่ที่เป็น pure function (`multiplayer/player.ts`, ตัวสุ่มรหัสห้อง, การเพิ่ม `maxPlayers` ใน `game/room.ts`) เขียน Vitest unit test ตามธรรมเนียมโปรเจกต์เดิม
-- Multiplayer จริงทดสอบด้วยการเล่นข้ามอุปกรณ์/แท็บจริง (สร้างห้องจากแท็บหนึ่ง join จากอีกแท็บ/เครื่องหนึ่ง เล่นจนจบเทิร์นสองสามรอบ เช็คว่า state sync ตรงกันทั้งสองฝั่ง) — ไม่ทำ automated e2e ตรงตามแนวทางเดิมของโปรเจกต์
+- Logic ใหม่ที่เป็น pure function (`lib/auth.tsx` ส่วนที่ไม่ผูก React, ตัวสุ่มรหัสห้อง) เขียน Vitest unit test ตามธรรมเนียมโปรเจกต์เดิม
+- Multiplayer จริงทดสอบด้วยการเล่นข้ามอุปกรณ์/แท็บจริง (สมัคร/login สองอีเมลต่างกัน หรือสองแท็บ incognito, สร้างห้องจากฝั่งหนึ่ง join จากอีกฝั่ง เล่นจนจบเทิร์นสองสามรอบ เช็คว่า state sync ตรงกัน) — ไม่ทำ automated e2e ตรงตามแนวทางเดิมของโปรเจกต์
 
 ## ขอบเขต (ไม่รวมในสเปกนี้)
 
-- Presence/heartbeat tracking (รู้ว่าใครออนไลน์อยู่จริง) — ตามที่ตกลงว่าคนหลุดก็รอเฉยๆ ไม่ต้องมีระบบนี้
+- Presence/heartbeat tracking — คนหลุดก็รอเฉยๆ ตามที่ตกลงไว้
 - สิทธิ์ host พิเศษ (เตะผู้เล่น/ปิดห้อง)
-- ระบบลบห้องเก่าอัตโนมัติ — ห้องจะค้างอยู่ในตาราง `rooms` ไปเรื่อยๆ ไม่กระทบผู้ใช้ในระยะสั้น ทำเพิ่มทีหลังถ้าห้องเยอะจนเป็นปัญหาจริง
-- ภาพประกอบการ์ด/ลวดลายหลังไพ่ (ยังใช้ placeholder สีเรียบตามสเปกเดิม)
-- การจับคู่ primitive ให้ครบทั้ง 231 ใบ (งานแยกต่างหาก ยังไม่เริ่ม ตามที่ระบุไว้แล้วในสเปกก่อนหน้า)
-- อัปเดต `CLAUDE.md` ส่วน "Project status" ที่ล้าสมัย (ควรทำเป็น commit เล็กแยกต่างหากระหว่างพัฒนา ไม่ใช่ส่วนของดีไซน์นี้)
+- ระบบลบห้องเก่าอัตโนมัติ — ห้องจะค้างอยู่ในตาราง `rooms` ไปเรื่อยๆ ทำเพิ่มทีหลังถ้าเป็นปัญหาจริง
+- เช็คสิทธิ์ระดับ "ต้องเป็นคนในห้องนั้นเท่านั้นถึงจะอ่าน/เขียนได้" ใน RLS — ตอนนี้แค่ต้อง login เฉยๆ พอ
+- OAuth (Google/Facebook login) หรือ email+password — เลือก Magic Link อย่างเดียวตามที่ตกลงไว้
+- การจับคู่ primitive ให้ครบทั้ง 231 ใบ (งานแยกต่างหาก)
+- อัปเดต `CLAUDE.md` ส่วน "Project status" ที่ล้าสมัย (ทำเป็น commit เล็กแยกได้ระหว่างพัฒนา)
