@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #ED1F4F;
+  --color-action: #1769C2;
+  --color-trap: #E52B35;
+  --color-counter: #2FA35A;
+  --color-app-bg: #F7F7F5;
+  --color-card: #FFFFFF;
+  --color-ink: #171717;
+  --color-ink-secondary: #6B6B6B;
+  --radius-card: 14px;
+}
+
+body {
+  background-color: var(--color-app-bg);
+  color: var(--color-ink);
+}
