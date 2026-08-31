@@ -19,7 +19,7 @@ export function PlayerList({
         <div key={id} className="flex items-center gap-2 rounded-card border border-ink/10 bg-card p-2">
           <PlayerAvatar name={players[id].name} size={32} />
           <span className="font-semibold text-ink">{players[id].name}</span>
-          {id === hostId && <span title="Host">👑</span>}
+          {id === hostId && <span title="เจ้าของห้อง">👑</span>}
         </div>
       ))}
       {Array.from({ length: emptySlots }).map((_, i) => (
