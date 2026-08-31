@@ -1,8 +1,8 @@
 import { CardGalleryView } from '../../components/card/CardGalleryView';
 
 export const metadata = {
-  title: 'คลังการ์ดทั้งหมด | Muffin Time',
-  description: 'รวมรายชื่อและการ์ดทั้งหมด 231 ใบในเกม Muffin Time',
+  title: 'คลังการ์ดทั้งหมด | MUFFIN TIME',
+  description: 'รวมรายชื่อและการ์ดทั้งหมด 231 ใบในเกม MUFFIN TIME',
 };
 
 export default function CardsPage() {

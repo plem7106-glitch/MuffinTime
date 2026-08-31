@@ -2,7 +2,7 @@ import { CardGalleryView } from '../../../components/card/CardGalleryView';
 import { counterCards } from '../../../data/cards/index';
 
 export const metadata = {
-  title: 'COUNTER CARDS | Muffin Time',
+  title: 'COUNTER CARDS | MUFFIN TIME',
   description: 'รวมการ์ดตอบโต้ (Counter Cards) ทั้งหมด 40 ใบ',
 };
 

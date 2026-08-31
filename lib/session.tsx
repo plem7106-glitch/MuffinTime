@@ -1,11 +1,18 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from 'react';
-import { createRoom as engineCreateRoom, addPlayer, startGame as engineStartGame } from '../game/room';
+import {
+  createRoom as engineCreateRoom,
+  addPlayer,
+  startGame as engineStartGame,
+  startSetup as engineStartSetup,
+  updateSeatOrder as engineUpdateSeatOrder,
+  updatePlayDirection as engineUpdatePlayDirection,
+} from '../game/room';
 import { draw, discard } from '../game/pile';
 import { placeTrap as enginePlaceTrap, removeTrap } from '../game/trap';
 import { advanceTurn, checkWinnerAtTurnStart, declareMuffinTime as engineDeclareMuffinTime } from '../game/turn';
-import type { RoomState, PlayerId, CardCode } from '../game/types';
+import type { RoomState, PlayerId, CardCode, PlayDirection } from '../game/types';
 import { buildDemoDeck, demoCardsOfType, resolveActionCard, resolveTrapCard, resolveCounterCard } from './demoCards';
 import { decideBotTurn } from './botTurn';
 
@@ -52,6 +59,10 @@ type Action =
   | { type: 'JOIN_ROOM'; code: string; name: string }
   | { type: 'JOIN_BOT' }
   | { type: 'LEAVE_ROOM' }
+  | { type: 'START_SETUP' }
+  | { type: 'SET_SEAT_ORDER'; seatOrder: PlayerId[] }
+  | { type: 'SET_PLAY_DIRECTION'; direction: PlayDirection }
+  | { type: 'CONFIRM_TURN_ORDER' }
   | { type: 'START_GAME' }
   | { type: 'DRAW_CARD' }
   | { type: 'PLAY_ACTION'; code: CardCode; targetId?: PlayerId }
@@ -154,6 +165,26 @@ function reducer(state: SessionState, action: Action): SessionState {
     }
     case 'LEAVE_ROOM':
       return { ...state, activeRoom: null, myPlayerId: null, pendingResponse: null };
+    case 'START_SETUP': {
+      if (!state.activeRoom) return state;
+      const next = engineStartSetup(state.activeRoom.state);
+      return { ...state, activeRoom: { ...state.activeRoom, state: next } };
+    }
+    case 'SET_SEAT_ORDER': {
+      if (!state.activeRoom) return state;
+      const next = engineUpdateSeatOrder(state.activeRoom.state, action.seatOrder);
+      return { ...state, activeRoom: { ...state.activeRoom, state: next } };
+    }
+    case 'SET_PLAY_DIRECTION': {
+      if (!state.activeRoom) return state;
+      const next = engineUpdatePlayDirection(state.activeRoom.state, action.direction);
+      return { ...state, activeRoom: { ...state.activeRoom, state: next } };
+    }
+    case 'CONFIRM_TURN_ORDER': {
+      if (!state.activeRoom) return state;
+      const next = engineStartGame(state.activeRoom.state, buildDemoDeck());
+      return { ...state, activeRoom: { ...state.activeRoom, state: next } };
+    }
     case 'START_GAME': {
       if (!state.activeRoom) return state;
       const next = engineStartGame(state.activeRoom.state, buildDemoDeck());
@@ -253,9 +284,13 @@ function reducer(state: SessionState, action: Action): SessionState {
           { ...p, hand: [], traps: [], hasCalledMuffinTime: false, skipNextTurn: false },
         ])
       );
+      const playerIds = Object.keys(room.players);
       const resetRoom: RoomState = {
         ...room,
         status: 'lobby',
+        joinOrder: [...playerIds],
+        seatOrder: [...playerIds],
+        playDirection: 'clockwise',
         turnOrder: [],
         currentTurnIndex: 0,
         direction: 1,
@@ -275,7 +310,7 @@ function reducer(state: SessionState, action: Action): SessionState {
   }
 }
 
-interface GameSessionValue {
+export interface GameSessionValue {
   rooms: RoomSummary[];
   activeRoom: ActiveRoom | null;
   myPlayerId: PlayerId | null;
@@ -286,6 +321,10 @@ interface GameSessionValue {
   joinRoom: (code: string, name: string) => void;
   joinNextBot: () => void;
   leaveRoom: () => void;
+  startSetup: () => void;
+  setSeatOrder: (seatOrder: PlayerId[]) => void;
+  setPlayDirection: (direction: PlayDirection) => void;
+  confirmTurnOrder: () => void;
   startGame: () => void;
   drawCard: () => void;
   playAction: (code: CardCode, targetId?: PlayerId) => void;
@@ -318,6 +357,16 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   }, []);
   const joinNextBot = useCallback(() => dispatch({ type: 'JOIN_BOT' }), []);
   const leaveRoom = useCallback(() => dispatch({ type: 'LEAVE_ROOM' }), []);
+  const startSetupFn = useCallback(() => dispatch({ type: 'START_SETUP' }), []);
+  const setSeatOrderFn = useCallback(
+    (seatOrder: PlayerId[]) => dispatch({ type: 'SET_SEAT_ORDER', seatOrder }),
+    []
+  );
+  const setPlayDirectionFn = useCallback(
+    (direction: PlayDirection) => dispatch({ type: 'SET_PLAY_DIRECTION', direction }),
+    []
+  );
+  const confirmTurnOrderFn = useCallback(() => dispatch({ type: 'CONFIRM_TURN_ORDER' }), []);
   const startGameFn = useCallback(() => dispatch({ type: 'START_GAME' }), []);
   const drawCard = useCallback(() => dispatch({ type: 'DRAW_CARD' }), []);
   const playAction = useCallback(
@@ -370,6 +419,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     joinRoom: joinRoomFn,
     joinNextBot,
     leaveRoom,
+    startSetup: startSetupFn,
+    setSeatOrder: setSeatOrderFn,
+    setPlayDirection: setPlayDirectionFn,
+    confirmTurnOrder: confirmTurnOrderFn,
     startGame: startGameFn,
     drawCard,
     playAction,
@@ -389,3 +442,4 @@ export function useGameSession(): GameSessionValue {
   if (!ctx) throw new Error('useGameSession must be used within GameSessionProvider');
   return ctx;
 }
+

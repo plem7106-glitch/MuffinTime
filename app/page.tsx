@@ -6,6 +6,7 @@ import { useGameSession } from '../lib/session';
 import { RoomCard } from '../components/lobby/RoomCard';
 import { GameBenefits } from '../components/lobby/GameBenefits';
 import { JoinRoomModal } from '../components/lobby/JoinRoomModal';
+import { useAudio } from '../lib/audio';
 import {
   MenuIcon,
   PlusIcon,
@@ -13,10 +14,16 @@ import {
   BookOpenIcon,
   ChevronRightIcon,
   CardsIcon,
+  EnterDoorIcon,
+  MusicIcon,
+  MusicOffIcon,
+  VolumeIcon,
+  VolumeOffIcon,
 } from '../components/ui/Icons';
 
 export default function Home() {
   const { rooms } = useGameSession();
+  const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx } = useAudio();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
@@ -51,13 +58,13 @@ export default function Home() {
 
           {/* Quick Dropdown Menu */}
           {isMenuOpen && (
-            <div className="absolute right-0 top-11 z-50 flex w-48 flex-col gap-1 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute right-0 top-11 z-50 flex w-52 flex-col gap-1 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
               <Link
                 href="/create"
                 onClick={() => setIsMenuOpen(false)}
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-primary/10 hover:text-primary transition-colors"
               >
-                <PlusIcon className="h-4 w-4" />
+                <PlusIcon className="h-4 w-4 text-primary" />
                 <span>สร้างห้องใหม่</span>
               </Link>
               <button
@@ -68,7 +75,7 @@ export default function Home() {
                 }}
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-primary/10 hover:text-primary transition-colors w-full text-left"
               >
-                <span className="text-sm">🚪</span>
+                <EnterDoorIcon className="h-4 w-4 text-primary" />
                 <span>เข้าร่วมห้อง</span>
               </button>
               <Link
@@ -76,7 +83,7 @@ export default function Home() {
                 onClick={() => setIsMenuOpen(false)}
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-primary/10 hover:text-primary transition-colors"
               >
-                <BookOpenIcon className="h-4 w-4" />
+                <BookOpenIcon className="h-4 w-4 text-primary" />
                 <span>วิธีเล่นเกม</span>
               </Link>
               <Link
@@ -84,9 +91,54 @@ export default function Home() {
                 onClick={() => setIsMenuOpen(false)}
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-primary/10 hover:text-primary transition-colors"
               >
-                <CardsIcon className="h-4 w-4" />
+                <CardsIcon className="h-4 w-4 text-primary" />
                 <span>คลังการ์ด 231 ใบ</span>
               </Link>
+
+              {/* Audio Controls Section */}
+              <div className="my-1 border-t border-gray-100" />
+              <button
+                type="button"
+                onClick={toggleMusic}
+                className="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-gray-50 transition-colors w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  {isMusicEnabled ? (
+                    <MusicIcon className="h-4 w-4 text-primary" />
+                  ) : (
+                    <MusicOffIcon className="h-4 w-4 text-gray-400" />
+                  )}
+                  <span>เพลงประกอบ</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isMusicEnabled ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {isMusicEnabled ? 'เปิด' : 'ปิด'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={toggleSfx}
+                className="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-gray-50 transition-colors w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  {isSfxEnabled ? (
+                    <VolumeIcon className="h-4 w-4 text-primary" />
+                  ) : (
+                    <VolumeOffIcon className="h-4 w-4 text-gray-400" />
+                  )}
+                  <span>เสียงเอฟเฟกต์</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isSfxEnabled ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {isSfxEnabled ? 'เปิด' : 'ปิด'}
+                </span>
+              </button>
             </div>
           )}
         </div>

@@ -9,8 +9,8 @@ import {
 } from '../../data/cards/index';
 
 export const metadata = {
-  title: 'วิธีเล่น | Muffin Time',
-  description: 'กฎกติกาและวิธีการเล่นเกมการ์ด Muffin Time บนมือถือ',
+  title: 'วิธีเล่น | MUFFIN TIME',
+  description: 'กฎกติกาและวิธีการเล่นเกมไพ่ MUFFIN TIME บนมือถือ',
 };
 
 export default function HowToPlayPage() {

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
+import { EnterDoorIcon, InfoIcon } from '../ui/Icons';
 
 export interface JoinRoomModalProps {
   isOpen: boolean;
@@ -113,7 +114,7 @@ export function JoinRoomModal({ isOpen, onClose }: JoinRoomModalProps) {
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-1">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-1">
-              <span className="text-xl">🚪</span>
+              <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
             </div>
             <h3 className="text-lg font-black text-ink">เข้าร่วมห้อง</h3>
             <p className="text-xs text-ink-secondary">
@@ -153,7 +154,7 @@ export function JoinRoomModal({ isOpen, onClose }: JoinRoomModalProps) {
           {/* Inline Error Message */}
           {error && (
             <div className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200/60 -mt-1">
-              <span>⚠️</span>
+              <InfoIcon className="h-3.5 w-3.5 shrink-0 text-red-500" />
               <span>{error}</span>
             </div>
           )}

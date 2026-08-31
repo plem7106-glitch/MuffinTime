@@ -1,5 +1,5 @@
 import { cloneState, shuffle } from './util';
-import type { RoomState, PlayerId, CardCode, Rng } from './types';
+import type { RoomState, PlayerId, CardCode, Rng, PlayDirection } from './types';
 
 export const GLOBAL_MIN_PLAYERS = 3;
 export const GLOBAL_MAX_PLAYERS = 15;
@@ -17,6 +17,9 @@ export function createRoom(
   return {
     status: 'lobby',
     hostId,
+    joinOrder: [hostId],
+    seatOrder: [hostId],
+    playDirection: 'clockwise',
     turnOrder: [],
     currentTurnIndex: 0,
     direction: 1,
@@ -62,11 +65,56 @@ export function addPlayer(
     hasCalledMuffinTime: false,
     skipNextTurn: false,
   };
+  const existingJoinOrder = next.joinOrder ?? Object.keys(state.players);
+  next.joinOrder = [...existingJoinOrder, playerId];
+  next.seatOrder = [...next.joinOrder];
+  next.playDirection = next.playDirection ?? 'clockwise';
+  return next;
+}
+
+export function startSetup(state: RoomState): RoomState {
+  if (state.status !== 'lobby') {
+    throw new Error('cannot enter setup from non-lobby state');
+  }
+  const playerIds = Object.keys(state.players);
+  if (playerIds.length < GLOBAL_MIN_PLAYERS) {
+    throw new Error('need at least 3 players to start');
+  }
+  const next = cloneState(state);
+  next.status = 'setup';
+  const joinOrder =
+    next.joinOrder && next.joinOrder.length === playerIds.length && next.joinOrder.every((id) => next.players[id])
+      ? next.joinOrder
+      : playerIds;
+  next.joinOrder = [...joinOrder];
+  next.seatOrder =
+    next.seatOrder && next.seatOrder.length === playerIds.length && next.seatOrder.every((id) => next.players[id])
+      ? [...next.seatOrder]
+      : [...joinOrder];
+  next.playDirection = next.playDirection ?? 'clockwise';
+  return next;
+}
+
+export function updateSeatOrder(state: RoomState, seatOrder: PlayerId[]): RoomState {
+  if (state.status !== 'setup') {
+    throw new Error('can only update seat order in setup status');
+  }
+  const next = cloneState(state);
+  next.seatOrder = [...seatOrder];
+  return next;
+}
+
+export function updatePlayDirection(state: RoomState, direction: PlayDirection): RoomState {
+  if (state.status !== 'setup') {
+    throw new Error('can only update play direction in setup status');
+  }
+  const next = cloneState(state);
+  next.playDirection = direction;
   return next;
 }
 
 export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng = Math.random): RoomState {
-  if (state.status !== 'lobby') {
+  if (state.status !== 'lobby' && (state.status as string) !== 'setup') {
     throw new Error('game already started');
   }
   const playerIds = Object.keys(state.players);
@@ -74,7 +122,14 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
     throw new Error('need at least 3 players to start');
   }
   const next = cloneState(state);
-  next.turnOrder = shuffle(playerIds, rng);
+  const seatOrder =
+    next.seatOrder && next.seatOrder.length === playerIds.length && next.seatOrder.every((id) => next.players[id])
+      ? next.seatOrder
+      : playerIds;
+  next.seatOrder = [...seatOrder];
+  next.turnOrder = [...seatOrder];
+  next.playDirection = next.playDirection ?? 'clockwise';
+  next.direction = next.playDirection === 'counterclockwise' ? -1 : 1;
   next.drawPile = shuffle(allCardCodes, rng);
   for (const playerId of next.turnOrder) {
     for (let i = 0; i < 3; i++) {
@@ -85,3 +140,4 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   next.currentTurnIndex = 0;
   return next;
 }
+

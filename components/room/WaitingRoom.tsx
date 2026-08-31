@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
+import { useAudio } from '../../lib/audio';
+import { GameStartOverlay } from './GameStartOverlay';
 import {
   ChevronLeftIcon,
   SettingsIcon,
@@ -14,6 +16,10 @@ import {
   CrownIcon,
   PlayIcon,
   LightbulbIcon,
+  MusicIcon,
+  MusicOffIcon,
+  VolumeIcon,
+  VolumeOffIcon,
 } from '../ui/Icons';
 
 const AVATAR_COLORS = [
@@ -27,8 +33,11 @@ const AVATAR_COLORS = [
 
 export function WaitingRoom() {
   const router = useRouter();
-  const { activeRoom, myPlayerId, joinNextBot, leaveRoom, startGame } = useGameSession();
+  const { activeRoom, myPlayerId, joinNextBot, leaveRoom, startSetup } = useGameSession();
+  const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx, playGameStart } = useAudio();
   const [copied, setCopied] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isStartingTransition, setIsStartingTransition] = useState(false);
 
   // Prototype bot auto-join timer
   useEffect(() => {
@@ -45,9 +54,16 @@ export function WaitingRoom() {
     const currentCount = Object.keys(activeRoom.state.players).length;
     if (currentCount < activeRoom.maxPlayers) return;
     if (!activeRoom.state.hostId.startsWith('bot-')) return;
-    const timer = setTimeout(() => startGame(), 1200);
+    if (isStartingTransition) return;
+    const timer = setTimeout(() => {
+      setIsStartingTransition(true);
+      playGameStart();
+      setTimeout(() => {
+        startSetup();
+      }, 2000);
+    }, 1200);
     return () => clearTimeout(timer);
-  }, [activeRoom, startGame]);
+  }, [activeRoom, startSetup, playGameStart, isStartingTransition]);
 
   if (!activeRoom) return null;
 
@@ -74,10 +90,20 @@ export function WaitingRoom() {
     router.push('/');
   };
 
+  const handleStartGame = () => {
+    if (!canStart || isStartingTransition) return;
+    setIsStartingTransition(true);
+    playGameStart();
+    setTimeout(() => {
+      startSetup();
+    }, 2000);
+  };
+
+
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3 p-4 pb-8 bg-white">
       {/* 1. Header */}
-      <header className="flex items-center justify-between py-1">
+      <header className="flex items-center justify-between py-1 relative">
         <button
           type="button"
           onClick={handleLeave}
@@ -99,13 +125,67 @@ export function WaitingRoom() {
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-label="ตั้งค่าห้อง"
-          className="flex h-10 w-10 items-center justify-center text-ink-secondary transition-colors hover:text-primary active:scale-95"
-        >
-          <SettingsIcon className="h-5 w-5" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="ตั้งค่าเสียง"
+            onClick={() => setIsSettingsOpen((prev) => !prev)}
+            className="flex h-10 w-10 items-center justify-center text-ink-secondary transition-colors hover:text-primary active:scale-95"
+          >
+            <SettingsIcon className="h-5 w-5" />
+          </button>
+
+          {/* Quick Settings Dropdown */}
+          {isSettingsOpen && (
+            <div className="absolute right-0 top-11 z-50 flex w-52 flex-col gap-1 rounded-2xl border border-gray-100 bg-white p-2 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
+              <span className="px-3 py-1 text-[11px] font-bold text-ink-secondary">
+                การตั้งค่าเสียง
+              </span>
+              <button
+                type="button"
+                onClick={toggleMusic}
+                className="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-gray-50 transition-colors w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  {isMusicEnabled ? (
+                    <MusicIcon className="h-4 w-4 text-primary" />
+                  ) : (
+                    <MusicOffIcon className="h-4 w-4 text-gray-400" />
+                  )}
+                  <span>เพลงประกอบ</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isMusicEnabled ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {isMusicEnabled ? 'เปิด' : 'ปิด'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={toggleSfx}
+                className="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-gray-50 transition-colors w-full text-left"
+              >
+                <div className="flex items-center gap-2">
+                  {isSfxEnabled ? (
+                    <VolumeIcon className="h-4 w-4 text-primary" />
+                  ) : (
+                    <VolumeOffIcon className="h-4 w-4 text-gray-400" />
+                  )}
+                  <span>เสียงเอฟเฟกต์</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isSfxEnabled ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {isSfxEnabled ? 'เปิด' : 'ปิด'}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* 2. Share Room Code Card */}
@@ -271,7 +351,7 @@ export function WaitingRoom() {
             <button
               type="button"
               disabled={!canStart}
-              onClick={startGame}
+              onClick={handleStartGame}
               className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF2E63] via-[#ED1F4F] to-[#E52B50] px-6 text-base font-black text-white shadow-[0_6px_16px_rgba(237,31,79,0.28)] transition-all hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               <PlayIcon className="h-4 w-4" />
@@ -289,7 +369,7 @@ export function WaitingRoom() {
         ) : (
           <>
             <div className="flex items-center justify-center gap-2 rounded-2xl border border-primary/10 bg-primary/5 py-3 text-xs font-bold text-primary">
-              <span className="animate-spin">⏳</span>
+              <RotateCcwIcon className="h-4 w-4 animate-spin text-primary" />
               <span>กำลังรอเจ้าของห้องเริ่มเกม...</span>
             </div>
 
@@ -303,6 +383,9 @@ export function WaitingRoom() {
           </>
         )}
       </div>
+
+      {/* 7. Game Start 2-Second Transition Overlay */}
+      {isStartingTransition && <GameStartOverlay />}
     </main>
   );
 }
