@@ -64,7 +64,24 @@ type Action =
   | { type: 'CLEAR_RESULT' }
   | { type: 'PLAY_AGAIN' };
 
-export const BOT_NAME_POOL = ['Bank', 'Joe', 'Guy', 'Nam', 'Ploy', 'Golf', 'Mint'];
+export const BOT_NAME_POOL = [
+  'Bank',
+  'Joe',
+  'Guy',
+  'Nam',
+  'Ploy',
+  'Golf',
+  'Mint',
+  'Fern',
+  'Aom',
+  'Art',
+  'Ice',
+  'Beam',
+  'Oat',
+  'Toey',
+  'Nook',
+  'Krit',
+];
 
 const SEED_ROOMS: RoomSummary[] = [
   { code: '4829', hostName: 'Tee', currentPlayers: 3, maxPlayers: 4 },
@@ -91,40 +108,49 @@ function advanceAndCheckWin(room: RoomState): RoomState {
 function reducer(state: SessionState, action: Action): SessionState {
   switch (action.type) {
     case 'CREATE_ROOM': {
-      const roomState = engineCreateRoom('me', action.hostName);
+      const roomState = engineCreateRoom('me', action.hostName, action.maxPlayers);
       return {
         ...state,
         myPlayerId: 'me',
-        activeRoom: { code: action.code, state: roomState, maxPlayers: action.maxPlayers },
+        activeRoom: { code: action.code, state: roomState, maxPlayers: roomState.maxPlayers ?? action.maxPlayers },
         pendingResponse: null,
       };
     }
     case 'JOIN_ROOM': {
       const summary = state.rooms.find((r) => r.code === action.code);
-      const maxPlayers = summary?.maxPlayers ?? 4;
+      const maxPlayers = summary?.maxPlayers ?? 15;
       const hostName = summary?.hostName ?? 'เจ้าของห้อง';
       const existingOthers = Math.max((summary?.currentPlayers ?? 1) - 1, 0);
-      let roomState = engineCreateRoom('bot-0', hostName);
-      for (let i = 1; i <= existingOthers; i++) {
-        roomState = addPlayer(roomState, `bot-${i}`, BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length]);
+      try {
+        let roomState = engineCreateRoom('bot-0', hostName, maxPlayers);
+        for (let i = 1; i <= existingOthers; i++) {
+          roomState = addPlayer(roomState, `bot-${i}`, BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length]);
+        }
+        roomState = addPlayer(roomState, 'me', action.name);
+        return {
+          ...state,
+          myPlayerId: 'me',
+          activeRoom: { code: action.code, state: roomState, maxPlayers },
+          pendingResponse: null,
+        };
+      } catch (err) {
+        console.warn('Cannot join room:', err);
+        return state;
       }
-      roomState = addPlayer(roomState, 'me', action.name);
-      return {
-        ...state,
-        myPlayerId: 'me',
-        activeRoom: { code: action.code, state: roomState, maxPlayers },
-        pendingResponse: null,
-      };
     }
     case 'JOIN_BOT': {
       if (!state.activeRoom) return state;
       const current = state.activeRoom.state;
       const currentCount = Object.keys(current.players).length;
       if (currentCount >= state.activeRoom.maxPlayers) return state;
-      const botId = `bot-${currentCount}`;
-      const botName = BOT_NAME_POOL[(currentCount - 1) % BOT_NAME_POOL.length];
-      const next = addPlayer(current, botId, botName);
-      return { ...state, activeRoom: { ...state.activeRoom, state: next } };
+      try {
+        const botId = `bot-${currentCount}`;
+        const botName = BOT_NAME_POOL[(currentCount - 1) % BOT_NAME_POOL.length] || `Bot ${currentCount}`;
+        const next = addPlayer(current, botId, botName);
+        return { ...state, activeRoom: { ...state.activeRoom, state: next } };
+      } catch {
+        return state;
+      }
     }
     case 'LEAVE_ROOM':
       return { ...state, activeRoom: null, myPlayerId: null, pendingResponse: null };

@@ -23,4 +23,5 @@ export interface RoomState {
   drawPile: CardCode[];
   discardPile: CardCode[];
   players: Record<PlayerId, PlayerState>;
+  maxPlayers?: number;
 }

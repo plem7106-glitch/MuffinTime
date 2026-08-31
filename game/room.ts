@@ -1,7 +1,19 @@
 import { cloneState, shuffle } from './util';
 import type { RoomState, PlayerId, CardCode, Rng } from './types';
 
-export function createRoom(hostId: PlayerId, hostName: string): RoomState {
+export const GLOBAL_MIN_PLAYERS = 3;
+export const GLOBAL_MAX_PLAYERS = 15;
+
+export function createRoom(
+  hostId: PlayerId,
+  hostName: string,
+  maxPlayers: number = GLOBAL_MAX_PLAYERS
+): RoomState {
+  const validatedMax = Math.max(
+    GLOBAL_MIN_PLAYERS,
+    Math.min(GLOBAL_MAX_PLAYERS, Math.floor(maxPlayers) || GLOBAL_MAX_PLAYERS)
+  );
+
   return {
     status: 'lobby',
     hostId,
@@ -11,6 +23,7 @@ export function createRoom(hostId: PlayerId, hostName: string): RoomState {
     muffinTimeTarget: 10,
     drawPile: [],
     discardPile: [],
+    maxPlayers: validatedMax,
     players: {
       [hostId]: {
         name: hostName,
@@ -24,11 +37,17 @@ export function createRoom(hostId: PlayerId, hostName: string): RoomState {
   };
 }
 
-export function addPlayer(state: RoomState, playerId: PlayerId, name: string): RoomState {
+export function addPlayer(
+  state: RoomState,
+  playerId: PlayerId,
+  name: string,
+  maxPlayers?: number
+): RoomState {
   if (state.status !== 'lobby') {
     throw new Error('cannot join a room that has already started');
   }
-  if (Object.keys(state.players).length >= 8) {
+  const effectiveMax = maxPlayers ?? state.maxPlayers ?? GLOBAL_MAX_PLAYERS;
+  if (Object.keys(state.players).length >= effectiveMax) {
     throw new Error('room is full');
   }
   if (state.players[playerId]) {
@@ -51,7 +70,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
     throw new Error('game already started');
   }
   const playerIds = Object.keys(state.players);
-  if (playerIds.length < 3) {
+  if (playerIds.length < GLOBAL_MIN_PLAYERS) {
     throw new Error('need at least 3 players to start');
   }
   const next = cloneState(state);
