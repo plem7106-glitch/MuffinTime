@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Confetti accents -->
+  <rect x="75" y="85" width="22" height="22" rx="5" fill="#06B6D4" transform="rotate(25 86 96)" />
+  <rect x="415" y="90" width="22" height="22" rx="5" fill="#EC4899" transform="rotate(-20 426 101)" />
+  <rect x="135" y="40" width="18" height="18" rx="4" fill="#F59E0B" transform="rotate(15 144 49)" />
+  <rect x="360" y="35" width="18" height="18" rx="4" fill="#10B981" transform="rotate(-15 369 44)" />
+  <circle cx="256" cy="30" r="9" fill="#F43F5E" />
+
+  <!-- Cupcake Liner Wrapper -->
+  <path d="M165 330 L185 450 Q190 465 205 465 L307 465 Q322 465 327 450 L347 330 Z" fill="#E2E8F0" stroke="#1A1A1A" stroke-width="12" stroke-linejoin="round" />
+  <!-- Liner fluting stripes -->
+  <path d="M210 335 L222 462" stroke="#CBD5E1" stroke-width="7" stroke-linecap="round" />
+  <path d="M256 335 L256 465" stroke="#CBD5E1" stroke-width="7" stroke-linecap="round" />
+  <path d="M302 335 L290 462" stroke="#CBD5E1" stroke-width="7" stroke-linecap="round" />
+
+  <!-- Little feet -->
+  <ellipse cx="215" cy="468" rx="22" ry="12" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="10" />
+  <ellipse cx="297" cy="468" rx="22" ry="12" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="10" />
+
+  <!-- Puffy Cloud Muffin Body -->
+  <path d="
+    M 175 355
+    C 130 355, 95 320, 95 275
+    C 95 245, 110 220, 135 205
+    C 115 165, 140 110, 185 100
+    C 205 95, 228 100, 245 115
+    C 265 85, 310 85, 335 115
+    C 350 100, 375 95, 395 105
+    C 435 120, 455 170, 435 210
+    C 460 225, 475 250, 475 280
+    C 475 325, 440 355, 395 355
+    C 380 355, 350 350, 335 338
+    C 310 350, 260 352, 235 340
+    C 215 352, 190 355, 175 355
+    Z
+  " fill="#FFFFFF" stroke="#1A1A1A" stroke-width="14" stroke-linejoin="round" stroke-linecap="round" />
+
+  <!-- Kawaii Blushing Cheeks -->
+  <ellipse cx="195" cy="265" rx="18" ry="11" fill="#FF758F" opacity="0.85" />
+  <ellipse cx="317" cy="265" rx="18" ry="11" fill="#FF758F" opacity="0.85" />
+
+  <!-- Eyes -->
+  <ellipse cx="205" cy="230" rx="13" ry="15" fill="#1A1A1A" />
+  <circle cx="209" cy="225" r="4.5" fill="#FFFFFF" />
+
+  <ellipse cx="307" cy="230" rx="13" ry="15" fill="#1A1A1A" />
+  <circle cx="311" cy="225" r="4.5" fill="#FFFFFF" />
+
+  <!-- Cute Open Smile -->
+  <path d="M236 255 Q256 282 276 255" fill="#C53030" stroke="#1A1A1A" stroke-width="8" stroke-linecap="round" />
+
+  <!-- BLUE Playing Card (Left) -->
+  <g transform="translate(60, 215) rotate(-16)">
+    <rect x="0" y="0" width="86" height="122" rx="10" fill="#2563EB" stroke="#1A1A1A" stroke-width="9" />
+    <rect x="8" y="8" width="70" height="106" rx="6" fill="none" stroke="#93C5FD" stroke-width="4" stroke-opacity="0.85" />
+    <!-- White Card Diamond Symbol -->
+    <path d="M43 47 L52 61 L43 75 L34 61 Z" fill="#FFFFFF" />
+  </g>
+
+  <!-- RED Playing Card (Right) -->
+  <g transform="translate(366, 190) rotate(16)">
+    <rect x="0" y="0" width="86" height="122" rx="10" fill="#ED1F4F" stroke="#1A1A1A" stroke-width="9" />
+    <rect x="8" y="8" width="70" height="106" rx="6" fill="none" stroke="#FDA4AF" stroke-width="4" stroke-opacity="0.85" />
+    <!-- White Card Diamond Symbol -->
+    <path d="M43 47 L52 61 L43 75 L34 61 Z" fill="#FFFFFF" />
+  </g>
+
+  <!-- Left Arm & Hand Gripping Blue Card -->
+  <path d="M155 280 Q120 290 108 305" fill="none" stroke="#1A1A1A" stroke-width="12" stroke-linecap="round" />
+  <circle cx="112" cy="298" r="16" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="9" />
+
+  <!-- Right Arm & Hand Gripping Red Card -->
+  <path d="M357 280 Q392 290 404 305" fill="none" stroke="#1A1A1A" stroke-width="12" stroke-linecap="round" />
+  <circle cx="400" cy="298" r="16" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="9" />
+</svg>

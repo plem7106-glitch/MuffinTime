@@ -1,7 +1,9 @@
 import { cloneState, shuffle, pickRandomIndices } from './util';
 import type { RoomState, PlayerId, CardCode, Rng } from './types';
+import { getCardById } from '../data/cards/index';
 
 export function reshuffleDiscardIntoDraw(state: RoomState, rng: Rng = Math.random): RoomState {
+
   const next = cloneState(state);
   if (next.discardPile.length <= 1) return next;
   const top = next.discardPile[next.discardPile.length - 1];
@@ -64,3 +66,121 @@ export function discard(
   }
   return next;
 }
+
+/**
+ * Reshuffle ONLY the remaining cards in the drawPile with a balanced
+
+ * card-type distribution (Action = blue, Trap = red, Counter = green).
+ *
+ * Guaranteed properties:
+ * - 100% preservation of all card IDs and total card count.
+ * - Same count per type before and after.
+ * - Prevents 3+ consecutive cards of the same type whenever other types are available.
+ * - Penalizes repeating the same type consecutively.
+ * - Retains randomness (not deterministic round-robin).
+ */
+export function balancedShuffleDrawPile(
+  state: RoomState,
+  rng: Rng = Math.random
+): RoomState {
+  if (state.drawPile.length <= 1) {
+    return cloneState(state);
+  }
+
+  const next = cloneState(state);
+  const remainingCards = [...next.drawPile];
+
+  // 1. Separate cards into pools by CardType
+  const actionPool: CardCode[] = [];
+  const trapPool: CardCode[] = [];
+  const counterPool: CardCode[] = [];
+  const otherPool: CardCode[] = [];
+
+  for (const code of remainingCards) {
+    const cardData = getCardById(code);
+    if (!cardData) {
+      otherPool.push(code);
+    } else if (cardData.type === 'action') {
+      actionPool.push(code);
+    } else if (cardData.type === 'trap') {
+      trapPool.push(code);
+    } else if (cardData.type === 'counter') {
+      counterPool.push(code);
+    } else {
+      otherPool.push(code);
+    }
+  }
+
+  // 2. Randomly shuffle each pool internally
+  const pools: Record<'action' | 'trap' | 'counter' | 'other', CardCode[]> = {
+    action: shuffle(actionPool, rng),
+    trap: shuffle(trapPool, rng),
+    counter: shuffle(counterPool, rng),
+    other: shuffle(otherPool, rng),
+  };
+
+  // 3. Interleaved weighted random selection
+  const result: CardCode[] = [];
+  const totalCards = remainingCards.length;
+  const recentTypes: ('action' | 'trap' | 'counter' | 'other')[] = [];
+
+  for (let i = 0; i < totalCards; i++) {
+    const availableTypes = (['action', 'trap', 'counter', 'other'] as const).filter(
+      (type) => pools[type].length > 0
+    );
+
+    if (availableTypes.length === 1) {
+      const soleType = availableTypes[0];
+      const card = pools[soleType].pop()!;
+      result.push(card);
+      recentTypes.push(soleType);
+      continue;
+    }
+
+    const lastType = recentTypes.length > 0 ? recentTypes[recentTypes.length - 1] : null;
+    const last2Same =
+      recentTypes.length >= 2 &&
+      recentTypes[recentTypes.length - 1] === recentTypes[recentTypes.length - 2];
+
+    const candidates: { type: 'action' | 'trap' | 'counter' | 'other'; weight: number }[] = [];
+
+    for (const type of availableTypes) {
+      let weight = pools[type].length;
+
+      // Strongly avoid 3+ cards of the same type consecutively
+      if (last2Same && lastType === type) {
+        weight = 0;
+      } else if (lastType === type) {
+        // Reduce probability of immediate repeated type
+        weight = weight * 0.35;
+      }
+
+      candidates.push({ type, weight });
+    }
+
+    const totalWeight = candidates.reduce((sum, c) => sum + c.weight, 0);
+    let chosenType: 'action' | 'trap' | 'counter' | 'other';
+
+    if (totalWeight <= 0) {
+      chosenType = availableTypes[Math.floor(rng() * availableTypes.length)];
+    } else {
+      let roll = rng() * totalWeight;
+      chosenType = candidates[0].type;
+      for (const c of candidates) {
+        if (roll < c.weight) {
+          chosenType = c.type;
+          break;
+        }
+        roll -= c.weight;
+      }
+    }
+
+    const card = pools[chosenType].pop()!;
+    result.push(card);
+    recentTypes.push(chosenType);
+  }
+
+  next.drawPile = result;
+  return next;
+}
+
