@@ -5,10 +5,12 @@ import type { DemoCard } from '../../lib/demoCards';
 
 export function TrapModal({
   card,
+  mode,
   onConfirm,
   onCancel,
 }: {
   card: DemoCard | null;
+  mode: 'place' | 'open';
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -20,7 +22,7 @@ export function TrapModal({
           <h2 className="text-lg font-bold text-ink">{card.th}</h2>
           <p className="text-sm text-ink-secondary">{card.effect}</p>
           <PrimaryButton tone="trap" onClick={onConfirm}>
-            วางกับดักนี้
+            {mode === 'place' ? 'วางกับดักนี้' : 'เปิดกับดักนี้'}
           </PrimaryButton>
           <SecondaryButton onClick={onCancel}>ยกเลิก</SecondaryButton>
         </div>

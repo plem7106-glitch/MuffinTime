@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useGameSession } from '../../lib/session';
 import { isMuffinTimeEligible } from '../../game/turn';
-import { getDemoCard, type DemoCard } from '../../lib/demoCards';
+import { getDemoCard, demoCardsOfType, type DemoCard } from '../../lib/demoCards';
 import { GameHeader } from './GameHeader';
 import { PlayerCard } from './PlayerCard';
 import { BottomActionBar } from './BottomActionBar';
@@ -13,20 +13,40 @@ import { CardHand } from '../card/CardHand';
 import { ActionModal } from '../modals/ActionModal';
 import { TrapModal } from '../modals/TrapModal';
 import { TargetSelector } from '../modals/TargetSelector';
+import { CounterModal } from '../modals/CounterModal';
+import { TrapResultModal } from '../modals/TrapResultModal';
+import { CounterResultModal } from '../modals/CounterResultModal';
 import type { CardCode, PlayerId } from '../../game/types';
 
 export function GameTable() {
-  const { activeRoom, myPlayerId, drawCard, declareMuffinTime, playAction, placeTrapCard, pendingResponse } =
-    useGameSession();
+  const {
+    activeRoom,
+    myPlayerId,
+    drawCard,
+    declareMuffinTime,
+    playAction,
+    placeTrapCard,
+    openTrapCard,
+    pendingResponse,
+    playCounter,
+    skipCounter,
+    lastResult,
+    clearLastResult,
+  } = useGameSession();
+
   const [pendingCard, setPendingCard] = useState<DemoCard | null>(null);
   const [awaitingTarget, setAwaitingTarget] = useState(false);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
+
+  const [pendingTrapOpen, setPendingTrapOpen] = useState<DemoCard | null>(null);
+  const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
+  const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
 
   if (!activeRoom || !myPlayerId) return null;
   const { state, code } = activeRoom;
   const me = state.players[myPlayerId];
   const isMyTurn = state.turnOrder[state.currentTurnIndex] === myPlayerId;
-  const canDeclare = isMyTurn && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
+  const canDeclare = isMyTurn && !pendingResponse && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
   const opponentIds = state.turnOrder.filter((id) => id !== myPlayerId);
 
   function handleSelectCard(cardCode: CardCode) {
@@ -37,7 +57,7 @@ export function GameTable() {
     }
   }
 
-  function closeModals() {
+  function closeHandFlow() {
     setPendingCard(null);
     setAwaitingTarget(false);
     setChosenTarget(null);
@@ -47,7 +67,7 @@ export function GameTable() {
     if (!pendingCard) return;
     if (pendingCard.type === 'trap') {
       placeTrapCard(pendingCard.code);
-      closeModals();
+      closeHandFlow();
       return;
     }
     if (pendingCard.needsTarget) {
@@ -55,14 +75,45 @@ export function GameTable() {
       return;
     }
     playAction(pendingCard.code);
-    closeModals();
+    closeHandFlow();
   }
 
   function handleConfirmTarget() {
     if (!pendingCard || !chosenTarget) return;
     playAction(pendingCard.code, chosenTarget);
-    closeModals();
+    closeHandFlow();
   }
+
+  function closeTrapOpenFlow() {
+    setPendingTrapOpen(null);
+    setAwaitingTrapTarget(false);
+    setChosenTrapTarget(null);
+  }
+
+  function handleOpenTrapTap(trapCode: CardCode) {
+    if (pendingResponse) return;
+    setPendingTrapOpen(getDemoCard(trapCode));
+  }
+
+  function handleConfirmOpenTrap() {
+    if (!pendingTrapOpen) return;
+    if (pendingTrapOpen.needsTarget) {
+      setAwaitingTrapTarget(true);
+      return;
+    }
+    openTrapCard(pendingTrapOpen.code);
+    closeTrapOpenFlow();
+  }
+
+  function handleConfirmTrapTarget() {
+    if (!pendingTrapOpen || !chosenTrapTarget) return;
+    openTrapCard(pendingTrapOpen.code, chosenTrapTarget);
+    closeTrapOpenFlow();
+  }
+
+  const counterCards = pendingResponse
+    ? me.hand.filter((c) => demoCardsOfType('counter').some((counter) => counter.code === c))
+    : [];
 
   return (
     <main className="mx-auto flex h-screen max-w-md flex-col overflow-hidden">
@@ -88,15 +139,28 @@ export function GameTable() {
 
       <div className="flex shrink-0 flex-col gap-2 border-t border-ink/10 p-3" style={{ flexBasis: '40%' }}>
         <PlayerCard player={me} isCurrentTurn={isMyTurn} />
+        {me.traps.length > 0 && (
+          <div className="flex gap-2">
+            {me.traps.map((trapCode, i) => (
+              <button
+                key={`${trapCode}-${i}`}
+                onClick={() => handleOpenTrapTap(trapCode)}
+                className="min-h-[36px] rounded-card border border-trap px-2 text-xs font-semibold text-trap"
+              >
+                เปิดกับดัก
+              </button>
+            ))}
+          </div>
+        )}
         <CardHand hand={me.hand} selectedCode={pendingCard?.code ?? null} onSelect={handleSelectCard} />
         <BottomActionBar isMyTurn={isMyTurn} onDraw={drawCard} canDeclare={canDeclare} onDeclare={declareMuffinTime} />
       </div>
 
       {pendingCard?.type === 'action' && (
-        <ActionModal card={awaitingTarget ? null : pendingCard} onConfirm={handleConfirmCard} onCancel={closeModals} />
+        <ActionModal card={awaitingTarget ? null : pendingCard} onConfirm={handleConfirmCard} onCancel={closeHandFlow} />
       )}
       {pendingCard?.type === 'trap' && (
-        <TrapModal card={pendingCard} onConfirm={handleConfirmCard} onCancel={closeModals} />
+        <TrapModal card={pendingCard} mode="place" onConfirm={handleConfirmCard} onCancel={closeHandFlow} />
       )}
       <TargetSelector
         open={awaitingTarget}
@@ -104,8 +168,44 @@ export function GameTable() {
         selectedId={chosenTarget}
         onSelect={setChosenTarget}
         onConfirm={handleConfirmTarget}
-        onCancel={closeModals}
+        onCancel={closeHandFlow}
         prompt={pendingCard ? pendingCard.effect : ''}
+      />
+
+      <TrapModal
+        card={awaitingTrapTarget ? null : pendingTrapOpen}
+        mode="open"
+        onConfirm={handleConfirmOpenTrap}
+        onCancel={closeTrapOpenFlow}
+      />
+      <TargetSelector
+        open={awaitingTrapTarget}
+        candidates={Object.keys(state.players)
+          .filter((id) => id !== myPlayerId)
+          .map((id) => ({ id, player: state.players[id] }))}
+        selectedId={chosenTrapTarget}
+        onSelect={setChosenTrapTarget}
+        onConfirm={handleConfirmTrapTarget}
+        onCancel={closeTrapOpenFlow}
+        prompt={pendingTrapOpen ? pendingTrapOpen.effect : ''}
+      />
+
+      <CounterModal
+        open={pendingResponse !== null && counterCards.length > 0}
+        counterCards={counterCards}
+        onPlay={playCounter}
+        onSkip={skipCounter}
+      />
+      <TrapResultModal
+        result={lastResult}
+        ownerName={lastResult ? state.players[lastResult.actorId]?.name ?? '' : ''}
+        targetName={lastResult?.targetId ? state.players[lastResult.targetId]?.name : undefined}
+        onClose={clearLastResult}
+      />
+      <CounterResultModal
+        result={lastResult}
+        counterActorName={lastResult?.counteredBy ? state.players[lastResult.counteredBy]?.name ?? '' : ''}
+        onClose={clearLastResult}
       />
     </main>
   );

@@ -29,11 +29,22 @@ export interface PendingResponse {
   targetId?: PlayerId;
 }
 
+export interface LastResult {
+  kind: 'action' | 'trap';
+  code: CardCode;
+  actorId: PlayerId;
+  targetId?: PlayerId;
+  countered: boolean;
+  counteredBy?: PlayerId;
+  counterCode?: CardCode;
+}
+
 interface SessionState {
   rooms: RoomSummary[];
   activeRoom: ActiveRoom | null;
   myPlayerId: PlayerId | null;
   pendingResponse: PendingResponse | null;
+  lastResult: LastResult | null;
 }
 
 type Action =
@@ -49,7 +60,8 @@ type Action =
   | { type: 'PLAY_COUNTER'; code: CardCode }
   | { type: 'SKIP_COUNTER' }
   | { type: 'DECLARE_MUFFIN_TIME' }
-  | { type: 'BOT_TURN' };
+  | { type: 'BOT_TURN' }
+  | { type: 'CLEAR_RESULT' };
 
 export const BOT_NAME_POOL = ['Bank', 'Joe', 'Guy', 'Nam', 'Ploy', 'Golf', 'Mint'];
 
@@ -160,7 +172,12 @@ function reducer(state: SessionState, action: Action): SessionState {
       const afterDiscard = discard(state.activeRoom.state, counterActorId, 1, [action.code]);
       const resolved = resolveCounterCard(afterDiscard, action.code, counterActorId);
       const finalState = state.pendingResponse.kind === 'action' ? advanceAndCheckWin(resolved) : resolved;
-      return { ...state, activeRoom: { ...state.activeRoom, state: finalState }, pendingResponse: null };
+      return {
+        ...state,
+        activeRoom: { ...state.activeRoom, state: finalState },
+        pendingResponse: null,
+        lastResult: { ...state.pendingResponse, countered: true, counteredBy: counterActorId, counterCode: action.code },
+      };
     }
     case 'SKIP_COUNTER': {
       if (!state.activeRoom || !state.pendingResponse) return state;
@@ -170,8 +187,15 @@ function reducer(state: SessionState, action: Action): SessionState {
           ? resolveActionCard(state.activeRoom.state, code, actorId, targetId)
           : resolveTrapCard(state.activeRoom.state, code, actorId, targetId);
       const finalState = kind === 'action' ? advanceAndCheckWin(resolved) : resolved;
-      return { ...state, activeRoom: { ...state.activeRoom, state: finalState }, pendingResponse: null };
+      return {
+        ...state,
+        activeRoom: { ...state.activeRoom, state: finalState },
+        pendingResponse: null,
+        lastResult: { kind, code, actorId, targetId, countered: false },
+      };
     }
+    case 'CLEAR_RESULT':
+      return { ...state, lastResult: null };
     case 'DECLARE_MUFFIN_TIME': {
       if (!state.activeRoom) return state;
       const next = engineDeclareMuffinTime(state.activeRoom.state, state.myPlayerId!);
@@ -203,6 +227,8 @@ interface GameSessionValue {
   activeRoom: ActiveRoom | null;
   myPlayerId: PlayerId | null;
   pendingResponse: PendingResponse | null;
+  lastResult: LastResult | null;
+  clearLastResult: () => void;
   createRoom: (hostName: string, maxPlayers: number) => string;
   joinRoom: (code: string, name: string) => void;
   joinNextBot: () => void;
@@ -225,6 +251,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     activeRoom: null,
     myPlayerId: null,
     pendingResponse: null,
+    lastResult: null,
   });
 
   const createRoomFn = useCallback((hostName: string, maxPlayers: number) => {
@@ -251,6 +278,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const playCounter = useCallback((code: CardCode) => dispatch({ type: 'PLAY_COUNTER', code }), []);
   const skipCounter = useCallback(() => dispatch({ type: 'SKIP_COUNTER' }), []);
   const declareMuffinTimeFn = useCallback(() => dispatch({ type: 'DECLARE_MUFFIN_TIME' }), []);
+  const clearLastResult = useCallback(() => dispatch({ type: 'CLEAR_RESULT' }), []);
 
   // Auto-skip the counter window when the human has no counter card to play —
   // don't show an empty prompt.
@@ -281,6 +309,8 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     activeRoom: state.activeRoom,
     myPlayerId: state.myPlayerId,
     pendingResponse: state.pendingResponse,
+    lastResult: state.lastResult,
+    clearLastResult,
     createRoom: createRoomFn,
     joinRoom: joinRoomFn,
     joinNextBot,
