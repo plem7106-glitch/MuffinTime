@@ -61,7 +61,8 @@ type Action =
   | { type: 'SKIP_COUNTER' }
   | { type: 'DECLARE_MUFFIN_TIME' }
   | { type: 'BOT_TURN' }
-  | { type: 'CLEAR_RESULT' };
+  | { type: 'CLEAR_RESULT' }
+  | { type: 'PLAY_AGAIN' };
 
 export const BOT_NAME_POOL = ['Bank', 'Joe', 'Guy', 'Nam', 'Ploy', 'Golf', 'Mint'];
 
@@ -217,6 +218,32 @@ function reducer(state: SessionState, action: Action): SessionState {
         pendingResponse: { kind: 'action', code: decision.code, actorId: botId, targetId: decision.targetId },
       };
     }
+    case 'PLAY_AGAIN': {
+      if (!state.activeRoom) return state;
+      const room = state.activeRoom.state;
+      const resetPlayers = Object.fromEntries(
+        Object.entries(room.players).map(([id, p]) => [
+          id,
+          { ...p, hand: [], traps: [], hasCalledMuffinTime: false, skipNextTurn: false },
+        ])
+      );
+      const resetRoom: RoomState = {
+        ...room,
+        status: 'lobby',
+        turnOrder: [],
+        currentTurnIndex: 0,
+        direction: 1,
+        drawPile: [],
+        discardPile: [],
+        players: resetPlayers,
+      };
+      return {
+        ...state,
+        activeRoom: { ...state.activeRoom, state: resetRoom },
+        pendingResponse: null,
+        lastResult: null,
+      };
+    }
     default:
       return state;
   }
@@ -241,6 +268,7 @@ interface GameSessionValue {
   playCounter: (code: CardCode) => void;
   skipCounter: () => void;
   declareMuffinTime: () => void;
+  playAgain: () => void;
 }
 
 const GameSessionContext = createContext<GameSessionValue | null>(null);
@@ -279,6 +307,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const skipCounter = useCallback(() => dispatch({ type: 'SKIP_COUNTER' }), []);
   const declareMuffinTimeFn = useCallback(() => dispatch({ type: 'DECLARE_MUFFIN_TIME' }), []);
   const clearLastResult = useCallback(() => dispatch({ type: 'CLEAR_RESULT' }), []);
+  const playAgain = useCallback(() => dispatch({ type: 'PLAY_AGAIN' }), []);
 
   // Auto-skip the counter window when the human has no counter card to play —
   // don't show an empty prompt.
@@ -323,6 +352,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     playCounter,
     skipCounter,
     declareMuffinTime: declareMuffinTimeFn,
+    playAgain,
   };
 
   return <GameSessionContext.Provider value={value}>{children}</GameSessionContext.Provider>;
