@@ -16,7 +16,8 @@ import { TargetSelector } from '../modals/TargetSelector';
 import type { CardCode, PlayerId } from '../../game/types';
 
 export function GameTable() {
-  const { activeRoom, myPlayerId, drawCard, declareMuffinTime, playAction, placeTrapCard } = useGameSession();
+  const { activeRoom, myPlayerId, drawCard, declareMuffinTime, playAction, placeTrapCard, pendingResponse } =
+    useGameSession();
   const [pendingCard, setPendingCard] = useState<DemoCard | null>(null);
   const [awaitingTarget, setAwaitingTarget] = useState(false);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
@@ -29,7 +30,7 @@ export function GameTable() {
   const opponentIds = state.turnOrder.filter((id) => id !== myPlayerId);
 
   function handleSelectCard(cardCode: CardCode) {
-    if (!isMyTurn) return;
+    if (!isMyTurn || pendingResponse) return;
     const card = getDemoCard(cardCode);
     if (card.type === 'action' || card.type === 'trap') {
       setPendingCard(card);
