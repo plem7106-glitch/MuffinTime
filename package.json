@@ -9,7 +9,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sync-cards": "node scripts/sync-cards.js"
+    "sync-cards": "node scripts/sync-cards.js",
+    "verify-supabase": "node --env-file=.env.local scripts/verify-supabase.mjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
