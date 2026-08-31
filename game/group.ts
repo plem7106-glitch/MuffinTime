@@ -32,7 +32,7 @@ export function everyoneDiscards(
 
 export function passHands(state: RoomState, steps: number): RoomState {
   const next = cloneState(state);
-  const order = next.turnOrder;
+  const order = next.seatOrder && next.seatOrder.length > 0 ? next.seatOrder : next.turnOrder;
   const count = order.length;
   const hands = order.map((id) => next.players[id].hand);
   for (let i = 0; i < count; i++) {
@@ -41,3 +41,4 @@ export function passHands(state: RoomState, steps: number): RoomState {
   }
   return next;
 }
+

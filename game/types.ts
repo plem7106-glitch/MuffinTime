@@ -15,7 +15,7 @@ export interface PlayerState {
 // No `log` field: the original design's Firebase sketch mentioned one, but no
 // engine function reads or writes it — add it when a real producer exists.
 export interface RoomState {
-  status: 'lobby' | 'setup' | 'playing' | 'ended';
+  status: 'lobby' | 'setup' | 'playing' | 'ended' | 'finished';
   hostId: PlayerId;
   joinOrder?: PlayerId[];
   seatOrder?: PlayerId[];
@@ -28,5 +28,14 @@ export interface RoomState {
   discardPile: CardCode[];
   players: Record<PlayerId, PlayerState>;
   maxPlayers?: number;
+  winnerId?: PlayerId;
+  finishReason?: 'normal' | 'manual';
+  isShufflingDrawPile?: boolean;
+  shuffleSequence?: number;
+  roundNumber?: number;
 }
+
+
+
+
 

@@ -8,12 +8,16 @@ import {
   startSetup as engineStartSetup,
   updateSeatOrder as engineUpdateSeatOrder,
   updatePlayDirection as engineUpdatePlayDirection,
+  finishGame as engineFinishGame,
+  resetForPlayAgain as engineResetForPlayAgain,
 } from '../game/room';
-import { draw, discard } from '../game/pile';
+import { draw, discard, balancedShuffleDrawPile } from '../game/pile';
 import { placeTrap as enginePlaceTrap, removeTrap } from '../game/trap';
 import { advanceTurn, checkWinnerAtTurnStart, declareMuffinTime as engineDeclareMuffinTime } from '../game/turn';
 import type { RoomState, PlayerId, CardCode, PlayDirection } from '../game/types';
-import { buildDemoDeck, demoCardsOfType, resolveActionCard, resolveTrapCard, resolveCounterCard } from './demoCards';
+
+import { buildDemoDeck, demoCardsOfType, resolveActionCard, resolveTrapCard, resolveCounterCard, getValidCounterCards } from './demoCards';
+
 import { decideBotTurn } from './botTurn';
 
 export interface RoomSummary {
@@ -30,6 +34,7 @@ export interface ActiveRoom {
 }
 
 export interface PendingResponse {
+  responseId?: string;
   kind: 'action' | 'trap';
   code: CardCode;
   actorId: PlayerId;
@@ -37,6 +42,7 @@ export interface PendingResponse {
 }
 
 export interface LastResult {
+  responseId?: string;
   kind: 'action' | 'trap';
   code: CardCode;
   actorId: PlayerId;
@@ -45,6 +51,7 @@ export interface LastResult {
   counteredBy?: PlayerId;
   counterCode?: CardCode;
 }
+
 
 interface SessionState {
   rooms: RoomSummary[];
@@ -70,12 +77,17 @@ type Action =
   | { type: 'OPEN_TRAP'; code: CardCode; targetId?: PlayerId }
   | { type: 'PLAY_COUNTER'; code: CardCode }
   | { type: 'SKIP_COUNTER' }
+  | { type: 'CLEAR_RESULT' }
   | { type: 'DECLARE_MUFFIN_TIME' }
   | { type: 'BOT_TURN' }
-  | { type: 'CLEAR_RESULT' }
-  | { type: 'PLAY_AGAIN' };
+  | { type: 'FINISH_GAME'; winnerId: PlayerId; reason: 'normal' | 'manual' }
+  | { type: 'PLAY_AGAIN' }
+  | { type: 'SHUFFLE_DRAW_PILE' }
+  | { type: 'FINISH_SHUFFLE_DRAW_PILE' };
+
 
 export const BOT_NAME_POOL = [
+  'Tee',
   'Bank',
   'Joe',
   'Guy',
@@ -111,7 +123,7 @@ function advanceAndCheckWin(room: RoomState): RoomState {
   const advanced = advanceTurn(room);
   const currentId = advanced.turnOrder[advanced.currentTurnIndex];
   if (checkWinnerAtTurnStart(advanced, currentId)) {
-    return { ...advanced, status: 'ended' };
+    return { ...advanced, status: 'finished', winnerId: currentId, finishReason: 'normal' };
   }
   return advanced;
 }
@@ -166,22 +178,44 @@ function reducer(state: SessionState, action: Action): SessionState {
     case 'LEAVE_ROOM':
       return { ...state, activeRoom: null, myPlayerId: null, pendingResponse: null };
     case 'START_SETUP': {
-      if (!state.activeRoom) return state;
+      if (!state.activeRoom || state.activeRoom.state.status !== 'lobby') return state;
+      // Guard: Only host can initiate setup
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+      const currentCount = Object.keys(state.activeRoom.state.players).length;
+      if (currentCount < 3) return state;
+
       const next = engineStartSetup(state.activeRoom.state);
       return { ...state, activeRoom: { ...state.activeRoom, state: next } };
     }
     case 'SET_SEAT_ORDER': {
-      if (!state.activeRoom) return state;
-      const next = engineUpdateSeatOrder(state.activeRoom.state, action.seatOrder);
+      if (!state.activeRoom || state.activeRoom.state.status !== 'setup') return state;
+      // Guard: Only host can set seat order
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+
+      // Validate all IDs belong to room and no duplicates
+      const currentPlayers = state.activeRoom.state.players;
+      const expectedCount = Object.keys(currentPlayers).length;
+      const validIds = action.seatOrder.filter((id) => currentPlayers[id] !== undefined);
+      if (validIds.length !== expectedCount || new Set(validIds).size !== expectedCount) return state;
+
+      const next = engineUpdateSeatOrder(state.activeRoom.state, validIds);
       return { ...state, activeRoom: { ...state.activeRoom, state: next } };
     }
     case 'SET_PLAY_DIRECTION': {
-      if (!state.activeRoom) return state;
+      if (!state.activeRoom || state.activeRoom.state.status !== 'setup') return state;
+      // Guard: Only host can set play direction
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+
       const next = engineUpdatePlayDirection(state.activeRoom.state, action.direction);
       return { ...state, activeRoom: { ...state.activeRoom, state: next } };
     }
     case 'CONFIRM_TURN_ORDER': {
-      if (!state.activeRoom) return state;
+      if (!state.activeRoom || state.activeRoom.state.status !== 'setup') return state;
+      // Guard: Only host can confirm turn order
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+      const currentCount = Object.keys(state.activeRoom.state.players).length;
+      if (currentCount < 3) return state;
+
       const next = engineStartGame(state.activeRoom.state, buildDemoDeck());
       return { ...state, activeRoom: { ...state.activeRoom, state: next } };
     }
@@ -190,6 +224,7 @@ function reducer(state: SessionState, action: Action): SessionState {
       const next = engineStartGame(state.activeRoom.state, buildDemoDeck());
       return { ...state, activeRoom: { ...state.activeRoom, state: next } };
     }
+
     case 'DRAW_CARD': {
       if (!state.activeRoom || state.pendingResponse) return state;
       const room = state.activeRoom.state;
@@ -203,10 +238,11 @@ function reducer(state: SessionState, action: Action): SessionState {
       if (room.turnOrder[room.currentTurnIndex] !== state.myPlayerId) return state;
       const actorId = state.myPlayerId!;
       const afterDiscard = discard(room, actorId, 1, [action.code]);
+      const responseId = `action-${action.code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       return {
         ...state,
         activeRoom: { ...state.activeRoom, state: afterDiscard },
-        pendingResponse: { kind: 'action', code: action.code, actorId, targetId: action.targetId },
+        pendingResponse: { responseId, kind: 'action', code: action.code, actorId, targetId: action.targetId },
       };
     }
     case 'PLACE_TRAP': {
@@ -218,10 +254,11 @@ function reducer(state: SessionState, action: Action): SessionState {
       if (!state.activeRoom || state.pendingResponse) return state;
       const ownerId = state.myPlayerId!;
       const afterRemove = removeTrap(state.activeRoom.state, ownerId, action.code);
+      const responseId = `trap-${action.code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       return {
         ...state,
         activeRoom: { ...state.activeRoom, state: afterRemove },
-        pendingResponse: { kind: 'trap', code: action.code, actorId: ownerId, targetId: action.targetId },
+        pendingResponse: { responseId, kind: 'trap', code: action.code, actorId: ownerId, targetId: action.targetId },
       };
     }
     case 'PLAY_COUNTER': {
@@ -239,7 +276,7 @@ function reducer(state: SessionState, action: Action): SessionState {
     }
     case 'SKIP_COUNTER': {
       if (!state.activeRoom || !state.pendingResponse) return state;
-      const { kind, code, actorId, targetId } = state.pendingResponse;
+      const { kind, code, actorId, targetId, responseId } = state.pendingResponse;
       const resolved =
         kind === 'action'
           ? resolveActionCard(state.activeRoom.state, code, actorId, targetId)
@@ -249,7 +286,7 @@ function reducer(state: SessionState, action: Action): SessionState {
         ...state,
         activeRoom: { ...state.activeRoom, state: finalState },
         pendingResponse: null,
-        lastResult: kind === 'trap' ? { kind, code, actorId, targetId, countered: false } : null,
+        lastResult: kind === 'trap' ? { responseId, kind, code, actorId, targetId, countered: false } : null,
       };
     }
     case 'CLEAR_RESULT':
@@ -269,40 +306,68 @@ function reducer(state: SessionState, action: Action): SessionState {
         return { ...state, activeRoom: { ...state.activeRoom, state: advanceAndCheckWin(drawn) } };
       }
       const afterDiscard = discard(room, botId, 1, [decision.code]);
+      const responseId = `action-${decision.code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       return {
         ...state,
         activeRoom: { ...state.activeRoom, state: afterDiscard },
-        pendingResponse: { kind: 'action', code: decision.code, actorId: botId, targetId: decision.targetId },
+        pendingResponse: { responseId, kind: 'action', code: decision.code, actorId: botId, targetId: decision.targetId },
+      };
+    }
+
+    case 'FINISH_GAME': {
+      if (!state.activeRoom || state.activeRoom.state.status !== 'playing') return state;
+      // Guard: only host can manually finish game
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+      // Guard: winner must exist in room
+      if (!state.activeRoom.state.players[action.winnerId]) return state;
+
+      const next = engineFinishGame(state.activeRoom.state, action.winnerId, action.reason);
+      return {
+        ...state,
+        activeRoom: { ...state.activeRoom, state: next },
+        pendingResponse: null,
       };
     }
     case 'PLAY_AGAIN': {
       if (!state.activeRoom) return state;
-      const room = state.activeRoom.state;
-      const resetPlayers = Object.fromEntries(
-        Object.entries(room.players).map(([id, p]) => [
-          id,
-          { ...p, hand: [], traps: [], hasCalledMuffinTime: false, skipNextTurn: false },
-        ])
-      );
-      const playerIds = Object.keys(room.players);
-      const resetRoom: RoomState = {
-        ...room,
-        status: 'lobby',
-        joinOrder: [...playerIds],
-        seatOrder: [...playerIds],
-        playDirection: 'clockwise',
-        turnOrder: [],
-        currentTurnIndex: 0,
-        direction: 1,
-        drawPile: [],
-        discardPile: [],
-        players: resetPlayers,
-      };
+      const currentStatus = state.activeRoom.state.status;
+      if (currentStatus !== 'finished' && (currentStatus as string) !== 'ended') return state;
+      // Guard: only host can reset room for play again
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+
+      const resetRoom = engineResetForPlayAgain(state.activeRoom.state);
       return {
         ...state,
         activeRoom: { ...state.activeRoom, state: resetRoom },
         pendingResponse: null,
         lastResult: null,
+      };
+    }
+    case 'SHUFFLE_DRAW_PILE': {
+      if (!state.activeRoom || state.activeRoom.state.status !== 'playing') return state;
+      // Guard: only host can shuffle draw pile
+      if (state.myPlayerId !== state.activeRoom.state.hostId) return state;
+      // Guard: cannot shuffle while pending response or already shuffling
+      if (state.pendingResponse || state.activeRoom.state.isShufflingDrawPile) return state;
+      // Guard: need at least 2 cards to meaningfully shuffle
+      if (state.activeRoom.state.drawPile.length <= 1) return state;
+
+      const shuffledRoom = balancedShuffleDrawPile(state.activeRoom.state);
+      shuffledRoom.isShufflingDrawPile = true;
+      shuffledRoom.shuffleSequence = (state.activeRoom.state.shuffleSequence ?? 0) + 1;
+
+      return {
+        ...state,
+        activeRoom: { ...state.activeRoom, state: shuffledRoom },
+      };
+
+    }
+    case 'FINISH_SHUFFLE_DRAW_PILE': {
+      if (!state.activeRoom) return state;
+      const nextRoom = { ...state.activeRoom.state, isShufflingDrawPile: false };
+      return {
+        ...state,
+        activeRoom: { ...state.activeRoom, state: nextRoom },
       };
     }
     default:
@@ -333,8 +398,12 @@ export interface GameSessionValue {
   playCounter: (code: CardCode) => void;
   skipCounter: () => void;
   declareMuffinTime: () => void;
+  finishGame: (winnerId: PlayerId, reason?: 'normal' | 'manual') => void;
   playAgain: () => void;
+  shuffleDrawPile: () => void;
+  finishShuffleDrawPile: () => void;
 }
+
 
 const GameSessionContext = createContext<GameSessionValue | null>(null);
 
@@ -382,20 +451,35 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const skipCounter = useCallback(() => dispatch({ type: 'SKIP_COUNTER' }), []);
   const declareMuffinTimeFn = useCallback(() => dispatch({ type: 'DECLARE_MUFFIN_TIME' }), []);
   const clearLastResult = useCallback(() => dispatch({ type: 'CLEAR_RESULT' }), []);
+  const finishGameFn = useCallback(
+    (winnerId: PlayerId, reason: 'normal' | 'manual' = 'normal') =>
+      dispatch({ type: 'FINISH_GAME', winnerId, reason }),
+    []
+  );
   const playAgain = useCallback(() => dispatch({ type: 'PLAY_AGAIN' }), []);
 
-  // Auto-skip the counter window when the human has no counter card to play —
-  // don't show an empty prompt.
+
+  // Auto-skip the counter window when the human has no valid counter card to play for Actions.
+  // For TRAPs targeting the local human player, do NOT auto-skip so the Trap Alert + Decision screen is displayed.
   useEffect(() => {
     if (!state.pendingResponse || !state.activeRoom || !state.myPlayerId) return;
+
+    const isTrapTarget =
+      state.pendingResponse.kind === 'trap' &&
+      state.pendingResponse.actorId !== state.myPlayerId &&
+      (!state.pendingResponse.targetId || state.pendingResponse.targetId === state.myPlayerId);
+
+    if (isTrapTarget) return;
+
     const myHand = state.activeRoom.state.players[state.myPlayerId]?.hand ?? [];
-    const counterCodes = new Set(demoCardsOfType('counter').map((c) => c.code));
-    const hasCounter = myHand.some((code) => counterCodes.has(code));
-    if (!hasCounter) {
+    const validCounters = getValidCounterCards(myHand, state.pendingResponse);
+    if (validCounters.length === 0) {
       const timer = setTimeout(() => dispatch({ type: 'SKIP_COUNTER' }), 400);
       return () => clearTimeout(timer);
     }
   }, [state.pendingResponse, state.activeRoom, state.myPlayerId]);
+
+
 
   // Auto-play bot turns when it's a bot's turn and no response window is open.
   useEffect(() => {
@@ -407,6 +491,14 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     const timer = setTimeout(() => dispatch({ type: 'BOT_TURN' }), 700);
     return () => clearTimeout(timer);
   }, [state.activeRoom, state.pendingResponse]);
+
+  const shuffleDrawPile = useCallback(() => {
+    dispatch({ type: 'SHUFFLE_DRAW_PILE' });
+  }, []);
+
+  const finishShuffleDrawPile = useCallback(() => {
+    dispatch({ type: 'FINISH_SHUFFLE_DRAW_PILE' });
+  }, []);
 
   const value: GameSessionValue = {
     rooms: state.rooms,
@@ -431,8 +523,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     playCounter,
     skipCounter,
     declareMuffinTime: declareMuffinTimeFn,
+    finishGame: finishGameFn,
     playAgain,
+    shuffleDrawPile,
+    finishShuffleDrawPile,
   };
+
 
   return <GameSessionContext.Provider value={value}>{children}</GameSessionContext.Provider>;
 }

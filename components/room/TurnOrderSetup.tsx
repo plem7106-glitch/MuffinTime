@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
+import { getTurnPreviewSequence } from '../../game/turn';
 import {
   ArrowUpIcon,
   ArrowDownIcon,
@@ -41,10 +42,16 @@ export function TurnOrderSetup() {
   const { state } = activeRoom;
   const isHost = myPlayerId === state.hostId;
   const playerIds = Object.keys(state.players);
-  const seatOrder =
-    state.seatOrder && state.seatOrder.length === playerIds.length && state.seatOrder.every((id) => state.players[id])
-      ? state.seatOrder
-      : (state.joinOrder && state.joinOrder.length === playerIds.length ? state.joinOrder : playerIds);
+
+  // Pure physical seat order without reversing; filters out any stale player IDs if someone left
+  const seatOrder = useMemo(() => {
+    const rawOrder =
+      state.seatOrder && state.seatOrder.length > 0
+        ? state.seatOrder
+        : (state.joinOrder && state.joinOrder.length > 0 ? state.joinOrder : playerIds);
+    return rawOrder.filter((id) => state.players[id] !== undefined);
+  }, [state.seatOrder, state.joinOrder, state.players, playerIds]);
+
   const playDirection = state.playDirection ?? 'clockwise';
 
   // Stable avatar color assignment by player ID
@@ -56,24 +63,14 @@ export function TurnOrderSetup() {
     return map;
   }, [playerIds]);
 
-  // Turn Preview sequence calculation
+  // Turn Preview sequence calculated dynamically using direction without mutating seatOrder
   const turnPreview = useMemo(() => {
-    if (!seatOrder || seatOrder.length === 0) return [];
-    if (playDirection === 'counterclockwise') {
-      const list = [seatOrder[0]];
-      for (let i = seatOrder.length - 1; i >= 1; i--) {
-        list.push(seatOrder[i]);
-      }
-      list.push(seatOrder[0]);
-      return list;
-    } else {
-      return [...seatOrder, seatOrder[0]];
-    }
+    return getTurnPreviewSequence(seatOrder, playDirection);
   }, [seatOrder, playDirection]);
 
-  // Host: Move player up in seat order
+  // Host: Move player up in physical seat order
   const handleMoveUp = (index: number) => {
-    if (!isHost || index <= 0) return;
+    if (!isHost || index <= 0 || isConfirming) return;
     const newOrder = [...seatOrder];
     const temp = newOrder[index - 1];
     newOrder[index - 1] = newOrder[index];
@@ -81,9 +78,9 @@ export function TurnOrderSetup() {
     setSeatOrder(newOrder);
   };
 
-  // Host: Move player down in seat order
+  // Host: Move player down in physical seat order
   const handleMoveDown = (index: number) => {
-    if (!isHost || index >= seatOrder.length - 1) return;
+    if (!isHost || index >= seatOrder.length - 1 || isConfirming) return;
     const newOrder = [...seatOrder];
     const temp = newOrder[index + 1];
     newOrder[index + 1] = newOrder[index];
@@ -93,7 +90,7 @@ export function TurnOrderSetup() {
 
   // Host: Toggle play direction
   const handleDirectionChange = (dir: 'clockwise' | 'counterclockwise') => {
-    if (!isHost) return;
+    if (!isHost || isConfirming) return;
     setPlayDirection(dir);
   };
 
@@ -114,13 +111,14 @@ export function TurnOrderSetup() {
     if (!activeRoom) return;
     if (activeRoom.state.status !== 'setup') return;
     if (!activeRoom.state.hostId.startsWith('bot-')) return;
-    if (isConfirming) return;
+    if (isConfirming || Object.keys(activeRoom.state.players).length < 3) return;
     const timer = setTimeout(() => {
       setIsConfirming(true);
       confirmTurnOrder();
     }, 1200);
     return () => clearTimeout(timer);
   }, [activeRoom, isConfirming, confirmTurnOrder]);
+
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3 p-4 pb-8 bg-gray-50/50">
@@ -369,6 +367,12 @@ export function TurnOrderSetup() {
 
       {/* 7. Bottom Action Buttons */}
       <div className="mt-auto flex flex-col gap-2 pt-2">
+        {isHost && seatOrder.length < 3 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-center text-xs font-bold text-amber-800">
+            ต้องการผู้เล่นอย่างน้อย 3 คนในการเริ่มเกม (ปัจจุบันมี {seatOrder.length} คน)
+          </div>
+        )}
+
         {isHost ? (
           <>
             <button
@@ -379,6 +383,7 @@ export function TurnOrderSetup() {
             >
               <span>ยืนยันและเริ่มเกม</span>
             </button>
+
 
             <button
               type="button"

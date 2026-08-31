@@ -122,6 +122,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
     throw new Error('need at least 3 players to start');
   }
   const next = cloneState(state);
+  // Physical seatOrder without mutation or reversal
   const seatOrder =
     next.seatOrder && next.seatOrder.length === playerIds.length && next.seatOrder.every((id) => next.players[id])
       ? next.seatOrder
@@ -138,6 +139,103 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   }
   next.status = 'playing';
   next.currentTurnIndex = 0;
+  next.roundNumber = 1;
   return next;
 }
+
+
+export function removePlayer(state: RoomState, playerId: PlayerId): RoomState {
+  if (!state.players[playerId]) {
+    return state;
+  }
+  const next = cloneState(state);
+  delete next.players[playerId];
+
+  if (next.joinOrder) {
+    next.joinOrder = next.joinOrder.filter((id) => id !== playerId);
+  }
+  if (next.seatOrder) {
+    next.seatOrder = next.seatOrder.filter((id) => id !== playerId);
+  }
+  if (next.turnOrder) {
+    next.turnOrder = next.turnOrder.filter((id) => id !== playerId);
+  }
+
+  // If the host left and other players remain, designate the next player as host
+  if (next.hostId === playerId) {
+    const remainingIds =
+      next.seatOrder && next.seatOrder.length > 0
+        ? next.seatOrder
+        : (next.joinOrder && next.joinOrder.length > 0 ? next.joinOrder : Object.keys(next.players));
+    if (remainingIds.length > 0) {
+      next.hostId = remainingIds[0];
+    }
+  }
+
+  const remainingCount = Object.keys(next.players).length;
+  if (remainingCount > 0) {
+    next.currentTurnIndex = next.currentTurnIndex % remainingCount;
+  } else {
+    next.currentTurnIndex = 0;
+  }
+
+  return next;
+}
+
+export function finishGame(
+  state: RoomState,
+  winnerId: PlayerId,
+  reason: 'normal' | 'manual' = 'normal'
+): RoomState {
+  if (state.status !== 'playing') {
+    throw new Error('can only finish game while playing');
+  }
+  if (!state.players[winnerId]) {
+    throw new Error(`winner ${winnerId} does not exist in room`);
+  }
+  const next = cloneState(state);
+  next.status = 'finished';
+  next.winnerId = winnerId;
+  next.finishReason = reason;
+  return next;
+}
+
+export function resetForPlayAgain(state: RoomState): RoomState {
+  if (state.status !== 'finished' && (state.status as string) !== 'ended') {
+    throw new Error('can only reset game when finished');
+  }
+  const next = cloneState(state);
+  const playerIds = Object.keys(next.players);
+
+  // Reset match-specific player state
+  for (const pid of playerIds) {
+    next.players[pid] = {
+      ...next.players[pid],
+      hand: [],
+      traps: [],
+      hasCalledMuffinTime: false,
+      skipNextTurn: false,
+    };
+  }
+
+  next.status = 'lobby';
+  next.winnerId = undefined;
+  next.finishReason = undefined;
+  next.joinOrder =
+    next.joinOrder && next.joinOrder.length === playerIds.length && next.joinOrder.every((id) => next.players[id])
+      ? next.joinOrder
+      : [...playerIds];
+  next.seatOrder = [...next.joinOrder];
+  next.playDirection = 'clockwise';
+  next.turnOrder = [];
+  next.currentTurnIndex = 0;
+  next.direction = 1;
+  next.drawPile = [];
+  next.discardPile = [];
+  next.isShufflingDrawPile = false;
+  next.shuffleSequence = 0;
+  next.roundNumber = 1;
+  return next;
+}
+
 

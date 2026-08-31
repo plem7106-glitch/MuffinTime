@@ -1,24 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
 import { isMuffinTimeEligible } from '../../game/turn';
-import { getDemoCard, demoCardsOfType, type DemoCard } from '../../lib/demoCards';
+import { getDemoCard, demoCardsOfType, getValidCounterCards, type DemoCard } from '../../lib/demoCards';
 import { GameHeader } from './GameHeader';
-import { PlayerCard } from './PlayerCard';
-import { BottomActionBar } from './BottomActionBar';
-import { Deck } from '../card/Deck';
-import { DiscardPile } from '../card/DiscardPile';
-import { CardHand } from '../card/CardHand';
-import { ActionModal } from '../modals/ActionModal';
-import { TrapModal } from '../modals/TrapModal';
+
+import { TurnStatusBar } from './TurnStatusBar';
+import { PlayerDensityGrid } from './PlayerDensityGrid';
+import { CenterTable } from './CenterTable';
+import { ActiveTrapsSection } from './ActiveTrapsSection';
+import { HandTrayModal } from './HandTrayModal';
+import { GameSettingsModal } from './GameSettingsModal';
+import { InGameCardGalleryModal } from './InGameCardGalleryModal';
+import { ManualFinishModal } from './ManualFinishModal';
+import { WinnerCelebrationOverlay } from './WinnerCelebrationOverlay';
+import { ShuffleConfirmModal } from './ShuffleConfirmModal';
+import { ShuffleDrawPileOverlay } from './ShuffleDrawPileOverlay';
+import { RoundTransitionOverlay } from './RoundTransitionOverlay';
 import { TargetSelector } from '../modals/TargetSelector';
+
+import { TrapModal } from '../modals/TrapModal';
+import { TrapAlertModal } from '../modals/TrapAlertModal';
 import { CounterModal } from '../modals/CounterModal';
 import { TrapResultModal } from '../modals/TrapResultModal';
 import { CounterResultModal } from '../modals/CounterResultModal';
+import { DiscardPileModal } from '../modals/DiscardPileModal';
+
+
+import { CardsIcon, TrapIcon, CardStackIcon } from '../ui/Icons';
 import type { CardCode, PlayerId } from '../../game/types';
 
+
 export function GameTable() {
+  const router = useRouter();
   const {
     activeRoom,
     myPlayerId,
@@ -32,16 +48,35 @@ export function GameTable() {
     skipCounter,
     lastResult,
     clearLastResult,
+    finishGame,
+    playAgain,
+    shuffleDrawPile,
+    finishShuffleDrawPile,
+    leaveRoom,
   } = useGameSession();
 
-  const [pendingCard, setPendingCard] = useState<DemoCard | null>(null);
-  const [awaitingTarget, setAwaitingTarget] = useState(false);
+  // Modals & Panels State
+  const [isHandTrayOpen, setIsHandTrayOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCardGalleryOpen, setIsCardGalleryOpen] = useState(false);
+  const [isDiscardPileOpen, setIsDiscardPileOpen] = useState(false);
+  const [isManualFinishOpen, setIsManualFinishOpen] = useState(false);
+  const [isShuffleConfirmOpen, setIsShuffleConfirmOpen] = useState(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+
+
+
+
+  // Action Target Flow State
+  const [pendingTargetCard, setPendingTargetCard] = useState<DemoCard | null>(null);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
 
+  // Trap Open Flow State
   const [pendingTrapOpen, setPendingTrapOpen] = useState<DemoCard | null>(null);
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
 
+  // Auto-close trap open flow if a counter response window opens
   useEffect(() => {
     if (pendingResponse && (pendingTrapOpen !== null || awaitingTrapTarget)) {
       setPendingTrapOpen(null);
@@ -51,171 +86,449 @@ export function GameTable() {
   }, [pendingResponse, pendingTrapOpen, awaitingTrapTarget]);
 
   if (!activeRoom || !myPlayerId) return null;
+
   const { state, code } = activeRoom;
   const me = state.players[myPlayerId];
-  const isMyTurn = state.turnOrder[state.currentTurnIndex] === myPlayerId;
-  const canDeclare = !pendingResponse && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
-  const opponentIds = state.turnOrder.filter((id) => id !== myPlayerId);
+  if (!me) return null;
 
-  function handleSelectCard(cardCode: CardCode) {
-    if (!isMyTurn || pendingResponse) return;
-    const card = getDemoCard(cardCode);
-    if (card.type === 'trap' && me.traps.length >= 3) return;
-    if (card.type === 'action' || card.type === 'trap') {
-      setPendingCard(card);
+  const hostName = state.players[state.hostId]?.name ?? 'เจ้าของห้อง';
+  const playerIds = Object.keys(state.players);
+
+  // Physical seating order from room state (without reversing)
+  const seatOrder =
+    state.seatOrder && state.seatOrder.length === playerIds.length && state.seatOrder.every((id) => state.players[id])
+      ? state.seatOrder
+      : (state.turnOrder && state.turnOrder.length === playerIds.length ? state.turnOrder : playerIds);
+
+  const playDirection = state.playDirection ?? 'clockwise';
+  const currentTurnPlayerId = state.turnOrder[state.currentTurnIndex] || seatOrder[0];
+  const isMyTurn = currentTurnPlayerId === myPlayerId;
+  const isHost = myPlayerId === state.hostId;
+  const isFinished = state.status === 'finished' || (state.status as string) === 'ended';
+  const isShuffling = !!state.isShufflingDrawPile;
+
+  // Round tracking & transition presentation
+  const currentRound = state.roundNumber ?? 1;
+  const [presentedRound, setPresentedRound] = useState<number>(1);
+
+  useEffect(() => {
+    // If a game reset occurs (Play Again), reset presentedRound back to 1
+    if (currentRound === 1 && presentedRound > 1) {
+      setPresentedRound(1);
     }
-  }
+  }, [currentRound, presentedRound]);
 
-  function closeHandFlow() {
-    setPendingCard(null);
-    setAwaitingTarget(false);
+  const isRoundTransitionActive = currentRound > 1 && currentRound > presentedRound;
+
+  const canAct = isMyTurn && !pendingResponse && !isFinished && !isShuffling && !isRoundTransitionActive;
+  const canDeclare = !pendingResponse && !isFinished && !isShuffling && !isRoundTransitionActive && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
+
+  const isShuffleDisabled = !isHost || !!pendingResponse || isShuffling || isRoundTransitionActive || state.drawPile.length <= 1;
+  const shuffleDisabledReason = pendingResponse
+    ? 'รอให้การเล่นไพ่ปัจจุบันเสร็จก่อน'
+    : state.drawPile.length <= 1
+    ? 'ไพ่ในกองจั่วไม่พอ'
+    : isShuffling
+    ? 'กำลังสับไพ่'
+    : isRoundTransitionActive
+    ? 'กำลังเริ่มรอบใหม่'
+    : undefined;
+
+  // Check if local player is the target of an active Trap response
+  const isLocalTrapTarget =
+    pendingResponse?.kind === 'trap' &&
+    pendingResponse.actorId !== myPlayerId &&
+    (!pendingResponse.targetId || pendingResponse.targetId === myPlayerId);
+
+
+
+
+
+  // Opponents ordered in physical seat order
+  const opponentCandidates = useMemo(() => {
+    return seatOrder
+      .filter((id) => id !== myPlayerId && state.players[id] !== undefined)
+      .map((id) => ({ id, player: state.players[id] }));
+  }, [seatOrder, myPlayerId, state.players]);
+
+  // Handlers for Hand Tray Actions
+  const handlePlayActionDirect = (cardCode: CardCode) => {
+    if (!canAct) return;
+    playAction(cardCode);
+  };
+
+  const handlePlaceTrap = (cardCode: CardCode) => {
+    if (!canAct || me.traps.length >= 3) return;
+    placeTrapCard(cardCode);
+  };
+
+  const handleRequestTarget = (demoCard: DemoCard) => {
+    setPendingTargetCard(demoCard);
+  };
+
+  const handleConfirmTargetAction = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    playAction(pendingTargetCard.code, chosenTarget);
+    setPendingTargetCard(null);
     setChosenTarget(null);
-  }
+  };
 
-  function handleConfirmCard() {
-    if (!pendingCard) return;
-    if (pendingCard.type === 'trap') {
-      placeTrapCard(pendingCard.code);
-      closeHandFlow();
-      return;
-    }
-    if (pendingCard.needsTarget) {
-      setAwaitingTarget(true);
-      return;
-    }
-    playAction(pendingCard.code);
-    closeHandFlow();
-  }
-
-  function handleConfirmTarget() {
-    if (!pendingCard || !chosenTarget) return;
-    playAction(pendingCard.code, chosenTarget);
-    closeHandFlow();
-  }
-
-  function closeTrapOpenFlow() {
-    setPendingTrapOpen(null);
-    setAwaitingTrapTarget(false);
-    setChosenTrapTarget(null);
-  }
-
-  function handleOpenTrapTap(trapCode: CardCode) {
+  // Handlers for Opening Active Traps
+  const handleOpenTrapTap = (trapCode: CardCode) => {
     if (pendingResponse) return;
-    setPendingTrapOpen(getDemoCard(trapCode));
-  }
+    try {
+      const demo = getDemoCard(trapCode);
+      setPendingTrapOpen(demo);
+    } catch {
+      openTrapCard(trapCode);
+    }
+  };
 
-  function handleConfirmOpenTrap() {
+  const handleConfirmOpenTrap = () => {
     if (!pendingTrapOpen) return;
     if (pendingTrapOpen.needsTarget) {
       setAwaitingTrapTarget(true);
       return;
     }
     openTrapCard(pendingTrapOpen.code);
-    closeTrapOpenFlow();
-  }
+    setPendingTrapOpen(null);
+  };
 
-  function handleConfirmTrapTarget() {
+  const handleConfirmTrapTarget = () => {
     if (!pendingTrapOpen || !chosenTrapTarget) return;
     openTrapCard(pendingTrapOpen.code, chosenTrapTarget);
-    closeTrapOpenFlow();
-  }
+    setPendingTrapOpen(null);
+    setAwaitingTrapTarget(false);
+    setChosenTrapTarget(null);
+  };
 
-  const counterCards = pendingResponse
-    ? me.hand.filter((c) => demoCardsOfType('counter').some((counter) => counter.code === c))
-    : [];
+  const handleConfirmLeave = () => {
+    leaveRoom();
+    router.push('/');
+  };
+
+  // Legally valid Counter response cards available in local hand for the active pendingResponse
+  const validCounterCards = useMemo(() => {
+    return getValidCounterCards(me.hand, pendingResponse);
+  }, [me.hand, pendingResponse]);
+
 
   return (
-    <main className="mx-auto flex h-screen max-w-md flex-col overflow-hidden">
-      <div className="shrink-0 p-3" style={{ flexBasis: '15%' }}>
-        <GameHeader hostName={state.players[state.hostId].name} code={code} />
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-start p-3 pb-24 bg-gradient-to-b from-gray-50/70 via-white to-gray-50/70 overflow-x-hidden">
+      {/* =================================================== */}
+      {/* A. UPPER GAMEPLAY CONTENT (Tightly Stacked at Top)  */}
+      {/* =================================================== */}
+      <div className="flex flex-col gap-2 shrink-0">
+        {/* 1. Header Section (Compact Room Info & Settings) */}
+        <GameHeader
+          hostName={hostName}
+          code={code}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onLeavePrompt={() => setIsLeaveConfirmOpen(true)}
+        />
+
+        {/* 2. Section 1: Current Turn Status */}
+        <TurnStatusBar
+          currentTurnPlayerId={currentTurnPlayerId}
+          myPlayerId={myPlayerId}
+          players={state.players}
+          seatOrder={seatOrder}
+          playDirection={playDirection}
+        />
+
+        {/* 3. Section 2: All Players (Responsive grid, no horizontal scroll, all visible) */}
+        <PlayerDensityGrid
+          seatOrder={seatOrder}
+          players={state.players}
+          currentTurnPlayerId={currentTurnPlayerId}
+          myPlayerId={myPlayerId}
+          hostId={state.hostId}
+        />
+
+        {/* 4. Section 3: Draw Pile + Discard Pile (Side-by-side center table with portrait 2:3 cards) */}
+        <CenterTable
+          drawPileCount={state.drawPile.length}
+          discardPile={state.discardPile}
+          isMyTurn={isMyTurn}
+          canAct={canAct}
+          onDraw={drawCard}
+          onOpenDiscardPile={() => setIsDiscardPileOpen(true)}
+        />
+
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-hidden p-3" style={{ flexBasis: '45%' }}>
-        <div className="flex flex-wrap justify-center gap-3">
-          {opponentIds.map((id) => (
-            <PlayerCard
-              key={id}
-              player={state.players[id]}
-              isCurrentTurn={state.turnOrder[state.currentTurnIndex] === id}
-            />
-          ))}
-        </div>
-        <div className="flex flex-1 items-center justify-center gap-6">
-          <Deck count={state.drawPile.length} />
-          <DiscardPile count={state.discardPile.length} />
-        </div>
-      </div>
+      {/* =================================================== */}
+      {/* B. FLEXIBLE SPACER (Only between CenterTable & Traps)*/}
+      {/* =================================================== */}
+      <div className="flex-1 min-h-[16px]" />
 
-      <div className="flex shrink-0 flex-col gap-2 border-t border-ink/10 p-3" style={{ flexBasis: '40%' }}>
-        <PlayerCard player={me} isCurrentTurn={isMyTurn} />
-        {me.traps.length > 0 && (
-          <div className="flex gap-2">
-            {me.traps.map((trapCode, i) => (
-              <button
-                key={`${trapCode}-${i}`}
-                onClick={() => handleOpenTrapTap(trapCode)}
-                className="min-h-[36px] rounded-card border border-trap px-2 text-xs font-semibold text-trap"
-              >
-                เปิดกับดัก
-              </button>
-            ))}
-          </div>
+      {/* =================================================== */}
+      {/* C. ACTIVE TRAPS (Anchored near bottom above Bar)    */}
+      {/* =================================================== */}
+      <div className="flex flex-col gap-1.5 shrink-0 mt-auto mb-2">
+        {/* 5. Section 4: My Active Traps (Always 3 portrait 2:3 slots) */}
+        <ActiveTrapsSection
+          traps={me.traps}
+          onOpenTrap={handleOpenTrapTap}
+          onAddTrapSlotClick={() => setIsHandTrayOpen(true)}
+          disabled={pendingResponse !== null || isShuffling || isRoundTransitionActive}
+        />
+
+
+        {/* Declare Muffin Time Button (Compact banner if eligible) */}
+        {canDeclare && (
+          <button
+            type="button"
+            onClick={declareMuffinTime}
+            className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 px-3 py-1.5 text-xs font-black text-white shadow-md shadow-amber-500/20 transition-all hover:opacity-95 active:scale-[0.98] animate-bounce shrink-0"
+          >
+            <span>🧁 ประกาศ MUFFIN TIME! (มีไพ่ครบ 10 ใบ)</span>
+          </button>
         )}
-        <CardHand hand={me.hand} selectedCode={pendingCard?.code ?? null} onSelect={handleSelectCard} />
-        <BottomActionBar isMyTurn={isMyTurn} onDraw={drawCard} canDeclare={canDeclare} onDeclare={declareMuffinTime} />
       </div>
 
-      {pendingCard?.type === 'action' && (
-        <ActionModal card={awaitingTarget ? null : pendingCard} onConfirm={handleConfirmCard} onCancel={closeHandFlow} />
-      )}
-      {pendingCard?.type === 'trap' && (
-        <TrapModal card={pendingCard} mode="place" onConfirm={handleConfirmCard} onCancel={closeHandFlow} />
-      )}
-      <TargetSelector
-        open={awaitingTarget}
-        candidates={opponentIds.map((id) => ({ id, player: state.players[id] }))}
-        selectedId={chosenTarget}
-        onSelect={setChosenTarget}
-        onConfirm={handleConfirmTarget}
-        onCancel={closeHandFlow}
-        prompt={pendingCard ? pendingCard.effect : ''}
+      {/* =================================================== */}
+      {/* D. BOTTOM ACTION BAR (Persistent fixed bar)         */}
+      {/* =================================================== */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-center p-2.5 bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-lg pointer-events-auto">
+        <div className="max-w-md w-full flex items-center gap-2 px-3">
+          {/* Left Action: Open Hand Tray */}
+          <button
+            type="button"
+            onClick={() => setIsHandTrayOpen(true)}
+            className="flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-[#FF2E63] via-[#ED1F4F] to-[#E52B50] px-3 text-xs sm:text-sm font-black text-white shadow-md shadow-primary/25 transition-all hover:opacity-95 active:scale-[0.98]"
+          >
+            <CardsIcon className="h-4 w-4 stroke-[2.5]" />
+            <span>ดูไพ่ในมือ ({me.hand.length})</span>
+          </button>
+
+          {/* Right Action: Quick Draw Card */}
+          <button
+            type="button"
+            onClick={drawCard}
+            disabled={!isMyTurn || !canAct}
+            className={`flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl border-2 px-3 text-xs sm:text-sm font-black transition-all ${
+              isMyTurn && canAct
+                ? 'border-primary bg-primary/10 text-primary shadow-sm hover:bg-primary/15 active:scale-[0.98]'
+                : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-75'
+            }`}
+          >
+            <CardStackIcon className="h-4 w-4" />
+            <span>จั่วไพ่</span>
+          </button>
+        </div>
+      </div>
+
+
+
+
+      {/* 9. Hand Tray Modal (Horizontal scrollable hand + tap card to play) */}
+      <HandTrayModal
+        isOpen={isHandTrayOpen}
+        hand={me.hand}
+        isMyTurn={isMyTurn}
+        canAct={canAct}
+        trapsCount={me.traps.length}
+        onClose={() => setIsHandTrayOpen(false)}
+        onPlayAction={handlePlayActionDirect}
+        onPlaceTrap={handlePlaceTrap}
+        onRequestTarget={handleRequestTarget}
       />
 
+      {/* 10. Action Card Target Selector */}
+      <TargetSelector
+        open={pendingTargetCard !== null}
+        candidates={opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={setChosenTarget}
+        onConfirm={handleConfirmTargetAction}
+        onCancel={() => {
+          setPendingTargetCard(null);
+          setChosenTarget(null);
+        }}
+        prompt={pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+
+      {/* 11. Trap Card Open Modal */}
       <TrapModal
         card={awaitingTrapTarget ? null : pendingTrapOpen}
         mode="open"
         onConfirm={handleConfirmOpenTrap}
-        onCancel={closeTrapOpenFlow}
+        onCancel={() => {
+          setPendingTrapOpen(null);
+          setAwaitingTrapTarget(false);
+        }}
       />
+
+      {/* 12. Trap Card Target Selector */}
       <TargetSelector
         open={awaitingTrapTarget}
-        candidates={Object.keys(state.players)
-          .filter((id) => id !== myPlayerId)
-          .map((id) => ({ id, player: state.players[id] }))}
+        candidates={opponentCandidates}
         selectedId={chosenTrapTarget}
         onSelect={setChosenTrapTarget}
         onConfirm={handleConfirmTrapTarget}
-        onCancel={closeTrapOpenFlow}
-        prompt={pendingTrapOpen ? pendingTrapOpen.effect : ''}
+        onCancel={() => {
+          setPendingTrapOpen(null);
+          setAwaitingTrapTarget(false);
+          setChosenTrapTarget(null);
+        }}
+        prompt={pendingTrapOpen?.effect ?? 'เลือกผู้เล่นเป้าหมายสำหรับกับดัก'}
       />
 
+      {/* 13. Trap Alert & Counter Decision Modal (When local player is hit by a Trap) */}
+      <TrapAlertModal
+        open={Boolean(isLocalTrapTarget && pendingResponse)}
+        trapCode={pendingResponse?.kind === 'trap' ? pendingResponse.code : null}
+        actorId={pendingResponse?.actorId}
+        actorName={pendingResponse?.actorId ? state.players[pendingResponse.actorId]?.name : 'ฝ่ายตรงข้าม'}
+        counterCards={validCounterCards}
+        responseId={pendingResponse?.responseId}
+        onPlayCounter={playCounter}
+        onDecline={skipCounter}
+      />
+
+      {/* 14. Counter Card Response Window Modal (For Action responses) */}
+      <CounterModal
+        open={pendingResponse?.kind === 'action' && validCounterCards.length > 0}
+        counterCards={validCounterCards}
+        onPlay={playCounter}
+        onSkip={skipCounter}
+      />
+
+
+
+      {/* 14. Action & Trap Result Notification Modals */}
       <TrapResultModal
         result={lastResult}
         ownerName={lastResult ? state.players[lastResult.actorId]?.name ?? '' : ''}
         targetName={lastResult?.targetId ? state.players[lastResult.targetId]?.name : undefined}
         onClose={clearLastResult}
       />
+
       <CounterResultModal
         result={lastResult}
         counterActorName={lastResult?.counteredBy ? state.players[lastResult.counteredBy]?.name ?? '' : ''}
         onClose={clearLastResult}
       />
-      <CounterModal
-        open={pendingResponse !== null && counterCards.length > 0}
-        counterCards={counterCards}
-        onPlay={playCounter}
-        onSkip={skipCounter}
+
+      {/* 15. In-Game Settings Bottom Sheet */}
+      <GameSettingsModal
+        isOpen={isSettingsOpen}
+        isHost={isHost}
+        onClose={() => setIsSettingsOpen(false)}
+        onOpenCardGallery={() => setIsCardGalleryOpen(true)}
+        onOpenShuffleConfirm={() => setIsShuffleConfirmOpen(true)}
+        isShuffleDisabled={isShuffleDisabled}
+        shuffleDisabledReason={shuffleDisabledReason}
+        onOpenManualFinish={() => setIsManualFinishOpen(true)}
       />
+
+      {/* 16. In-Game Card Gallery Browser Modal */}
+      <InGameCardGalleryModal
+        isOpen={isCardGalleryOpen}
+        onClose={() => setIsCardGalleryOpen(false)}
+      />
+
+      {/* 17. Discard Pile Viewer Modal (View-only inspection of all discarded cards) */}
+      <DiscardPileModal
+        isOpen={isDiscardPileOpen}
+        onClose={() => setIsDiscardPileOpen(false)}
+        discardPile={state.discardPile}
+      />
+
+
+      {/* 17. Host-Only Shuffle Draw Pile Confirm Modal */}
+      {isShuffleConfirmOpen && (
+        <ShuffleConfirmModal
+          isOpen={isShuffleConfirmOpen}
+          drawPileCount={state.drawPile.length}
+          onClose={() => setIsShuffleConfirmOpen(false)}
+          onConfirm={shuffleDrawPile}
+        />
+      )}
+
+      {/* 18. Transient Animated Shuffle Draw Pile Overlay (Synced for all players) */}
+      {isShuffling && (
+        <ShuffleDrawPileOverlay
+          key={state.shuffleSequence ?? 1}
+          isHost={isHost}
+          onComplete={finishShuffleDrawPile}
+        />
+      )}
+
+      {/* 19. Transient Animated Round Transition Overlay (When advancing to Round 2, 3, 4...) */}
+      {isRoundTransitionActive && (
+        <RoundTransitionOverlay
+          key={`round-${currentRound}`}
+          roundNumber={currentRound}
+          activePlayerId={currentTurnPlayerId}
+          myPlayerId={myPlayerId}
+          activePlayerName={state.players[currentTurnPlayerId]?.name || 'ผู้เล่น'}
+          onComplete={() => setPresentedRound(currentRound)}
+        />
+      )}
+
+
+      {/* 20. Host-Only Manual Finish Game Modal */}
+      {isManualFinishOpen && (
+        <ManualFinishModal
+          isOpen={isManualFinishOpen}
+          seatOrder={seatOrder}
+          players={state.players}
+          hostId={state.hostId}
+          myPlayerId={myPlayerId}
+          onClose={() => setIsManualFinishOpen(false)}
+          onConfirmWinner={(winnerId) => {
+            finishGame(winnerId, 'manual');
+            setIsManualFinishOpen(false);
+          }}
+        />
+      )}
+
+
+      {/* 20. Winner Celebration & Post-Game Overlay (Full-screen celebration for all players) */}
+      {isFinished && (
+        <WinnerCelebrationOverlay
+          winnerId={state.winnerId || seatOrder[0]}
+          finishReason={state.finishReason ?? 'normal'}
+          players={state.players}
+          isHost={isHost}
+          myPlayerId={myPlayerId}
+          onPlayAgain={playAgain}
+          onLeaveRoom={handleConfirmLeave}
+        />
+      )}
+
+
+
+      {/* 19. Leave Room Direct Confirm Modal */}
+      {isLeaveConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-xs rounded-3xl bg-white p-5 text-center shadow-2xl">
+            <h3 className="text-base font-black text-ink">ออกจากห้องเกม?</h3>
+            <p className="text-xs text-ink-secondary mt-1">
+              คุณต้องการออกจากห้องเกมนี้และกลับสู่หน้าหลักใช่หรือไม่?
+            </p>
+            <div className="mt-4 flex w-full gap-2">
+              <button
+                type="button"
+                onClick={handleConfirmLeave}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-red-700 active:scale-95 transition-all"
+              >
+                ออกจากห้อง
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsLeaveConfirmOpen(false)}
+                className="flex-1 rounded-xl border border-gray-200 bg-white py-2.5 text-xs font-bold text-ink-secondary hover:bg-gray-100 active:scale-95 transition-all"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
+

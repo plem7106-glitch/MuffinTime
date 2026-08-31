@@ -109,3 +109,57 @@ export function resolveCounterCard(state: RoomState, code: CardCode, actorId: Pl
       throw new Error(`resolveCounterCard: ${code} is not a playable demo counter`);
   }
 }
+
+/**
+ * Validates whether a specific Counter card can legally respond to the given pending event.
+ */
+export function isCounterEligible(
+  counterCode: CardCode,
+  pending: { kind: 'action' | 'trap'; code: CardCode }
+): boolean {
+  // 1. Check demo card specifications
+  if (counterCode === 'C09') {
+    return pending.kind === 'trap';
+  }
+  if (counterCode === 'C17') {
+    return pending.kind === 'action';
+  }
+  if (counterCode === 'C16') {
+    // Bomb squad counters active cards
+    return true;
+  }
+
+  // 2. Fallback check for other Counter cards
+  if (pending.kind === 'trap') {
+    // Exclude counters explicitly targeted only at actions
+    if (['C10', 'C13', 'C14', 'C15', 'C17'].includes(counterCode)) {
+      return false;
+    }
+    return true;
+  } else if (pending.kind === 'action') {
+    // Exclude counters explicitly targeted only at traps
+    if (['C09', 'C11'].includes(counterCode)) {
+      return false;
+    }
+    return true;
+  }
+
+  return true;
+}
+
+/**
+ * Filters a player's hand to only include Counter cards that are valid for the active response event.
+ */
+export function getValidCounterCards(
+  hand: CardCode[],
+  pending: { kind: 'action' | 'trap'; code: CardCode } | null
+): CardCode[] {
+  if (!pending) return [];
+  const allCounterCodes = new Set(demoCardsOfType('counter').map((c) => c.code));
+  return hand.filter((code) => {
+    const isCounter = allCounterCodes.has(code) || code.startsWith('C');
+    if (!isCounter) return false;
+    return isCounterEligible(code, pending);
+  });
+}
+

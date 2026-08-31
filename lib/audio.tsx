@@ -22,19 +22,31 @@ export interface AudioContextValue {
   playLobbyMusic: () => void;
   stopLobbyMusic: () => void;
   playGameStart: () => void;
+  playSuccess: () => void;
+  playRound: () => void;
+  playTrapAlert: () => void;
 }
 
 const AudioContext = createContext<AudioContextValue | null>(null);
 
 const LOBBY_MUSIC_SRC = '/sounds/muffin-song.mp3';
 const GAME_START_SRC = '/sounds/Game-Start.mp3';
+const SUCCESS_SFX_SRC = '/sounds/Succes.mp3';
+const ROUND_SFX_SRC = '/sounds/Round.mp3';
+const TRAP_SFX_SRC = '/sounds/TRAP.mp3';
 
 // Reduce volume by about 25 dB from full scale: 10^(-25/20) ≈ 0.056
 const LOBBY_VOLUME = 0.056;
 const SFX_VOLUME = 0.85;
+// -15 dB from full scale: 10^(-15/20) ≈ 0.1778
+const SUCCESS_SFX_VOLUME = 0.178;
+// -5 dB from full scale: 10^(-5/20) ≈ 0.562
+const ROUND_SFX_VOLUME = 0.56;
+const TRAP_SFX_VOLUME = 0.85;
 
 const FADE_IN_DURATION_MS = 1800;
 const FADE_OUT_DURATION_MS = 500;
+
 
 const INTERACTION_EVENTS = ['click', 'pointerdown', 'touchstart', 'keydown'] as const;
 
@@ -45,6 +57,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const lobbyAudioRef = useRef<HTMLAudioElement | null>(null);
   const gameStartAudioRef = useRef<HTMLAudioElement | null>(null);
+  const successAudioRef = useRef<HTMLAudioElement | null>(null);
+  const roundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const trapAudioRef = useRef<HTMLAudioElement | null>(null);
+
+
+
   const audioPhaseRef = useRef<AudioPhase>('pre-game');
   const isMusicEnabledRef = useRef<boolean>(true);
   const isSfxEnabledRef = useRef<boolean>(true);
@@ -232,6 +250,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     gameStartAudio.preload = 'auto';
     gameStartAudioRef.current = gameStartAudio;
 
+    const successAudio = new Audio(SUCCESS_SFX_SRC);
+    successAudio.volume = SUCCESS_SFX_VOLUME;
+    successAudio.preload = 'auto';
+    successAudioRef.current = successAudio;
+
+    const roundAudio = new Audio(ROUND_SFX_SRC);
+    roundAudio.volume = ROUND_SFX_VOLUME;
+    roundAudio.preload = 'auto';
+    roundAudioRef.current = roundAudio;
+
+    const trapAudio = new Audio(TRAP_SFX_SRC);
+    trapAudio.volume = TRAP_SFX_VOLUME;
+    trapAudio.preload = 'auto';
+    trapAudioRef.current = trapAudio;
+
+
     // 1. Immediately attempt autoplay on first mount if music is enabled & in pre-game
     if (initialMusicEnabled && audioPhaseRef.current === 'pre-game') {
       startLobbyMusicWithFadeIn();
@@ -247,6 +281,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       if (gameStartAudioRef.current) {
         gameStartAudioRef.current.pause();
         gameStartAudioRef.current = null;
+      }
+      if (successAudioRef.current) {
+        successAudioRef.current.pause();
+        successAudioRef.current = null;
+      }
+      if (roundAudioRef.current) {
+        roundAudioRef.current.pause();
+        roundAudioRef.current = null;
+      }
+      if (trapAudioRef.current) {
+        trapAudioRef.current.pause();
+        trapAudioRef.current = null;
       }
     };
   }, [startLobbyMusicWithFadeIn, removeInteractionListeners, cancelFade]);
@@ -340,6 +386,33 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [removeInteractionListeners, fadeOut]);
 
+  const playSuccess = useCallback(() => {
+    // Play Succes.mp3 exactly once if SFX is enabled at -15 dB (0.178)
+    if (isSfxEnabledRef.current && successAudioRef.current) {
+      successAudioRef.current.currentTime = 0;
+      successAudioRef.current.volume = SUCCESS_SFX_VOLUME;
+      successAudioRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  const playRound = useCallback(() => {
+    // Play Round.mp3 exactly once if SFX is enabled at -5 dB (0.56)
+    if (isSfxEnabledRef.current && roundAudioRef.current) {
+      roundAudioRef.current.currentTime = 0;
+      roundAudioRef.current.volume = ROUND_SFX_VOLUME;
+      roundAudioRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  const playTrapAlert = useCallback(() => {
+    // Play TRAP.mp3 alert once if SFX is enabled
+    if (isSfxEnabledRef.current && trapAudioRef.current) {
+      trapAudioRef.current.currentTime = 0;
+      trapAudioRef.current.volume = TRAP_SFX_VOLUME;
+      trapAudioRef.current.play().catch(() => {});
+    }
+  }, []);
+
   return (
     <AudioContext.Provider
       value={{
@@ -352,6 +425,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         playLobbyMusic,
         stopLobbyMusic,
         playGameStart,
+        playSuccess,
+        playRound,
+        playTrapAlert,
       }}
     >
       {children}

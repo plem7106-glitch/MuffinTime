@@ -21,7 +21,7 @@ export default function RoomPage() {
       return;
     }
 
-    if (activeRoom.state.status === 'playing' && audioPhase !== 'gameplay') {
+    if ((activeRoom.state.status === 'playing' || activeRoom.state.status === 'finished' || (activeRoom.state.status as string) === 'ended') && audioPhase !== 'gameplay') {
       setAudioPhase('gameplay');
     } else if (activeRoom.state.status === 'lobby' && audioPhase !== 'pre-game') {
       setAudioPhase('pre-game');
@@ -36,9 +36,10 @@ export default function RoomPage() {
     case 'setup':
       return <TurnOrderSetup />;
     case 'playing':
-      return <GameTable />;
+    case 'finished':
     case 'ended':
-      return <GameResult />;
+      return <GameTable />;
   }
 }
+
 
