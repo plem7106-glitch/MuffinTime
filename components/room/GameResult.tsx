@@ -28,7 +28,6 @@ export function GameResult() {
 
       <div className="mt-4 flex w-full flex-col gap-2">
         <PrimaryButton onClick={playAgain}>เล่นอีกครั้ง</PrimaryButton>
-        <SecondaryButton onClick={handleLeave}>กลับไปหน้า Lobby</SecondaryButton>
         <SecondaryButton onClick={handleLeave}>ออกจากห้อง</SecondaryButton>
       </div>
     </main>
