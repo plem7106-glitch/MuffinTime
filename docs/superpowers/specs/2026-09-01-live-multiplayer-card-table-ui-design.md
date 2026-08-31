@@ -111,6 +111,21 @@ Component ที่ใช้ context เดิม (`WaitingRoom`, `GameTable`, �
 
 `WaitingRoom.tsx` เดิมเติมบอทอัตโนมัติถ้าห้องว่างเกิน 900ms — ปิดพฤติกรรมนี้ในโหมดจริง (โค้ดบอทไม่ลบ เก็บไว้เผื่อใช้ภายหลัง)
 
+### `pendingResponse` / `lastResult` ต้อง sync ผ่าน `RoomState` ด้วย (พบระหว่างวางแผน ไม่ใช่แค่ local state แล้ว)
+
+ตอน local reducer เดิม `pendingResponse` (การ์ด Action/Trap ที่เพิ่งเล่น รอช่วง Counter) และ `lastResult` (ผลลัพธ์ล่าสุดเพื่อโชว์ popup) เป็น state ในเครื่องผู้เล่นคนเดียว ใช้ได้เพราะทุกคนอยู่ใน reducer เดียวกัน — พอเป็น multiplayer จริงข้ามเครื่อง **ต้องย้ายสองอันนี้เข้าไปเป็นส่วนหนึ่งของ `RoomState`** (เพิ่ม field `pendingResponse?: PendingResponse | null` และ `lastResult?: LastResult | null` ใน `game/types.ts`) ไม่งั้นผู้เล่นอีกฝั่ง (เช่นเป้าหมายของ Trap) จะไม่เห็นว่ามีอะไรรอให้ตอบสนองอยู่เลย — เหมือนกับที่เพิ่ม `maxPlayers` เข้า state ไปก่อนหน้านี้ ยังเป็นแค่ jsonb ก้อนเดิม ไม่ต้องแก้ migration
+
+**ป้องกันการ resolve ซ้ำซ้อน**: เมื่อหลายเครื่อง subscribe เห็น `pendingResponse` เดียวกันพร้อมกัน (เช่น auto-skip counter เมื่อมือไม่มีการ์ดตอบโต้) ต้องไม่ให้ทุกเครื่อง apply ผลซ้ำกัน — ใช้ `responseId` (มีอยู่แล้วในโครงสร้างเดิม) เป็น idempotency token: ฟังก์ชัน updater ที่ resolve ต้องเช็คก่อนว่า `state.pendingResponse?.responseId === responseId` ที่ตัวเองถืออยู่ ถ้าไม่ตรง (มีคนอื่น resolve ไปก่อนแล้ว) ให้ return state เดิมไม่ทำอะไร — `updateRoomWithRetry` fetch state ใหม่ทุกครั้งที่ retry อยู่แล้วจึงเช็คได้
+
+`lastResult` sync แต่ **การปิด popup (`clearLastResult`) ต้องเป็น local เท่านั้น** ไม่เขียนกลับ Supabase — ไม่งั้นคนหนึ่งกดปิด popup จะไปปิดของทุกคนพร้อมกันทั้งที่บางคนยังไม่ทันอ่าน (เทียบ `dismissedResponseId` ใน local component state กับ `lastResult.responseId` แทน)
+
+### Gotcha อื่นที่ต้องระวังตอน implement
+
+- **ฟังก์ชัน engine โยน exception เมื่อทำไม่ได้** (`addPlayer` โยนถ้าห้องเต็ม, `placeTrap` โยนถ้ากับดักเกิน 3, `startGame` โยนถ้าผู้เล่นไม่ถึง 3 คน) — reducer เดิมจับด้วย try/catch แล้ว "เงียบๆ คืน state เดิม" พอเป็น async เขียนผ่าน `updateRoomWithRetry` ต้อง catch แล้วโชว์ error ให้ผู้ใช้เห็นจริงๆ (ไม่เงียบเหมือนเดิม)
+- **ต้องกันกดซ้ำระหว่างรอ round-trip**: ไม่มี optimistic update แล้ว (ตามที่ตัดสินใจไว้) ระหว่างที่ยังไม่มี state ใหม่กลับมาจาก Supabase ปุ่ม action ต่างๆ (จั่วไพ่ ฯลฯ) ยังกดซ้ำได้ถ้าไม่กันไว้ — ต้องมี local flag (เช่น `isWriting`) ปิดปุ่มระหว่างรอ
+- **Overlay ที่จบด้วยการเรียก action ต้อง gate ไม่ให้ทุกเครื่องยิงพร้อมกัน**: `ShuffleDrawPileOverlay` เรียก `finishShuffleDrawPile()` ตอน animation จบ ซึ่งทุกเครื่องที่เห็น `isShufflingDrawPile: true` จะรัน animation แล้วเรียกพร้อมกันหมด — จำกัดให้ host เท่านั้นเป็นคนเรียก (เครื่องอื่น no-op)
+- **`app/page.tsx` มีลิสต์ "ห้องที่เปิดอยู่"** (seed จาก `SEED_ROOMS`) และ `components/lobby/JoinRoomModal.tsx` (อีกทางเข้า join ที่พิมพ์รหัสแล้วเช็คกับ `rooms` local list เหมือนกัน) — โมเดล multiplayer จริงเป็นแบบ "รู้รหัสห้องถึงเข้าได้" (แชร์รหัสกันเอง) ไม่มีแนวคิด "เห็นห้องคนอื่นทั้งระบบ" ตัดสินใจ: **ลบลิสต์ "ห้องที่เปิดอยู่" ทิ้ง** (ไม่ query ห้องทั้งหมดจาก Supabase มาโชว์) เหลือแค่ปุ่ม "สร้างห้อง" / "เข้าร่วมห้อง" (กรอกรหัส) — `JoinRoomModal` ยังเก็บไว้ได้แต่เปลี่ยนให้ไปเช็คห้องจริงตอนกด "เข้าร่วม" (fetch แล้ว push ไป `/join/[code]` เสมอ ให้หน้า join เป็นคนเช็คว่าห้องมีจริง/เต็มไหมอีกที)
+
 ## มือไพ่ผู้เล่นเอง — ต่อยอด `HandTrayModal` ที่มีอยู่แล้ว
 
 ไม่รื้อ ไม่สร้างใหม่ — แก้แค่ CSS ของแถวการ์ดใน `HandTrayModal.tsx`: จากเรียงห่างกัน → ซ้อนทับกันซ้าย→ขวา (margin ติดลบ ~1/3 ความกว้างการ์ด, z-index ไล่ตามลำดับ) การ์ดที่แตะเลือก (`selectedCode`) ยกขึ้น + ยกระดับ z-index เหนือใบข้างๆ ให้เห็นชัดว่าใบไหนถูกเลือกอยู่ (ของเดิมมี state `selectedCode` + panel รายละเอียดอยู่แล้ว ไม่ต้องแก้ logic ส่วนนั้น)
