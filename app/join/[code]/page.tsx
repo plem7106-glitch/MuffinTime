@@ -26,7 +26,7 @@ export default function JoinRoomPage() {
         <Link href="/" aria-label="ย้อนกลับ" className="text-xl text-ink">
           ←
         </Link>
-        <h1 className="text-lg font-bold text-ink">JOIN ห้อง</h1>
+        <h1 className="text-lg font-bold text-ink">เข้าร่วมห้อง</h1>
       </header>
 
       <div className="rounded-card border border-ink/10 bg-card p-3">
