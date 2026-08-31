@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useGameSession } from '../../lib/session';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 
-const PLAYER_COUNTS = [2, 3, 4, 5, 6, 7, 8];
+const PLAYER_COUNTS = [3, 4, 5, 6, 7, 8];
 
 export default function CreateRoomPage() {
   const router = useRouter();
