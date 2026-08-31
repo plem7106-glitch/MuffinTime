@@ -45,7 +45,7 @@ export default function Home() {
       <BottomSheet open={showHowToPlay} onClose={() => setShowHowToPlay(false)}>
         <h2 className="mb-2 text-lg font-bold text-ink">วิธีเล่น</h2>
         <p className="text-sm text-ink-secondary">
-          จั่ว ทิ้ง หรือขโมยไพ่ผ่านการ์ด Action, Trap และ Counter ผู้เล่นที่มีไพ่ในมือครบ 10 ใบพอดี
+          จั่ว ทิ้ง หรือขโมยไพ่ผ่านการ์ดแอ็กชัน กับดัก และการ์ดสวนกลับ ผู้เล่นที่มีไพ่ในมือครบ 10 ใบพอดี
           ตอนเริ่มเทิร์นของตัวเอง (และเคยประกาศไว้ก่อนหน้า) เป็นผู้ชนะ
         </p>
       </BottomSheet>

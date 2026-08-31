@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameSession } from '../../lib/session';
 import { isMuffinTimeEligible } from '../../game/turn';
 import { getDemoCard, demoCardsOfType, type DemoCard } from '../../lib/demoCards';
@@ -42,11 +42,19 @@ export function GameTable() {
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
 
+  useEffect(() => {
+    if (pendingResponse && (pendingTrapOpen !== null || awaitingTrapTarget)) {
+      setPendingTrapOpen(null);
+      setAwaitingTrapTarget(false);
+      setChosenTrapTarget(null);
+    }
+  }, [pendingResponse, pendingTrapOpen, awaitingTrapTarget]);
+
   if (!activeRoom || !myPlayerId) return null;
   const { state, code } = activeRoom;
   const me = state.players[myPlayerId];
   const isMyTurn = state.turnOrder[state.currentTurnIndex] === myPlayerId;
-  const canDeclare = isMyTurn && !pendingResponse && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
+  const canDeclare = !pendingResponse && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
   const opponentIds = state.turnOrder.filter((id) => id !== myPlayerId);
 
   function handleSelectCard(cardCode: CardCode) {
@@ -191,12 +199,6 @@ export function GameTable() {
         prompt={pendingTrapOpen ? pendingTrapOpen.effect : ''}
       />
 
-      <CounterModal
-        open={pendingResponse !== null && counterCards.length > 0}
-        counterCards={counterCards}
-        onPlay={playCounter}
-        onSkip={skipCounter}
-      />
       <TrapResultModal
         result={lastResult}
         ownerName={lastResult ? state.players[lastResult.actorId]?.name ?? '' : ''}
@@ -207,6 +209,12 @@ export function GameTable() {
         result={lastResult}
         counterActorName={lastResult?.counteredBy ? state.players[lastResult.counteredBy]?.name ?? '' : ''}
         onClose={clearLastResult}
+      />
+      <CounterModal
+        open={pendingResponse !== null && counterCards.length > 0}
+        counterCards={counterCards}
+        onPlay={playCounter}
+        onSkip={skipCounter}
       />
     </main>
   );

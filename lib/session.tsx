@@ -192,7 +192,7 @@ function reducer(state: SessionState, action: Action): SessionState {
         ...state,
         activeRoom: { ...state.activeRoom, state: finalState },
         pendingResponse: null,
-        lastResult: { kind, code, actorId, targetId, countered: false },
+        lastResult: kind === 'trap' ? { kind, code, actorId, targetId, countered: false } : null,
       };
     }
     case 'CLEAR_RESULT':

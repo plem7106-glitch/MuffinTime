@@ -20,6 +20,15 @@ export function WaitingRoom() {
     return () => clearTimeout(timer);
   }, [activeRoom, joinNextBot]);
 
+  useEffect(() => {
+    if (!activeRoom) return;
+    const currentCount = Object.keys(activeRoom.state.players).length;
+    if (currentCount < activeRoom.maxPlayers) return;
+    if (!activeRoom.state.hostId.startsWith('bot-')) return;
+    const timer = setTimeout(() => startGame(), 900);
+    return () => clearTimeout(timer);
+  }, [activeRoom, startGame]);
+
   if (!activeRoom) return null;
   const { state, maxPlayers, code } = activeRoom;
   const isHost = myPlayerId === state.hostId;
