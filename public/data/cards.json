@@ -1,1394 +1,1625 @@
 {
   "action": [
     {
-      "en": "Wrong House",
-      "th": "ผิดบ้านแล้ว!",
-      "effect": "ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ จั่วไพ่คนละ 2 ใบ",
-      "code": "A001"
+      "code": "A001",
+      "name_en": "Wrong House",
+      "name_th": "ผิดบ้านแล้ว!",
+      "description_en": "All players who do not live here draw 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ จั่วไพ่คนละ 2 ใบ"
     },
     {
-      "en": "Oh No! Babies!",
-      "th": "โอ้ไม่นะ! เด็กใหม่!",
-      "effect": "ผู้เล่นทุกคนที่ไม่เคยเล่นเกมนี้มาก่อน จั่วไพ่คนละ 3 ใบ",
-      "code": "A002"
+      "code": "A002",
+      "name_en": "Oh No! Babies!",
+      "name_th": "โอ้ไม่นะ! เด็กใหม่!",
+      "description_en": "All players who have never played this game before draw 3 cards.",
+      "description_th": "ผู้เล่นทุกคนที่ไม่เคยเล่นเกมนี้มาก่อน จั่วไพ่คนละ 3 ใบ"
     },
     {
-      "en": "Shoot Your Problems",
-      "th": "ยิงปัญหาทิ้งซะ",
-      "effect": "ทิ้ง Trap ที่วางไว้ใบใดก็ได้รวม 3 ใบ",
-      "code": "A003"
+      "code": "A003",
+      "name_en": "Shoot Your Problems",
+      "name_th": "ยิงปัญหาทิ้งซะ",
+      "description_en": "Discard any 3 placed trap cards.",
+      "description_th": "ทิ้ง Trap ที่วางไว้ใบใดก็ได้รวม 3 ใบ"
     },
     {
-      "en": "Parallel Universe",
-      "th": "จักรวาลคู่ขนาน",
-      "effect": "จั่วไพ่เพิ่มเท่ากับจำนวนไพ่ที่คุณมีอยู่ในมือตอนนี้",
-      "code": "A004"
+      "code": "A004",
+      "name_en": "Parallel Universe",
+      "name_th": "จักรวาลคู่ขนาน",
+      "description_en": "Draw the same number of cards as you currently have in your hand.",
+      "description_th": "จั่วไพ่เพิ่มเท่ากับจำนวนไพ่ที่คุณมีอยู่ในมือตอนนี้"
     },
     {
-      "en": "Rejects",
-      "th": "พวกถูกทิ้ง",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นคนอื่นทุกคน จากนั้นเก็บไว้ 1 ใบ และทิ้งไพ่ที่เหลือ",
-      "code": "A005"
+      "code": "A005",
+      "name_en": "Rejects",
+      "name_th": "พวกถูกทิ้ง",
+      "description_en": "Steal 1 card from every other player, keep 1 and discard the rest.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นคนอื่นทุกคน จากนั้นเก็บไว้ 1 ใบ และทิ้งไพ่ที่เหลือ"
     },
     {
-      "en": "Showdown",
-      "th": "ดวลสายตา",
-      "effect": "Mini-Game: แข่งจ้องตากับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ",
-      "code": "A006"
+      "code": "A006",
+      "name_en": "Showdown",
+      "name_th": "ดวลสายตา",
+      "description_en": "(Mini-Game) Have a staring contest with another player. The winner draws 3 cards.",
+      "description_th": "Mini-Game: แข่งจ้องตากับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ"
     },
     {
-      "en": "Mystery Button",
-      "th": "ปุ่มปริศนา",
-      "effect": "Mini-Game: โยนเหรียญ ถ้าออกหัว จั่ว 3 ใบ ถ้าออกก้อย ทิ้ง 3 ใบ",
-      "code": "A007"
+      "code": "A007",
+      "name_en": "Mystery Button",
+      "name_th": "ปุ่มปริศนา",
+      "description_en": "(Mini-Game) Flip a coin. If heads, draw 3 cards. If tails, discard 3 cards.",
+      "description_th": "Mini-Game: โยนเหรียญ ถ้าออกหัว จั่ว 3 ใบ ถ้าออกก้อย ทิ้ง 3 ใบ"
     },
     {
-      "en": "Throw The Cheese",
-      "th": "ปาชีส!",
-      "effect": "ผู้เล่นคนอื่นทั้งหมดทิ้งไพ่คนละ 1 ใบ",
-      "code": "A008"
+      "code": "A008",
+      "name_en": "Throw The Cheese",
+      "name_th": "ปาชีส!",
+      "description_en": "All other players discard 1 card.",
+      "description_th": "ผู้เล่นคนอื่นทั้งหมดทิ้งไพ่คนละ 1 ใบ"
     },
     {
-      "en": "Quickfire",
-      "th": "ยิงรัว!",
-      "effect": "ผู้เล่นคนอื่นทั้งหมดต้องนำ Trap ทุกใบที่อยู่ในมือออกมาวางเป็น Trap",
-      "code": "A009"
+      "code": "A009",
+      "name_en": "Quickfire",
+      "name_th": "ยิงรัว!",
+      "description_en": "All other players must place every trap card in their hand as placed traps.",
+      "description_th": "ผู้เล่นคนอื่นทั้งหมดต้องนำ Trap ทุกใบที่อยู่ในมือออกมาวางเป็น Trap"
     },
     {
-      "en": "You're A Chair",
-      "th": "นายคือเก้าอี้",
-      "effect": "ผู้เล่นทุกคนย้ายที่นั่งไปทางขวา โดยทิ้ง Trap ที่วางไว้ให้อยู่ที่เดิม",
-      "code": "A010"
+      "code": "A010",
+      "name_en": "You're A Chair",
+      "name_th": "นายคือเก้าอี้",
+      "description_en": "All players move seats to the right. (Leave placed trap cards behind.)",
+      "description_th": "ผู้เล่นทุกคนย้ายที่นั่งไปทางขวา โดยทิ้ง Trap ที่วางไว้ให้อยู่ที่เดิม"
     },
     {
-      "en": "I Am Lonely",
-      "th": "ฉันเหงา",
-      "effect": "ผู้เล่นทุกคนที่ไม่ได้อยู่ในความสัมพันธ์ จั่วไพ่คนละ 2 ใบ",
-      "code": "A011"
+      "code": "A011",
+      "name_en": "I Am Lonely",
+      "name_th": "ฉันเหงา",
+      "description_en": "All players not in a relationship draw 2 cards",
+      "description_th": "ผู้เล่นทุกคนที่ไม่ได้อยู่ในความสัมพันธ์ จั่วไพ่คนละ 2 ใบ"
     },
     {
-      "en": "Nice Hat",
-      "th": "หมวกสวยนะ",
-      "effect": "ผู้เล่นทุกคนที่สวมหมวก ทิ้งไพ่คนละ 3 ใบ",
-      "code": "A012"
+      "code": "A012",
+      "name_en": "Nice Hat",
+      "name_th": "หมวกสวยนะ",
+      "description_en": "All players wearing a hat discard 3 cards.",
+      "description_th": "ผู้เล่นทุกคนที่สวมหมวก ทิ้งไพ่คนละ 3 ใบ"
     },
     {
-      "en": "Parked Car",
-      "th": "รถจอดอยู่",
-      "effect": "ผู้เล่นทุกคนที่ขับรถเป็น ทิ้งไพ่คนละ 1 ใบ",
-      "code": "A013"
+      "code": "A013",
+      "name_en": "Parked Car",
+      "name_th": "รถจอดอยู่",
+      "description_en": "All players who can drive discard 1 card.",
+      "description_th": "ผู้เล่นทุกคนที่ขับรถเป็น ทิ้งไพ่คนละ 1 ใบ"
     },
     {
-      "en": "Pull My Finger",
-      "th": "ดึงนิ้วฉันสิ",
-      "effect": "เลือกผู้เล่น 1 คนให้ขโมยไพ่จากมือคุณ 1 ใบ",
-      "code": "A014"
+      "code": "A014",
+      "name_en": "Pull My Finger",
+      "name_th": "ดึงนิ้วฉันสิ",
+      "description_en": "Choose 1 player to steal one card from your hand.",
+      "description_th": "เลือกผู้เล่น 1 คนให้ขโมยไพ่จากมือคุณ 1 ใบ"
     },
     {
-      "en": "Punch 'Em",
-      "th": "ต่อยเลย!",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้ทิ้ง Trap ที่วางไว้ทั้งหมด",
-      "code": "A015"
+      "code": "A015",
+      "name_en": "Punch 'Em",
+      "name_th": "ต่อยเลย!",
+      "description_en": "Choose another player to discard all their trap cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ทิ้ง Trap ที่วางไว้ทั้งหมด"
     },
     {
-      "en": "Take 'Em Out",
-      "th": "จัดการมัน!",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้ทิ้งไพ่ทั้งหมดในมือ",
-      "code": "A016"
+      "code": "A016",
+      "name_en": "Take 'Em Out",
+      "name_th": "จัดการมัน!",
+      "description_en": "Choose another player to discard their entire hand.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ทิ้งไพ่ทั้งหมดในมือ"
     },
     {
-      "en": "You're Blind",
-      "th": "นายตาบอด",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้จั่วไพ่ใบบนสุดของกองและเล่นใบนั้น หากเป็น Trap หรือ Counter ให้ทิ้งไปจนกว่าจะได้ Action",
-      "code": "A017"
+      "code": "A017",
+      "name_en": "You're Blind",
+      "name_th": "นายตาบอด",
+      "description_en": "Choose another player to draw and play the next action card in the deck. (Discard any trap or counter cards.)",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้จั่วไพ่ใบบนสุดของกองและเล่นใบนั้น หากเป็น Trap หรือ Counter ให้ทิ้งไปจนกว่าจะได้ Action"
     },
     {
-      "en": "You Can Wait",
-      "th": "รอไปก่อนนะ",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้ข้ามเทิร์น",
-      "code": "A018"
+      "code": "A018",
+      "name_en": "You Can Wait",
+      "name_th": "รอไปก่อนนะ",
+      "description_en": "Choose another player to skip their turn.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ข้ามเทิร์น"
     },
     {
-      "en": "We're All Gonna Die",
-      "th": "เราจะตายกันหมด!",
-      "effect": "ไพ่ Counter ไม่สามารถใช้งานได้จนถึงเทิร์นถัดไปของคุณ",
-      "code": "A019"
+      "code": "A019",
+      "name_en": "We're All Gonna Die",
+      "name_th": "เราจะตายกันหมด!",
+      "description_en": "Counter cards don't work until your next turn.",
+      "description_th": "ไพ่ Counter ไม่สามารถใช้งานได้จนถึงเทิร์นถัดไปของคุณ"
     },
     {
-      "en": "New You",
-      "th": "ตัวตนใหม่",
-      "effect": "ทิ้งไพ่ทั้งหมดในมือ แล้วจั่วไพ่ใหม่ในจำนวนเท่ากัน",
-      "code": "A020"
+      "code": "A020",
+      "name_en": "New You",
+      "name_th": "ตัวตนใหม่",
+      "description_en": "Discard your entire hand and draw the same number of cards.",
+      "description_th": "ทิ้งไพ่ทั้งหมดในมือ แล้วจั่วไพ่ใหม่ในจำนวนเท่ากัน"
     },
     {
-      "en": "Seen My Pony?",
-      "th": "เห็นโพนี่ของฉันไหม?",
-      "effect": "หาก “Magical Pony” อยู่ในกองทิ้ง ให้นำไพ่ใบนั้นมาใส่ในมือคุณ",
-      "code": "A021"
+      "code": "A021",
+      "name_en": "Seen My Pony?",
+      "name_th": "เห็นโพนี่ของฉันไหม?",
+      "description_en": "If \"Magical Pony\" is in the discard pile, add it to your hand.",
+      "description_th": "หาก “Magical Pony” อยู่ในกองทิ้ง ให้นำไพ่ใบนั้นมาใส่ในมือคุณ"
     },
     {
-      "en": "Single",
-      "th": "ตัวคนเดียว",
-      "effect": "หากไพ่ใบนี้เป็นไพ่เพียงใบเดียวในมือคุณ ให้จั่วไพ่ 10 ใบ",
-      "code": "A022"
+      "code": "A022",
+      "name_en": "Single",
+      "name_th": "ตัวคนเดียว",
+      "description_en": "If this is your only card, draw 10 cards.",
+      "description_th": "หากไพ่ใบนี้เป็นไพ่เพียงใบเดียวในมือคุณ ให้จั่วไพ่ 10 ใบ"
     },
     {
-      "en": "Shoot Me",
-      "th": "ยิงฉันสิ",
-      "effect": "หากถึงเทิร์นถัดไปของคุณแล้วยังมีไพ่เหลืออยู่ในมือ คุณชนะเกม",
-      "code": "A023"
+      "code": "A023",
+      "name_en": "Shoot Me",
+      "name_th": "ยิงฉันสิ",
+      "description_en": "If you have any cards remaining in your hand by your next turn, you win.",
+      "description_th": "หากถึงเทิร์นถัดไปของคุณแล้วยังมีไพ่เหลืออยู่ในมือ คุณชนะเกม"
     },
     {
-      "en": "The End",
-      "th": "จุดจบ",
-      "effect": "เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือน้อยที่สุดชนะ หากเสมอกัน ให้ลองใหม่",
-      "code": "A024"
+      "code": "A024",
+      "name_en": "The End",
+      "name_th": "จุดจบ",
+      "description_en": "The player with the fewest cards in their hand by your next turn, wins (if any players are tried: try again)",
+      "description_th": "เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือน้อยที่สุดชนะ หากเสมอกัน ให้ลองใหม่"
     },
     {
-      "en": "Who's There?",
-      "th": "ใครอยู่นั่น?",
-      "effect": "พลิก Trap ที่วางไว้ของผู้เล่นคนอื่นทุกคน คนละ 1 ใบ โดยไม่ทำให้ Trap ทำงาน",
-      "code": "A025"
+      "code": "A025",
+      "name_en": "Who's There?",
+      "name_th": "ใครอยู่นั่น?",
+      "description_en": "Turn 1 placed trap card from all other players. (This does not activate them.)",
+      "description_th": "พลิก Trap ที่วางไว้ของผู้เล่นคนอื่นทุกคน คนละ 1 ใบ โดยไม่ทำให้ Trap ทำงาน"
     },
     {
-      "en": "Magic Trick",
-      "th": "มายากล",
-      "effect": "คุณมีเวลา 10 วินาทีในการเลือกไพ่ 1 ใบจากกองมาเก็บไว้",
-      "code": "A026"
+      "code": "A026",
+      "name_en": "Magic Trick",
+      "name_th": "มายากล",
+      "description_en": "You have 10 seconds to choose and keep 1 card from the deck.",
+      "description_th": "คุณมีเวลา 10 วินาทีในการเลือกไพ่ 1 ใบจากกองมาเก็บไว้"
     },
     {
-      "en": "1 Year to Live",
-      "th": "เหลือเวลาอีก 1 ปี",
-      "effect": "เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือมากที่สุดชนะ หากเสมอกัน ให้ลองใหม่",
-      "code": "A027"
+      "code": "A027",
+      "name_en": "1 Year to Live",
+      "name_th": "เหลือเวลาอีก 1 ปี",
+      "description_en": "The player with the most cards in their hand by your next turn wins. (If any players are tied, try again.)",
+      "description_th": "เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือมากที่สุดชนะ หากเสมอกัน ให้ลองใหม่"
     },
     {
-      "en": "Bad Spread",
-      "th": "ทาเยอะไปหน่อย",
-      "effect": "เล่นไพ่ใบนี้พร้อมกับ Action อีก 1 ใบ เพื่อเพิ่ม Effect ของ Action ใบนั้นเป็น 2 เท่า",
-      "code": "A028"
+      "code": "A028",
+      "name_en": "Bad Spread",
+      "name_th": "ทาเยอะไปหน่อย",
+      "description_en": "Play this with an action card to double its effect.",
+      "description_th": "เล่นไพ่ใบนี้พร้อมกับ Action อีก 1 ใบ เพื่อเพิ่ม Effect ของ Action ใบนั้นเป็น 2 เท่า"
     },
     {
-      "en": "Barbershop Quartet",
-      "th": "วงประสานเสียงสี่คน",
-      "effect": "เลือกขโมยไพ่ 4 ใบจากผู้เล่นอีก 1 คน หรือจั่วไพ่ 4 ใบ",
-      "code": "A029"
+      "code": "A029",
+      "name_en": "Barbershop Quartet",
+      "name_th": "วงประสานเสียงสี่คน",
+      "description_en": "Steal 4 cards from another player, or draw 4 cards.",
+      "description_th": "เลือกขโมยไพ่ 4 ใบจากผู้เล่นอีก 1 คน หรือจั่วไพ่ 4 ใบ"
     },
     {
-      "en": "Be Careful",
-      "th": "ระวังหน่อย",
-      "effect": "แอบดู Trap ที่วางไว้ของผู้เล่นคนอื่นทุกคน คนละ 1 ใบ",
-      "code": "A030"
+      "code": "A030",
+      "name_en": "Be Careful",
+      "name_th": "ระวังหน่อย",
+      "description_en": "Peek at 1 placed trap card from all other players.",
+      "description_th": "แอบดู Trap ที่วางไว้ของผู้เล่นคนอื่นทุกคน คนละ 1 ใบ"
     },
     {
-      "en": "Big Baby",
-      "th": "เด็กยักษ์",
-      "effect": "ผู้เล่นที่อายุมากที่สุดต้องทิ้งไพ่ 3 ใบ",
-      "code": "A031"
+      "code": "A031",
+      "name_en": "Big Baby",
+      "name_th": "เด็กยักษ์",
+      "description_en": "The oldest player has to discard 3 cards.",
+      "description_th": "ผู้เล่นที่อายุมากที่สุดต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Bound Together",
-      "th": "ผูกติดกัน",
-      "effect": "ขโมยไพ่ทั้งหมดในมือของผู้เล่นอีก 1 คน นำมาสับรวมกับไพ่ในมือคุณ แล้วแจกกลับให้คุณทั้งสองคนเท่า ๆ กัน",
-      "code": "A032"
+      "code": "A032",
+      "name_en": "Bound Together",
+      "name_th": "ผูกติดกัน",
+      "description_en": "Steal another player's hand, shuffle it with your own, and deal the cards between you both evenly.",
+      "description_th": "ขโมยไพ่ทั้งหมดในมือของผู้เล่นอีก 1 คน นำมาสับรวมกับไพ่ในมือคุณ แล้วแจกกลับให้คุณทั้งสองคนเท่า ๆ กัน"
     },
     {
-      "en": "Can You Do This?",
-      "th": "ทำแบบนี้ได้ไหม?",
-      "effect": "Mini-Game: ทำท่าทางอย่างหนึ่ง แล้วเลือกผู้เล่นอีก 1 คนให้ทำตาม หากทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ",
-      "code": "A033"
+      "code": "A033",
+      "name_en": "Can You Do This?",
+      "name_th": "ทำแบบนี้ได้ไหม?",
+      "description_en": "(Mini-Game) Perform a physical action and choose another player to repeat it. If they fail, steal 3 of their cards.",
+      "description_th": "Mini-Game: ทำท่าทางอย่างหนึ่ง แล้วเลือกผู้เล่นอีก 1 คนให้ทำตาม หากทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ"
     },
     {
-      "en": "Cannonball",
-      "th": "ลูกปืนใหญ่!",
-      "effect": "ผู้เล่นทุกคนทิ้ง Trap ที่วางไว้คนละ 1 ใบ",
-      "code": "A034"
+      "code": "A034",
+      "name_en": "Cannonball",
+      "name_th": "ลูกปืนใหญ่!",
+      "description_en": "All players discard 1 placed trap card each.",
+      "description_th": "ผู้เล่นทุกคนทิ้ง Trap ที่วางไว้คนละ 1 ใบ"
     },
     {
-      "en": "Come Out to Play",
-      "th": "ออกมาเล่นกันเถอะ",
-      "effect": "ในเทิร์นถัดไป ผู้เล่นทุกคนที่มี Action อยู่ในมือต้องเล่น Action",
-      "code": "A035"
+      "code": "A035",
+      "name_en": "Come Out to Play",
+      "name_th": "ออกมาเล่นกันเถอะ",
+      "description_en": "All players must play action cards on their next turn if they have any.",
+      "description_th": "ในเทิร์นถัดไป ผู้เล่นทุกคนที่มี Action อยู่ในมือต้องเล่น Action"
     },
     {
-      "en": "Confession",
-      "th": "คำสารภาพ",
-      "effect": "จั่วไพ่ 3 ใบ แต่ต้องเปิดให้ผู้เล่นคนอื่นทุกคนเห็น",
-      "code": "A036"
+      "code": "A036",
+      "name_en": "Confession",
+      "name_th": "คำสารภาพ",
+      "description_en": "Draw 3 cards but show them to all other players.",
+      "description_th": "จั่วไพ่ 3 ใบ แต่ต้องเปิดให้ผู้เล่นคนอื่นทุกคนเห็น"
     },
     {
-      "en": "Day of Birth",
-      "th": "วันเกิด",
-      "effect": "หากวันนี้เป็นวันเกิดของคุณ คุณชนะเกมทันที!",
-      "code": "A037"
+      "code": "A037",
+      "name_en": "Day of Birth",
+      "name_th": "วันเกิด",
+      "description_en": "If today is your birthday, you win!",
+      "description_th": "หากวันนี้เป็นวันเกิดของคุณ คุณชนะเกมทันที!"
     },
     {
-      "en": "Die Potato",
-      "th": "ตายซะ มันฝรั่ง!",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้ทิ้งไพ่ 3 ใบ",
-      "code": "A038"
+      "code": "A038",
+      "name_en": "Die Potato",
+      "name_th": "ตายซะ มันฝรั่ง!",
+      "description_en": "Choose another player to discard 3 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Don't Want to Be Fat",
-      "th": "ไม่อยากอ้วน",
-      "effect": "เลือกผู้เล่นอีก 1 คนหรือเลือกตัวเอง ให้ทิ้งไพ่ 5 ใบ",
-      "code": "A039"
+      "code": "A039",
+      "name_en": "Don't Want to Be Fat",
+      "name_th": "ไม่อยากอ้วน",
+      "description_en": "Choose another player (or yourself) to discard 5 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนหรือเลือกตัวเอง ให้ทิ้งไพ่ 5 ใบ"
     },
     {
-      "en": "I Love It!",
-      "th": "ฉันชอบมัน!",
-      "effect": "Action 3 ใบถัดไปที่ถูกเล่น เมื่อใช้เสร็จแล้วจะเข้ามาอยู่ในมือคุณแทนที่จะลงกองทิ้ง",
-      "code": "A040"
+      "code": "A040",
+      "name_en": "I Love It!",
+      "name_th": "ฉันชอบมัน!",
+      "description_en": "The next 3 action cards that are played enter your hand instead of the discard pile.",
+      "description_th": "Action 3 ใบถัดไปที่ถูกเล่น เมื่อใช้เสร็จแล้วจะเข้ามาอยู่ในมือคุณแทนที่จะลงกองทิ้ง"
     },
     {
-      "en": "Feed Me Paper",
-      "th": "เอากระดาษมาให้ฉันกิน",
-      "effect": "คุณและผู้เล่นอีก 1 คนที่คุณเลือก ทิ้งไพ่คนละ 3 ใบ",
-      "code": "A041"
+      "code": "A041",
+      "name_en": "Feed Me Paper",
+      "name_th": "เอากระดาษมาให้ฉันกิน",
+      "description_en": "You and another player of your choice discard 3 cards.",
+      "description_th": "คุณและผู้เล่นอีก 1 คนที่คุณเลือก ทิ้งไพ่คนละ 3 ใบ"
     },
     {
-      "en": "Get Off My Property",
-      "th": "ออกไปจากบ้านฉัน!",
-      "effect": "ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ ทิ้งไพ่คนละ 2 ใบ",
-      "code": "A042"
+      "code": "A042",
+      "name_en": "Get Off My Property",
+      "name_th": "ออกไปจากบ้านฉัน!",
+      "description_en": "All players who do not live here discard 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ ทิ้งไพ่คนละ 2 ใบ"
     },
     {
-      "en": "Got It Back In",
-      "th": "เอากลับเข้าไปแล้ว",
-      "effect": "ขโมยไพ่ทั้งหมดในมือของผู้เล่นอีก 1 คน แล้วนำไพ่เหล่านั้นไปใส่ไว้ตรงไหนก็ได้ในกองจั่ว",
-      "code": "A043"
+      "code": "A043",
+      "name_en": "Got It Back In",
+      "name_th": "เอากลับเข้าไปแล้ว",
+      "description_en": "Steal another player's entire hand and put it anywhere in the deck.",
+      "description_th": "ขโมยไพ่ทั้งหมดในมือของผู้เล่นอีก 1 คน แล้วนำไพ่เหล่านั้นไปใส่ไว้ตรงไหนก็ได้ในกองจั่ว"
     },
     {
-      "en": "Grow Up Fast",
-      "th": "โตไว ๆ",
-      "effect": "ผู้เล่นทุกคนปรับจำนวนไพ่ในมือให้เหลือ 7 ใบ โดยถ้ามีน้อยกว่าให้จั่วเพิ่ม และถ้ามากกว่าให้ทิ้ง",
-      "code": "A044"
+      "code": "A044",
+      "name_en": "Grow Up Fast",
+      "name_th": "โตไว ๆ",
+      "description_en": "All players draw up to (or discard down to) 7 cards.",
+      "description_th": "ผู้เล่นทุกคนปรับจำนวนไพ่ในมือให้เหลือ 7 ใบ โดยถ้ามีน้อยกว่าให้จั่วเพิ่ม และถ้ามากกว่าให้ทิ้ง"
     },
     {
-      "en": "Hit By A Card",
-      "th": "โดนไพ่ฟาด",
-      "effect": "บังคับผู้เล่นอีก 1 คนให้ทิ้งไพ่ทั้งหมดในมือ แล้วจั่วไพ่ใหม่ 3 ใบ",
-      "code": "A045"
+      "code": "A045",
+      "name_en": "Hit By A Card",
+      "name_th": "โดนไพ่ฟาด",
+      "description_en": "Force another player to discard their entire hand but draw 3 cards.",
+      "description_th": "บังคับผู้เล่นอีก 1 คนให้ทิ้งไพ่ทั้งหมดในมือ แล้วจั่วไพ่ใหม่ 3 ใบ"
     },
     {
-      "en": "Homework",
-      "th": "การบ้าน",
-      "effect": "ดูไพ่ 5 ใบถัดไปจากกอง เลือกเก็บไว้ 1 ใบ",
-      "code": "A046"
+      "code": "A046",
+      "name_en": "Homework",
+      "name_th": "การบ้าน",
+      "description_en": "Choose and keep 1 of the next 5 cards in the deck.",
+      "description_th": "ดูไพ่ 5 ใบถัดไปจากกอง เลือกเก็บไว้ 1 ใบ"
     },
     {
-      "en": "I Sentence You",
-      "th": "ฉันขอตัดสินโทษนาย",
-      "effect": "ให้ผู้เล่นอีก 1 คนเลือกระหว่างข้าม 1 เทิร์น หรือทิ้งไพ่ 3 ใบ",
-      "code": "A047"
+      "code": "A047",
+      "name_en": "I Sentence You",
+      "name_th": "ฉันขอตัดสินโทษนาย",
+      "description_en": "Give another player a choice to skip a turn or discard 3 cards.",
+      "description_th": "ให้ผู้เล่นอีก 1 คนเลือกระหว่างข้าม 1 เทิร์น หรือทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "I Want My Lemons",
-      "th": "เอามะนาวฉันคืนมา!",
-      "effect": "ถามว่า “Do you have my lemons?” หากผู้เล่นคนอื่นมีไพ่ “My Lemons” ให้ขโมยไพ่ทั้งหมดในมือของผู้เล่นคนนั้น",
-      "code": "A048"
+      "code": "A048",
+      "name_en": "I Want My Lemons",
+      "name_th": "เอามะนาวฉันคืนมา!",
+      "description_en": "Ask \"Do you have my lemons?\" If another player has the \"My Lemons\" card, steal their entire hand.",
+      "description_th": "ถามว่า “Do you have my lemons?” หากผู้เล่นคนอื่นมีไพ่ “My Lemons” ให้ขโมยไพ่ทั้งหมดในมือของผู้เล่นคนนั้น"
     },
     {
-      "en": "I'm On My Way",
-      "th": "กำลังไปแล้ว!",
-      "effect": "มอบไพ่ใบนี้ให้ผู้เล่นที่เล่นต่อจากคุณ",
-      "code": "A049"
+      "code": "A049",
+      "name_en": "I'm On My Way",
+      "name_th": "กำลังไปแล้ว!",
+      "description_en": "Give this card to the player after you.",
+      "description_th": "มอบไพ่ใบนี้ให้ผู้เล่นที่เล่นต่อจากคุณ"
     },
     {
-      "en": "Intervention",
-      "th": "ต้องคุยกันหน่อยแล้ว",
-      "effect": "ผู้เล่นที่มีไพ่ในมือมากที่สุดต้องข้ามเทิร์นถัดไป หากเสมอกัน ผู้เล่นที่เสมอกันทั้งหมดข้ามเทิร์น",
-      "code": "A050"
+      "code": "A050",
+      "name_en": "Intervention",
+      "name_th": "ต้องคุยกันหน่อยแล้ว",
+      "description_en": "The player(s) with the most cards in their hand skip(s) their next turn.",
+      "description_th": "ผู้เล่นที่มีไพ่ในมือมากที่สุดต้องข้ามเทิร์นถัดไป หากเสมอกัน ผู้เล่นที่เสมอกันทั้งหมดข้ามเทิร์น"
     },
     {
-      "en": "Invisible Billy",
-      "th": "บิลลี่ล่องหน",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้เปิดไพ่ในมือให้คุณดู แล้วเลือกขโมยมา 1 ใบ",
-      "code": "A051"
+      "code": "A051",
+      "name_en": "Invisible Billy",
+      "name_th": "บิลลี่ล่องหน",
+      "description_en": "Choose another player to show you their hand and steal 1 card of your choice.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้เปิดไพ่ในมือให้คุณดู แล้วเลือกขโมยมา 1 ใบ"
     },
     {
-      "en": "Is This You?",
-      "th": "นี่นายเหรอ?",
-      "effect": "จั่วไพ่ 3 ใบ แล้วเลือกผู้เล่นอีก 1 คนให้จั่ว 3 ใบเช่นกัน",
-      "code": "A052"
+      "code": "A052",
+      "name_en": "Is This You?",
+      "name_th": "นี่นายเหรอ?",
+      "description_en": "Draw 3 cards and choose another player to do the same.",
+      "description_th": "จั่วไพ่ 3 ใบ แล้วเลือกผู้เล่นอีก 1 คนให้จั่ว 3 ใบเช่นกัน"
     },
     {
-      "en": "Is This Yours?",
-      "th": "นี่ของนายเหรอ?",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้นำ Trap ที่วางไว้ทั้งหมดกลับเข้ามือ",
-      "code": "A053"
+      "code": "A053",
+      "name_en": "Is This Yours?",
+      "name_th": "นี่ของนายเหรอ?",
+      "description_en": "Choose another player to put all their placed trap cards back into their hand.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้นำ Trap ที่วางไว้ทั้งหมดกลับเข้ามือ"
     },
     {
-      "en": "Jewellery",
-      "th": "เครื่องประดับ",
-      "effect": "ผู้เล่นที่สวมเครื่องประดับมากที่สุดทิ้งไพ่ 2 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง",
-      "code": "A054"
+      "code": "A054",
+      "name_en": "Jewellery",
+      "name_th": "เครื่องประดับ",
+      "description_en": "The player(s) wearing the most jewellery discard(s) 2 cards.",
+      "description_th": "ผู้เล่นที่สวมเครื่องประดับมากที่สุดทิ้งไพ่ 2 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง"
     },
     {
-      "en": "Killed Us All",
-      "th": "ฆ่าพวกเราหมดเลย",
-      "effect": "คุณทิ้งไพ่ 2 ใบ ผู้เล่นคนอื่นทั้งหมดทิ้งคนละ 1 ใบ",
-      "code": "A055"
+      "code": "A055",
+      "name_en": "Killed Us All",
+      "name_th": "ฆ่าพวกเราหมดเลย",
+      "description_en": "Discard 2 cards. All other players discard 1.",
+      "description_th": "คุณทิ้งไพ่ 2 ใบ ผู้เล่นคนอื่นทั้งหมดทิ้งคนละ 1 ใบ"
     },
     {
-      "en": "Let You Go",
-      "th": "ปล่อยนายไป",
-      "effect": "ทิ้งไพ่ใบใดก็ได้ที่คุณไม่ต้องการ",
-      "code": "A056"
+      "code": "A056",
+      "name_en": "Let You Go",
+      "name_th": "ปล่อยนายไป",
+      "description_en": "Discard any cards you don't want.",
+      "description_th": "ทิ้งไพ่ใบใดก็ได้ที่คุณไม่ต้องการ"
     },
     {
-      "en": "Lie to Me",
-      "th": "โกหกฉันสิ",
-      "effect": "Mini-Game: บอกผู้เล่นอีก 1 คนด้วยเรื่องจริง 1 เรื่องและเรื่องโกหก 1 เรื่อง หากเขาแยกไม่ได้ว่าเรื่องไหนจริงหรือโกหก เขาต้องทิ้งไพ่ 3 ใบ",
-      "code": "A057"
+      "code": "A057",
+      "name_en": "Lie to Me",
+      "name_th": "โกหกฉันสิ",
+      "description_en": "(Mini-Game) Tell another player 1 truth and 1 lie. If they cannot tell which is which, they discard 3 cards.",
+      "description_th": "Mini-Game: บอกผู้เล่นอีก 1 คนด้วยเรื่องจริง 1 เรื่องและเรื่องโกหก 1 เรื่อง หากเขาแยกไม่ได้ว่าเรื่องไหนจริงหรือโกหก เขาต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Little Baby",
-      "th": "เด็กน้อย",
-      "effect": "ผู้เล่นที่อายุน้อยที่สุดต้องทิ้งไพ่ 3 ใบ",
-      "code": "A058"
+      "code": "A058",
+      "name_en": "Little Baby",
+      "name_th": "เด็กน้อย",
+      "description_en": "The youngest player has to discard 3 cards.",
+      "description_th": "ผู้เล่นที่อายุน้อยที่สุดต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Mine Now",
-      "th": "ของฉันแล้ว",
-      "effect": "ขโมย Trap ที่วางไว้ของผู้เล่นอีก 1 คน แล้วนำกลับเข้ามือคุณ",
-      "code": "A059"
+      "code": "A059",
+      "name_en": "Mine Now",
+      "name_th": "ของฉันแล้ว",
+      "description_en": "Steal another player's placed trap card and add them to your hand.",
+      "description_th": "ขโมย Trap ที่วางไว้ของผู้เล่นอีก 1 คน แล้วนำกลับเข้ามือคุณ"
     },
     {
-      "en": "Alien Invasion",
-      "th": "เอเลี่ยนบุก!",
-      "effect": "มอบไพ่ทั้งหมดในมือของคุณให้ผู้เล่นอีก 1 คน",
-      "code": "A060"
+      "code": "A060",
+      "name_en": "Alien Invasion",
+      "name_th": "เอเลี่ยนบุก!",
+      "description_en": "Give another player your entire hand (all of your cards).",
+      "description_th": "มอบไพ่ทั้งหมดในมือของคุณให้ผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Alphabet",
-      "th": "ท่องตัวอักษร",
-      "effect": "Mini-Game: เลือกผู้เล่นอีก 1 คนให้ท่องตัวอักษรภาษาอังกฤษจาก Z → A หากพูดผิด ให้ทิ้งไพ่ 3 ใบ",
-      "code": "A061"
+      "code": "A061",
+      "name_en": "Alphabet",
+      "name_th": "ท่องตัวอักษร",
+      "description_en": "(Mini-Game) Choose another player to recite the alphabet in reverse. If they make a mistake, they discard 3 cards.",
+      "description_th": "Mini-Game: เลือกผู้เล่นอีก 1 คนให้ท่องตัวอักษรภาษาอังกฤษจาก Z → A หากพูดผิด ให้ทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Baby Voice",
-      "th": "เสียงเด็กน้อย",
-      "effect": "Mini-Game: เลือกผู้เล่นอีก 1 คนให้พูดด้วยเสียงเด็กจนถึงเทิร์นถัดไปของคุณ หากทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ",
-      "code": "A062"
+      "code": "A062",
+      "name_en": "Baby Voice",
+      "name_th": "เสียงเด็กน้อย",
+      "description_en": "(Mini-Game) Choose another player to speak in a baby voice until your next turn. If they fail, you steal 3 of their cards.",
+      "description_th": "Mini-Game: เลือกผู้เล่นอีก 1 คนให้พูดด้วยเสียงเด็กจนถึงเทิร์นถัดไปของคุณ หากทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ"
     },
     {
-      "en": "Baby With A Gun",
-      "th": "เด็กถือปืน",
-      "effect": "ขโมยไพ่กี่ใบก็ได้จากผู้เล่นคนอื่นกี่คนก็ได้",
-      "code": "A063"
+      "code": "A063",
+      "name_en": "Baby With A Gun",
+      "name_th": "เด็กถือปืน",
+      "description_en": "Steal as many cards as you want from as many other players.",
+      "description_th": "ขโมยไพ่กี่ใบก็ได้จากผู้เล่นคนอื่นกี่คนก็ได้"
     },
     {
-      "en": "Banana Peel",
-      "th": "เปลือกกล้วย",
-      "effect": "ใส่ไพ่ใบนี้กลับเข้าไปในกองจั่วโดยหงายหน้า ผู้เล่นที่จั่วเจอจะเก็บไพ่ใบนี้ไว้และต้องทิ้งไพ่อื่น 3 ใบ",
-      "code": "A064"
+      "code": "A064",
+      "name_en": "Banana Peel",
+      "name_th": "เปลือกกล้วย",
+      "description_en": "Put this card in the deck face-up. Whoever draws it keeps it and discards 3 other cards.",
+      "description_th": "ใส่ไพ่ใบนี้กลับเข้าไปในกองจั่วโดยหงายหน้า ผู้เล่นที่จั่วเจอจะเก็บไพ่ใบนี้ไว้และต้องทิ้งไพ่อื่น 3 ใบ"
     },
     {
-      "en": "Big Bee",
-      "th": "ผึ้งยักษ์",
-      "effect": "ผู้เล่นทุกคนที่มีตัวอักษร “b” อยู่ในชื่อเต็ม จั่วไพ่คนละ 2 ใบ",
-      "code": "A065"
+      "code": "A065",
+      "name_en": "Big Bee",
+      "name_th": "ผึ้งยักษ์",
+      "description_en": "All players with a \"b\" in their full name draw 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่มีตัวอักษร “b” อยู่ในชื่อเต็ม จั่วไพ่คนละ 2 ใบ"
     },
     {
-      "en": "Cake Day",
-      "th": "วันเค้ก",
-      "effect": "ผู้เล่นทุกคนมอบไพ่คนละ 1 ใบให้ผู้เล่นที่มีวันเกิดใกล้จะถึงที่สุด",
-      "code": "A066"
+      "code": "A066",
+      "name_en": "Cake Day",
+      "name_th": "วันเค้ก",
+      "description_en": "All players each give 1 card to the player whose birthday is closest.",
+      "description_th": "ผู้เล่นทุกคนมอบไพ่คนละ 1 ใบให้ผู้เล่นที่มีวันเกิดใกล้จะถึงที่สุด"
     },
     {
-      "en": "Can't Breathe",
-      "th": "หายใจไม่ออก",
-      "effect": "Mini-Game: แข่งกลั้นหายใจ ผู้เล่นที่กลั้นได้นานที่สุดจั่วไพ่ 3 ใบ",
-      "code": "A067"
+      "code": "A067",
+      "name_en": "Can't Breathe",
+      "name_th": "หายใจไม่ออก",
+      "description_en": "(Mini-Game) The player who can hold their breath the longest draws 3 cards.",
+      "description_th": "Mini-Game: แข่งกลั้นหายใจ ผู้เล่นที่กลั้นได้นานที่สุดจั่วไพ่ 3 ใบ"
     },
     {
-      "en": "Cat Allergy",
-      "th": "แพ้แมว",
-      "effect": "ผู้เล่นทุกคนที่เลี้ยงแมว ทิ้งไพ่คนละ 2 ใบ",
-      "code": "A068"
+      "code": "A068",
+      "name_en": "Cat Allergy",
+      "name_th": "แพ้แมว",
+      "description_en": "All players who own a cat discard 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่เลี้ยงแมว ทิ้งไพ่คนละ 2 ใบ"
     },
     {
-      "en": "Cool Hat",
-      "th": "หมวกเท่จัง",
-      "effect": "ผู้เล่นทุกคนที่สวมหมวก จั่วไพ่คนละ 3 ใบ",
-      "code": "A069"
+      "code": "A069",
+      "name_en": "Cool Hat",
+      "name_th": "หมวกเท่จัง",
+      "description_en": "Any players wearing a hat draw 3 cards.",
+      "description_th": "ผู้เล่นทุกคนที่สวมหมวก จั่วไพ่คนละ 3 ใบ"
     },
     {
-      "en": "Desmond The Moon Bear",
-      "th": "เดสมอนด์ หมีแห่งดวงจันทร์",
-      "effect": "ผู้เล่นที่อยู่ไกลจากบ้านของตัวเองมากที่สุด จั่วไพ่ 3 ใบ",
-      "code": "A070"
+      "code": "A070",
+      "name_en": "Desmond The Moon Bear",
+      "name_th": "เดสมอนด์ หมีแห่งดวงจันทร์",
+      "description_en": "The player furthest away from home draws 3 cards.",
+      "description_th": "ผู้เล่นที่อยู่ไกลจากบ้านของตัวเองมากที่สุด จั่วไพ่ 3 ใบ"
     },
     {
-      "en": "Do The Flop",
-      "th": "ล้มตัวลง!",
-      "effect": "ผู้เล่นทุกคนวางไพ่ในมือหงายหน้าไว้จนถึงเทิร์นถัดไปของคุณ",
-      "code": "A071"
+      "code": "A071",
+      "name_en": "Do The Flop",
+      "name_th": "ล้มตัวลง!",
+      "description_en": "All players lay their cards down face-up until your next turn.",
+      "description_th": "ผู้เล่นทุกคนวางไพ่ในมือหงายหน้าไว้จนถึงเทิร์นถัดไปของคุณ"
     },
     {
-      "en": "Don't Even",
-      "th": "อย่าแม้แต่จะคิด",
-      "effect": "ไม่มีผู้เล่นคนใดสามารถเล่น Action ได้จนถึงเทิร์นถัดไปของคุณ",
-      "code": "A072"
+      "code": "A072",
+      "name_en": "Don't Even",
+      "name_th": "อย่าแม้แต่จะคิด",
+      "description_en": "No players can play action cards until your next turn.",
+      "description_th": "ไม่มีผู้เล่นคนใดสามารถเล่น Action ได้จนถึงเทิร์นถัดไปของคุณ"
     },
     {
-      "en": "Draw A Bear",
-      "th": "จั่วหมี",
-      "effect": "จั่วไพ่ 3 ใบ หากหนึ่งในนั้นคือ “Desmond The Moon Bear” ให้จั่วเพิ่มอีก 3 ใบ",
-      "code": "A073"
+      "code": "A073",
+      "name_en": "Draw A Bear",
+      "name_th": "จั่วหมี",
+      "description_en": "Draw 3 cards. If \"Desmond The Moon Bear\" is 1 of them, draw 3 more.",
+      "description_th": "จั่วไพ่ 3 ใบ หากหนึ่งในนั้นคือ “Desmond The Moon Bear” ให้จั่วเพิ่มอีก 3 ใบ"
     },
     {
-      "en": "Drunk Science",
-      "th": "วิทยาศาสตร์เมา ๆ",
-      "effect": "นำไพ่ในมือของผู้เล่นทุกคนมารวมกัน สับ แล้วแจกกลับให้ทุกคนเท่า ๆ กัน",
-      "code": "A074"
+      "code": "A074",
+      "name_en": "Drunk Science",
+      "name_th": "วิทยาศาสตร์เมา ๆ",
+      "description_en": "Steal all players' hands, shuffle them, and deal them out evenly.",
+      "description_th": "นำไพ่ในมือของผู้เล่นทุกคนมารวมกัน สับ แล้วแจกกลับให้ทุกคนเท่า ๆ กัน"
     },
     {
-      "en": "Evil Tie",
-      "th": "เนกไทปีศาจ",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่มีจำนวนไพ่ในมือเท่ากับคุณ",
-      "code": "A075"
+      "code": "A075",
+      "name_en": "Evil Tie",
+      "name_th": "เนกไทปีศาจ",
+      "description_en": "Steal 1 card from every player with the same amount of cards as you.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่มีจำนวนไพ่ในมือเท่ากับคุณ"
     },
     {
-      "en": "Falling Up",
-      "th": "ตกขึ้นข้างบน",
-      "effect": "กลับทิศทางการเล่น",
-      "code": "A076"
+      "code": "A076",
+      "name_en": "Falling Up",
+      "name_th": "ตกขึ้นข้างบน",
+      "description_en": "Reverse the direction of play.",
+      "description_th": "กลับทิศทางการเล่น"
     },
     {
-      "en": "Got Your Nose",
-      "th": "ขโมยจมูกแล้ว!",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นอีก 1 คน",
-      "code": "A077"
+      "code": "A077",
+      "name_en": "Got Your Nose",
+      "name_th": "ขโมยจมูกแล้ว!",
+      "description_en": "Steal 1 card from another player.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Here Comes The Aeroplane",
-      "th": "เครื่องบินมาแล้ว!",
-      "effect": "มอบไพ่ใบนี้ให้ผู้เล่นอีก 1 คน จากนี้ไพ่ใบนี้เป็นของผู้เล่นคนนั้น",
-      "code": "A078"
+      "code": "A078",
+      "name_en": "Here Comes The Aeroplane",
+      "name_th": "เครื่องบินมาแล้ว!",
+      "description_en": "Give this card to another player. (It's their card now.)",
+      "description_th": "มอบไพ่ใบนี้ให้ผู้เล่นอีก 1 คน จากนี้ไพ่ใบนี้เป็นของผู้เล่นคนนั้น"
     },
     {
-      "en": "Here! Have It!",
-      "th": "เอ้า! เอาไป!",
-      "effect": "มอบไพ่ใบใดก็ได้ที่คุณไม่ต้องการให้ผู้เล่นอีก 1 คน",
-      "code": "A079"
+      "code": "A079",
+      "name_en": "Here! Have It!",
+      "name_th": "เอ้า! เอาไป!",
+      "description_en": "Give any cards you don't want to another player.",
+      "description_th": "มอบไพ่ใบใดก็ได้ที่คุณไม่ต้องการให้ผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Here It Comes!",
-      "th": "มาแล้ว!",
-      "effect": "ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่นั่งทางขวาของตัวเอง",
-      "code": "A080"
+      "code": "A080",
+      "name_en": "Here It Comes!",
+      "name_th": "มาแล้ว!",
+      "description_en": "All players steal 1 card from the player to their right.",
+      "description_th": "ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่นั่งทางขวาของตัวเอง"
     },
     {
-      "en": "Hey, Are You An Angel?",
-      "th": "เฮ้ เธอเป็นนางฟ้าเหรอ?",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นผู้หญิงทุกคน",
-      "code": "A081"
+      "code": "A081",
+      "name_en": "Hey, Are You An Angel?",
+      "name_th": "เฮ้ เธอเป็นนางฟ้าเหรอ?",
+      "description_en": "Steal 1 card from every girl player.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นผู้หญิงทุกคน"
     },
     {
-      "en": "Hey, You Two Should Kiss!",
-      "th": "เฮ้ พวกเธอสองคนจูบกันสิ!",
-      "effect": "จั่วไพ่ 2 ใบ แต่ต้องมอบ 1 ใบให้ผู้เล่นอีกคน",
-      "code": "A082"
+      "code": "A082",
+      "name_en": "Hey, You Two Should Kiss!",
+      "name_th": "เฮ้ พวกเธอสองคนจูบกันสิ!",
+      "description_en": "Draw 2 cards, but give 1 to another player.",
+      "description_th": "จั่วไพ่ 2 ใบ แต่ต้องมอบ 1 ใบให้ผู้เล่นอีกคน"
     },
     {
-      "en": "Hit The Apple",
-      "th": "ตีแอปเปิล!",
-      "effect": "Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องแตะไพ่ใบนี้ คนสุดท้ายที่แตะต้องทิ้งไพ่ 3 ใบ",
-      "code": "A083"
+      "code": "A083",
+      "name_en": "Hit The Apple",
+      "name_th": "ตีแอปเปิล!",
+      "description_en": "(Mini-Game) All players, including you, touch this card. The last player to do so discards 3 cards.",
+      "description_th": "Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องแตะไพ่ใบนี้ คนสุดท้ายที่แตะต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Hold This!",
-      "th": "ถือไว้นะ!",
-      "effect": "สลับไพ่ทั้งหมดในมือกับผู้เล่นอีก 1 คนที่คุณเลือก",
-      "code": "A084"
+      "code": "A084",
+      "name_en": "Hold This!",
+      "name_th": "ถือไว้นะ!",
+      "description_en": "Trade hands with another player of your choice.",
+      "description_th": "สลับไพ่ทั้งหมดในมือกับผู้เล่นอีก 1 คนที่คุณเลือก"
     },
     {
-      "en": "Hold Your Horses",
-      "th": "ใจเย็นก่อน!",
-      "effect": "ไม่มีผู้เล่นคนใดสามารถชนะเกมได้จนถึงเทิร์นถัดไปของคุณ",
-      "code": "A085"
+      "code": "A085",
+      "name_en": "Hold Your Horses",
+      "name_th": "ใจเย็นก่อน!",
+      "description_en": "No players can win until your next turn.",
+      "description_th": "ไม่มีผู้เล่นคนใดสามารถชนะเกมได้จนถึงเทิร์นถัดไปของคุณ"
     },
     {
-      "en": "I Can Explain",
-      "th": "ฉันอธิบายได้นะ",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้หงาย Trap ที่วางไว้ทั้งหมด โดยไม่ทำให้ Trap ทำงาน",
-      "code": "A086"
+      "code": "A086",
+      "name_en": "I Can Explain",
+      "name_th": "ฉันอธิบายได้นะ",
+      "description_en": "Choose another player to turn all their placed trap cards face-up. (This does not activate them)",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้หงาย Trap ที่วางไว้ทั้งหมด โดยไม่ทำให้ Trap ทำงาน"
     },
     {
-      "en": "I Like Trains",
-      "th": "ฉันชอบรถไฟ",
-      "effect": "ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางซ้าย",
-      "code": "A087"
+      "code": "A087",
+      "name_en": "I Like Trains",
+      "name_th": "ฉันชอบรถไฟ",
+      "description_en": "All players pass their hands to the left.",
+      "description_th": "ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางซ้าย"
     },
     {
-      "en": "I Suck At This Game",
-      "th": "ฉันห่วยเกมนี้",
-      "effect": "ผู้เล่นที่มีไพ่ในมือน้อยที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว",
-      "code": "A088"
+      "code": "A088",
+      "name_en": "I Suck At This Game",
+      "name_th": "ฉันห่วยเกมนี้",
+      "description_en": "The player(s) with the fewest cards in the hand draw(s) 3 cards.",
+      "description_th": "ผู้เล่นที่มีไพ่ในมือน้อยที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว"
     },
     {
-      "en": "I Used To Be A Cow",
-      "th": "ฉันเคยเป็นวัว",
-      "effect": "ผู้เล่นทุกคนที่กินเนื้อสัตว์ ข้ามเทิร์นถัดไป",
-      "code": "A089"
+      "code": "A089",
+      "name_en": "I Used To Be A Cow",
+      "name_th": "ฉันเคยเป็นวัว",
+      "description_en": "All meat-eating players skip their next turn.",
+      "description_th": "ผู้เล่นทุกคนที่กินเนื้อสัตว์ ข้ามเทิร์นถัดไป"
     },
     {
-      "en": "I Wanna Die",
-      "th": "ฉันอยากตาย",
-      "effect": "ทิ้งไพ่ทั้งหมดในมือ (จะหยุดเล่นด้วยก็ได้)",
-      "code": "A090"
+      "code": "A090",
+      "name_en": "I Wanna Die",
+      "name_th": "ฉันอยากตาย",
+      "description_en": "Discard your entire hand. (Stop playing if you want.)",
+      "description_th": "ทิ้งไพ่ทั้งหมดในมือ (จะหยุดเล่นด้วยก็ได้)"
     },
     {
-      "en": "I'm A Doctor",
-      "th": "ฉันเป็นหมอ",
-      "effect": "จั่วไพ่เท่ากับจำนวนไพ่ที่ถูกขโมยหรือถูกบังคับให้ทิ้งจากคุณ นับตั้งแต่เทิร์นก่อนหน้าของคุณ",
-      "code": "A091"
+      "code": "A091",
+      "name_en": "I'm A Doctor",
+      "name_th": "ฉันเป็นหมอ",
+      "description_en": "Draw as many cards as you've had stolen or discarded since your last turn",
+      "description_th": "จั่วไพ่เท่ากับจำนวนไพ่ที่ถูกขโมยหรือถูกบังคับให้ทิ้งจากคุณ นับตั้งแต่เทิร์นก่อนหน้าของคุณ"
     },
     {
-      "en": "I'm Crazy",
-      "th": "ฉันบ้าไปแล้ว!",
-      "effect": "นำไพ่ทั้งหมดกลับเข้ากอง สับไพ่ แล้วเริ่มเกมใหม่ทั้งหมด",
-      "code": "A092"
+      "code": "A092",
+      "name_en": "I'm Crazy",
+      "name_th": "ฉันบ้าไปแล้ว!",
+      "description_en": "Put all cards back into the deck, then shuffle it and restart the entire game.",
+      "description_th": "นำไพ่ทั้งหมดกลับเข้ากอง สับไพ่ แล้วเริ่มเกมใหม่ทั้งหมด"
     },
     {
-      "en": "Imma Getcha!",
-      "th": "จับได้แน่!",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้ทิ้ง Action ทั้งหมดที่อยู่ในมือ",
-      "code": "A093"
+      "code": "A093",
+      "name_en": "Imma Getcha!",
+      "name_th": "จับได้แน่!",
+      "description_en": "Choose another player to discard all their action cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ทิ้ง Action ทั้งหมดที่อยู่ในมือ"
     },
     {
-      "en": "In Sync",
-      "th": "พร้อมเพรียง",
-      "effect": "ใช้ Effect ของ Action ใบล่าสุดที่ถูกเล่นซ้ำอีกครั้ง",
-      "code": "A094"
+      "code": "A094",
+      "name_en": "In Sync",
+      "name_th": "พร้อมเพรียง",
+      "description_en": "Repeat the effects of the most recently played action card.",
+      "description_th": "ใช้ Effect ของ Action ใบล่าสุดที่ถูกเล่นซ้ำอีกครั้ง"
     },
     {
-      "en": "Johnny Big Feet",
-      "th": "จอห์นนี่เท้าใหญ่",
-      "effect": "ผู้เล่นที่มีเท้าใหญ่ที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว",
-      "code": "A095"
+      "code": "A095",
+      "name_en": "Johnny Big Feet",
+      "name_th": "จอห์นนี่เท้าใหญ่",
+      "description_en": "The player(s) with the biggest feet draw(s) 3 cards.",
+      "description_th": "ผู้เล่นที่มีเท้าใหญ่ที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว"
     },
     {
-      "en": "Joust Time",
-      "th": "ถึงเวลาดวล!",
-      "effect": "Mini-Game: เป่ายิ้งฉุบกับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ",
-      "code": "A096"
+      "code": "A096",
+      "name_en": "Joust Time",
+      "name_th": "ถึงเวลาดวล!",
+      "description_en": "(Mini-Game) Play rock-paper-scissors with another player. Whoever wins draws 3 cards.",
+      "description_th": "Mini-Game: เป่ายิ้งฉุบกับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ"
     },
     {
-      "en": "Magical Pony",
-      "th": "โพนี่วิเศษ",
-      "effect": "จั่วไพ่ 4 ใบ",
-      "code": "A097"
+      "code": "A097",
+      "name_en": "Magical Pony",
+      "name_th": "โพนี่วิเศษ",
+      "description_en": "Draw 4 cards.",
+      "description_th": "จั่วไพ่ 4 ใบ"
     },
     {
-      "en": "Medication",
-      "th": "ยา",
-      "effect": "ผู้เล่นทุกคนที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา จั่วไพ่คนละ 2 ใบ",
-      "code": "A098"
+      "code": "A098",
+      "name_en": "Medication",
+      "name_th": "ยา",
+      "description_en": "All players who have taken medication in the last 24 hours draw 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา จั่วไพ่คนละ 2 ใบ"
     },
     {
-      "en": "Mine Turtle",
-      "th": "เต่าระเบิด",
-      "effect": "ผู้เล่นทุกคนทิ้งไพ่คนละ 3 ใบ",
-      "code": "A099"
+      "code": "A099",
+      "name_en": "Mine Turtle",
+      "name_th": "เต่าระเบิด",
+      "description_en": "All players discard 3 cards.",
+      "description_th": "ผู้เล่นทุกคนทิ้งไพ่คนละ 3 ใบ"
     },
     {
-      "en": "Muffin Factory",
-      "th": "โรงงานมัฟฟิน",
-      "effect": "คุณสามารถเล่น Action เพิ่มอีก 2 ใบในเทิร์นนี้",
-      "code": "A100"
+      "code": "A100",
+      "name_en": "Muffin Factory",
+      "name_th": "โรงงานมัฟฟิน",
+      "description_en": "Play 2 additional action cards this turn.",
+      "description_th": "คุณสามารถเล่น Action เพิ่มอีก 2 ใบในเทิร์นนี้"
     },
     {
-      "en": "Muffin Time",
-      "th": "ถึงเวลามัฟฟิน!",
-      "effect": "จั่วไพ่ 5 ใบ",
-      "code": "A101"
+      "code": "A101",
+      "name_en": "Muffin Time",
+      "name_th": "ถึงเวลามัฟฟิน!",
+      "description_en": "Draw 5 cards.",
+      "description_th": "จั่วไพ่ 5 ใบ"
     },
     {
-      "en": "No Dog?!",
-      "th": "ไม่มีหมาเหรอ?!",
-      "effect": "ผู้เล่นทุกคนที่ไม่ได้เลี้ยงสุนัข ทิ้งไพ่คนละ 2 ใบ",
-      "code": "A102"
+      "code": "A102",
+      "name_en": "No Dog?!",
+      "name_th": "ไม่มีหมาเหรอ?!",
+      "description_en": "All players who don't own a dog discard 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่ไม่ได้เลี้ยงสุนัข ทิ้งไพ่คนละ 2 ใบ"
     },
     {
-      "en": "No Llama No!",
-      "th": "ไม่นะ ลามะ ไม่!",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่ขับรถไม่เป็น",
-      "code": "A103"
+      "code": "A103",
+      "name_en": "No Llama No!",
+      "name_th": "ไม่นะ ลามะ ไม่!",
+      "description_en": "Steal 1 card from all players who can't drive.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่ขับรถไม่เป็น"
     },
     {
-      "en": "Okay, Draw!",
-      "th": "โอเค ชักปืน!",
-      "effect": "Mini-Game: ผู้เล่นทุกคนทำมือเป็นปืนแล้วเล็งใส่กัน ผู้เล่นที่ถูกเล็งมากที่สุดทิ้งไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง",
-      "code": "A104"
+      "code": "A104",
+      "name_en": "Okay, Draw!",
+      "name_th": "โอเค ชักปืน!",
+      "description_en": "(Mini-Game) All players aim finger guns at each other. The most targeted player(s) discard(s) 3 cards.",
+      "description_th": "Mini-Game: ผู้เล่นทุกคนทำมือเป็นปืนแล้วเล็งใส่กัน ผู้เล่นที่ถูกเล็งมากที่สุดทิ้งไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง"
     },
     {
-      "en": "Oh No!",
-      "th": "โอ้ไม่นะ!",
-      "effect": "Mini-Game: ทายจำนวน Action ที่อยู่ในมือของผู้เล่นอีก 1 คน หากทายจำนวนได้ถูกต้องพอดี ขโมย Action ทั้งหมดของผู้เล่นคนนั้น",
-      "code": "A105"
+      "code": "A105",
+      "name_en": "Oh No!",
+      "name_th": "โอ้ไม่นะ!",
+      "description_en": "(Mini-Game) If you can correctly guess the exact number of action cards in another player's hand, steal all of them.",
+      "description_th": "Mini-Game: ทายจำนวน Action ที่อยู่ในมือของผู้เล่นอีก 1 คน หากทายจำนวนได้ถูกต้องพอดี ขโมย Action ทั้งหมดของผู้เล่นคนนั้น"
     },
     {
-      "en": "Pie Flavor",
-      "th": "พายรสอะไร?",
-      "effect": "เลือกไพ่ 1 ใบจากไพ่ 10 ใบล่าสุดในกองทิ้งมาเก็บไว้",
-      "code": "A106"
+      "code": "A106",
+      "name_en": "Pie Flavor",
+      "name_th": "พายรสอะไร?",
+      "description_en": "Choose and keep 1 of the 10 most recently discarded cards.",
+      "description_th": "เลือกไพ่ 1 ใบจากไพ่ 10 ใบล่าสุดในกองทิ้งมาเก็บไว้"
     },
     {
-      "en": "Piece of Me",
-      "th": "ส่วนหนึ่งของฉัน",
-      "effect": "มอบไพ่ 2 ใบให้ผู้เล่นอีก 1 คน",
-      "code": "A107"
+      "code": "A107",
+      "name_en": "Piece of Me",
+      "name_th": "ส่วนหนึ่งของฉัน",
+      "description_en": "Give 2 cards to another player.",
+      "description_th": "มอบไพ่ 2 ใบให้ผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Play That One",
-      "th": "เล่นใบนั้นสิ",
-      "effect": "เลือก Action 1 ใบจากมือของผู้เล่นอีก 1 คน แล้วบังคับให้ผู้เล่นคนนั้นเล่นไพ่ใบนั้น",
-      "code": "A108"
+      "code": "A108",
+      "name_en": "Play That One",
+      "name_th": "เล่นใบนั้นสิ",
+      "description_en": "Choose 1 action card from another player's hand and force them to play it.",
+      "description_th": "เลือก Action 1 ใบจากมือของผู้เล่นอีก 1 คน แล้วบังคับให้ผู้เล่นคนนั้นเล่นไพ่ใบนั้น"
     },
     {
-      "en": "Pointless",
-      "th": "ไม่มีประโยชน์",
-      "effect": "ไม่มีอะไรเกิดขึ้น",
-      "code": "A109"
+      "code": "A109",
+      "name_en": "Pointless",
+      "name_th": "ไม่มีประโยชน์",
+      "description_en": "Nothing happens.",
+      "description_th": "ไม่มีอะไรเกิดขึ้น"
     },
     {
-      "en": "Skateboards",
-      "th": "สเกตบอร์ด",
-      "effect": "ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางขวา",
-      "code": "A110"
+      "code": "A110",
+      "name_en": "Skateboards",
+      "name_th": "สเกตบอร์ด",
+      "description_en": "All players pass their hands to the right.",
+      "description_th": "ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางขวา"
     },
     {
-      "en": "Snake Arms",
-      "th": "แขนงู",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นผู้ชายทุกคน",
-      "code": "A111"
+      "code": "A111",
+      "name_en": "Snake Arms",
+      "name_th": "แขนงู",
+      "description_en": "Steal 1 card from every boy player.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นผู้ชายทุกคน"
     },
     {
-      "en": "Stolen Face",
-      "th": "ขโมยหน้า",
-      "effect": "ขโมยไพ่ 2 ใบจากผู้เล่นอีก 1 คน",
-      "code": "A112"
+      "code": "A112",
+      "name_en": "Stolen Face",
+      "name_th": "ขโมยหน้า",
+      "description_en": "Steal 2 cards from another player.",
+      "description_th": "ขโมยไพ่ 2 ใบจากผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Suddenly Pineapples",
-      "th": "จู่ ๆ ก็สับปะรด",
-      "effect": "ทิ้ง Trap ที่วางอยู่ทั้งหมด",
-      "code": "A113"
+      "code": "A113",
+      "name_en": "Suddenly Pineapples",
+      "name_th": "จู่ ๆ ก็สับปะรด",
+      "description_en": "All placed trap cards are discarded.",
+      "description_th": "ทิ้ง Trap ที่วางอยู่ทั้งหมด"
     },
     {
-      "en": "Take It Outside",
-      "th": "ไปเคลียร์กันข้างนอก!",
-      "effect": "Mini-Game: ท้าอีก 1 คนงัดข้อหรือเล่นสงครามนิ้วโป้ง ผู้ชนะจั่วไพ่ 3 ใบ",
-      "code": "A114"
+      "code": "A114",
+      "name_en": "Take It Outside",
+      "name_th": "ไปเคลียร์กันข้างนอก!",
+      "description_en": "(Mini-Game) Challenge another player to an arm wrestle or thumb war. The winner draws 3 cards.",
+      "description_th": "Mini-Game: ท้าอีก 1 คนงัดข้อหรือเล่นสงครามนิ้วโป้ง ผู้ชนะจั่วไพ่ 3 ใบ"
     },
     {
-      "en": "Tall Midget",
-      "th": "คนแคระตัวสูง",
-      "effect": "ผู้เล่นที่สูงที่สุดต้องมอบไพ่ 3 ใบให้ผู้เล่นที่เตี้ยที่สุด",
-      "code": "A115"
+      "code": "A115",
+      "name_en": "Tall Midget",
+      "name_th": "คนแคระตัวสูง",
+      "description_en": "The tallest player has to give 3 cards to the shortest player.",
+      "description_th": "ผู้เล่นที่สูงที่สุดต้องมอบไพ่ 3 ใบให้ผู้เล่นที่เตี้ยที่สุด"
     },
     {
-      "en": "Time Machine",
-      "th": "ไทม์แมชชีน",
-      "effect": "นำไพ่ของคุณ 1 ใบจากกองทิ้งกลับมา",
-      "code": "A116"
+      "code": "A116",
+      "name_en": "Time Machine",
+      "name_th": "ไทม์แมชชีน",
+      "description_en": "Retrieve 1 of your cards from the discard pile.",
+      "description_th": "นำไพ่ของคุณ 1 ใบจากกองทิ้งกลับมา"
     },
     {
-      "en": "What Are You Doing?!",
-      "th": "นายทำอะไรเนี่ย?!",
-      "effect": "นำกองทิ้งทั้งหมดโดยไม่สับ ไปวางไว้ด้านบนของกองจั่ว",
-      "code": "A117"
+      "code": "A117",
+      "name_en": "What Are You Doing?!",
+      "name_th": "นายทำอะไรเนี่ย?!",
+      "description_en": "Place the unshuffled discard pile on top of the deck.",
+      "description_th": "นำกองทิ้งทั้งหมดโดยไม่สับ ไปวางไว้ด้านบนของกองจั่ว"
     },
     {
-      "en": "Whose Idea?",
-      "th": "ไอเดียใครเนี่ย?",
-      "effect": "ขโมยไพ่ 3 ใบจากผู้เล่นที่เป็นคนเสนอให้เล่นเกมนี้",
-      "code": "A118"
+      "code": "A118",
+      "name_en": "Whose Idea?",
+      "name_th": "ไอเดียใครเนี่ย?",
+      "description_en": "Steal 3 cards from the player who suggested this game.",
+      "description_th": "ขโมยไพ่ 3 ใบจากผู้เล่นที่เป็นคนเสนอให้เล่นเกมนี้"
     },
     {
-      "en": "Why Wait?",
-      "th": "จะรอทำไม?",
-      "effect": "เลือกผู้เล่นอีก 1 คน แล้วข้ามการเล่นไปยังเทิร์นถัดไปของผู้เล่นคนนั้น",
-      "code": "A119"
+      "code": "A119",
+      "name_en": "Why Wait?",
+      "name_th": "จะรอทำไม?",
+      "description_en": "Choose another player and skip ahead to their next turn.",
+      "description_th": "เลือกผู้เล่นอีก 1 คน แล้วข้ามการเล่นไปยังเทิร์นถัดไปของผู้เล่นคนนั้น"
     },
     {
-      "en": "Wish Granted",
-      "th": "คำขอเป็นจริง",
-      "effect": "เลือกประเภทไพ่ Action, Trap หรือ Counter อย่างใดอย่างหนึ่ง แล้วขโมยไพ่ประเภทนั้น 1 ใบจากผู้เล่นอีก 1 คน",
-      "code": "A120"
+      "code": "A120",
+      "name_en": "Wish Granted",
+      "name_th": "คำขอเป็นจริง",
+      "description_en": "Request either 1 action, trap, or counter card to steal from another player.",
+      "description_th": "เลือกประเภทไพ่ Action, Trap หรือ Counter อย่างใดอย่างหนึ่ง แล้วขโมยไพ่ประเภทนั้น 1 ใบจากผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Yay! Cookies!",
-      "th": "เย้! คุกกี้!",
-      "effect": "ขโมยไพ่ 1 ใบจากผู้เล่นคนอื่นทุกคน",
-      "code": "A121"
+      "code": "A121",
+      "name_en": "Yay! Cookies!",
+      "name_th": "เย้! คุกกี้!",
+      "description_en": "Steal 1 card from all other players.",
+      "description_th": "ขโมยไพ่ 1 ใบจากผู้เล่นคนอื่นทุกคน"
     },
     {
-      "en": "You're Adopted",
-      "th": "นายถูกรับเลี้ยงแล้ว",
-      "effect": "นำไพ่ 3 ใบล่าสุดจากกองทิ้งมาเป็นของคุณ",
-      "code": "A122"
+      "code": "A122",
+      "name_en": "You're Adopted",
+      "name_th": "นายถูกรับเลี้ยงแล้ว",
+      "description_en": "Adopt the 3 most recently discarded cards.",
+      "description_th": "นำไพ่ 3 ใบล่าสุดจากกองทิ้งมาเป็นของคุณ"
     },
     {
-      "en": "You're Dead!",
-      "th": "นายตายแล้ว!",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้ทิ้ง Counter ทั้งหมดในมือ ไพ่ใบนี้ไม่สามารถถูก Counter ได้",
-      "code": "A123"
+      "code": "A123",
+      "name_en": "You're Dead!",
+      "name_th": "นายตายแล้ว!",
+      "description_en": "Choose another player to discard all their counter cards. (Can't be countered, sorry!)",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ทิ้ง Counter ทั้งหมดในมือ ไพ่ใบนี้ไม่สามารถถูก Counter ได้"
     },
     {
-      "en": "You're Fat",
-      "th": "นายอ้วน",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้จั่วไพ่ 5 ใบ",
-      "code": "A124"
+      "code": "A124",
+      "name_en": "You're Fat",
+      "name_th": "นายอ้วน",
+      "description_en": "Choose another player to draw 5 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้จั่วไพ่ 5 ใบ"
     },
     {
-      "en": "Do Not Want",
-      "th": "ไม่เอา!",
-      "effect": "มอบไพ่ใบนี้ให้ผู้เล่นอีก 1 คน แล้วขโมยไพ่จากผู้เล่นคนนั้น 1 ใบ",
-      "code": "A125"
+      "code": "A125",
+      "name_en": "Do Not Want",
+      "name_th": "ไม่เอา!",
+      "description_en": "Give this card to another player and steal 1 of theirs",
+      "description_th": "มอบไพ่ใบนี้ให้ผู้เล่นอีก 1 คน แล้วขโมยไพ่จากผู้เล่นคนนั้น 1 ใบ"
     },
     {
-      "en": "Gunman",
-      "th": "มือปืน",
-      "effect": "เลือกผู้เล่นอีก 1 คนให้เป็นมือปืน จากนั้นผู้เล่นคนนั้นต้องเลือกผู้เล่นคนใดก็ได้ 1 คนให้ทิ้งไพ่ทั้งหมดในมือ",
-      "code": "A126"
+      "code": "A126",
+      "name_en": "Gunman",
+      "name_th": "มือปืน",
+      "description_en": "Choose another player to be a gunman. They must choose any player to discard their hand.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้เป็นมือปืน จากนั้นผู้เล่นคนนั้นต้องเลือกผู้เล่นคนใดก็ได้ 1 คนให้ทิ้งไพ่ทั้งหมดในมือ"
     },
     {
-      "en": "My Lemons",
-      "th": "มะนาวของฉัน",
-      "effect": "ทิ้งไพ่ 4 ใบ",
-      "code": "A127"
+      "code": "A127",
+      "name_en": "My Lemons",
+      "name_th": "มะนาวของฉัน",
+      "description_en": "Discard 4 cards.",
+      "description_th": "ทิ้งไพ่ 4 ใบ"
     },
     {
-      "en": "New Camera",
-      "th": "กล้องใหม่",
-      "effect": "Mini-Game: ถ่ายรูปร่วมกับผู้เล่นทุกคน (ความทรงจำเหล่านี้มีค่านะ)",
-      "code": "A128"
+      "code": "A128",
+      "name_en": "New Camera",
+      "name_th": "กล้องใหม่",
+      "description_en": "(Mini-Game) Take a photo with everyone. (These memories are precious.)",
+      "description_th": "Mini-Game: ถ่ายรูปร่วมกับผู้เล่นทุกคน (ความทรงจำเหล่านี้มีค่านะ)"
     },
     {
-      "en": "Only One",
-      "th": "เหลือแค่หนึ่ง",
-      "effect": "ผู้เล่นทุกคนทิ้งไพ่จนเหลือไพ่ในมือเพียงคนละ 1 ใบ",
-      "code": "A129"
+      "code": "A129",
+      "name_en": "Only One",
+      "name_th": "เหลือแค่หนึ่ง",
+      "description_en": "All players discard all but 1 card.",
+      "description_th": "ผู้เล่นทุกคนทิ้งไพ่จนเหลือไพ่ในมือเพียงคนละ 1 ใบ"
     },
     {
-      "en": "Promotion",
-      "th": "เลื่อนตำแหน่ง",
-      "effect": "เลือกผู้เล่น 1 คน ให้ผู้เล่นคนนั้นเลือกไพ่ของตัวเอง 1 ใบแล้วมอบให้ผู้เล่นอีก 1 คน",
-      "code": "A130"
+      "code": "A130",
+      "name_en": "Promotion",
+      "name_th": "เลื่อนตำแหน่ง",
+      "description_en": "Choose one player to give 1 card of their choice to another player.",
+      "description_th": "เลือกผู้เล่น 1 คน ให้ผู้เล่นคนนั้นเลือกไพ่ของตัวเอง 1 ใบแล้วมอบให้ผู้เล่นอีก 1 คน"
     },
     {
-      "en": "Rainbows",
-      "th": "สายรุ้ง",
-      "effect": "เลือกสีของสายรุ้ง 1 สี ผู้เล่นทุกคนที่สวมใส่สีนั้นทิ้งไพ่คนละ 1 ใบ",
-      "code": "A131"
+      "code": "A131",
+      "name_en": "Rainbows",
+      "name_th": "สายรุ้ง",
+      "description_en": "Choose a color of the rainbow. All players wearing that color discard 1 card.",
+      "description_th": "เลือกสีของสายรุ้ง 1 สี ผู้เล่นทุกคนที่สวมใส่สีนั้นทิ้งไพ่คนละ 1 ใบ"
     },
     {
-      "en": "Level Up",
-      "th": "เลเวลอัป!",
-      "effect": "คุณจั่วไพ่ 2 ใบ ผู้เล่นคนอื่นทั้งหมดจั่วคนละ 1 ใบ",
-      "code": "A132"
+      "code": "A132",
+      "name_en": "Level Up",
+      "name_th": "เลเวลอัป!",
+      "description_en": "Draw 2 cards. All other players draw 1.",
+      "description_th": "คุณจั่วไพ่ 2 ใบ ผู้เล่นคนอื่นทั้งหมดจั่วคนละ 1 ใบ"
     },
     {
-      "en": "Screw Gravity",
-      "th": "ช่างหัวแรงโน้มถ่วง!",
-      "effect": "จั่วไพ่ 3 ใบจากด้านล่างของกองจั่ว",
-      "code": "A133"
+      "code": "A133",
+      "name_en": "Screw Gravity",
+      "name_th": "ช่างหัวแรงโน้มถ่วง!",
+      "description_en": "Draw 3 cards from the bottom of the deck.",
+      "description_th": "จั่วไพ่ 3 ใบจากด้านล่างของกองจั่ว"
     },
     {
-      "en": "Standing Up School",
-      "th": "โรงเรียนยืนขึ้น",
-      "effect": "Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องยืนขึ้น คนสุดท้ายที่ยืนต้องทิ้งไพ่ 3 ใบ",
-      "code": "A134"
+      "code": "A134",
+      "name_en": "Standing Up School",
+      "name_th": "โรงเรียนยืนขึ้น",
+      "description_en": "(Mini-Game) All players, including you, stand up. The last player to do so discards 3 cards.",
+      "description_th": "Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องยืนขึ้น คนสุดท้ายที่ยืนต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Time of Death",
-      "th": "เวลาแห่งความตาย",
-      "effect": "เปลี่ยนเงื่อนไขชนะของ Muffin Time จาก 10 ใบ เป็นจำนวนไพ่ที่คุณเลือก และใช้จำนวนใหม่นี้ไปจนจบเกม",
-      "code": "A135"
+      "code": "A135",
+      "name_en": "Time of Death",
+      "name_th": "เวลาแห่งความตาย",
+      "description_en": "Change the goal of Muffin Time from 10 cards to a number of your choice for the rest of the game.",
+      "description_th": "เปลี่ยนเงื่อนไขชนะของ Muffin Time จาก 10 ใบ เป็นจำนวนไพ่ที่คุณเลือก และใช้จำนวนใหม่นี้ไปจนจบเกม"
     },
     {
-      "en": "What's Their Name?",
-      "th": "เขาชื่ออะไรนะ?",
-      "effect": "เลือกผู้เล่นอีก 1 คน หากผู้เล่นคนนั้นไม่รู้ชื่อเต็มของคุณ ขโมยไพ่จากเขา 3 ใบ",
-      "code": "A136"
+      "code": "A136",
+      "name_en": "What's Their Name?",
+      "name_th": "เขาชื่ออะไรนะ?",
+      "description_en": "If another player of your choice doesn't know your full name, steal 3 of their cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คน หากผู้เล่นคนนั้นไม่รู้ชื่อเต็มของคุณ ขโมยไพ่จากเขา 3 ใบ"
     },
     {
-      "en": "Watcha Get?",
-      "th": "ได้อะไรมา?",
-      "effect": "ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่มีวันเกิดครั้งถัดไปใกล้ที่สุด",
-      "code": "A137"
+      "code": "A137",
+      "name_en": "Watcha Get?",
+      "name_th": "ได้อะไรมา?",
+      "description_en": "All players steal 1 card from the player whose next birthday is the closest.",
+      "description_th": "ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่มีวันเกิดครั้งถัดไปใกล้ที่สุด"
     },
     {
-      "en": "You're A Nerd",
-      "th": "นายมันเด็กเนิร์ด",
-      "effect": "ผู้เล่นทุกคนที่สวมแว่น จั่วไพ่คนละ 2 ใบ",
-      "code": "A138"
-    }
-  ],
-  "counter": [
-    {
-      "en": "Baby with Two Guns",
-      "th": "เด็กกับปืนสองกระบอก",
-      "effect": "หยุดไพ่ “Baby With a Gun” และขโมยไพ่จากผู้เล่นที่ใช้ไพ่ใบนั้นกี่ใบก็ได้ตามที่คุณต้องการ",
-      "code": "C01"
-    },
-    {
-      "en": "Don't Jump!",
-      "th": "อย่ากระโดด!",
-      "effect": "หยุดไม่ให้ผู้เล่นคนอื่นทิ้งไพ่ของตัวเอง.",
-      "code": "C02"
-    },
-    {
-      "en": "Here They Are",
-      "th": "อยู่นี่ไง",
-      "effect": "หากคุณกำลังถูกบังคับให้ทิ้งไพ่ ให้เก็บไพ่ไว้ได้ 2 ใบ",
-      "code": "C03"
-    },
-    {
-      "en": "Not My Hand!",
-      "th": "อย่าเอาไพ่ฉัน!",
-      "effect": "หยุดไม่ให้ไพ่ของคุณถูกขโมย แล้วเลือกผู้เล่นคนอื่นให้ถูกขโมยไพ่แทน",
-      "code": "C04"
-    },
-    {
-      "en": "Put It Back",
-      "th": "เอาคืนไป",
-      "effect": "นำไพ่ Action, Counter หรือ Trap ที่กำลังถูกใช้ กลับคืนสู่มือของผู้เล่นที่ใช้ไพ่ใบนั้น",
-      "code": "C05"
-    },
-    {
-      "en": "Stop It!",
-      "th": "หยุดนะ!",
-      "effect": "หยุดการถูกบังคับให้จั่วหรือขโมยไพ่",
-      "code": "C06"
-    },
-    {
-      "en": "Wannabe",
-      "th": "เอาด้วยคน",
-      "effect": "เลือกให้ตัวคุณได้รับผลจากไพ่ Action หรือ Trap ที่กำลังทำงานอยู่ด้วย",
-      "code": "C07"
-    },
-    {
-      "en": "Can't Fire Me",
-      "th": "ไล่ฉันออกไม่ได้หรอก",
-      "effect": "หากผู้เล่นคนอื่นพยายามขโมยไพ่ของคุณ ให้คุณทิ้งไพ่ในจำนวนเท่ากันแทน",
-      "code": "C08"
-    },
-    {
-      "en": "Dog With A Knife",
-      "th": "หมาถือมีด",
-      "effect": "หยุดไพ่ Trap ที่กำลังทำงานอยู่",
-      "code": "C09"
-    },
-    {
-      "en": "I'm A Ghost",
-      "th": "ฉันเป็นผี",
-      "effect": "หยุดไพ่ Action ที่กำลังทำงานอยู่ แต่คุณต้องทิ้งไพ่ Trap ที่วางไว้ทั้งหมดของคุณ",
-      "code": "C10"
-    },
-    {
-      "en": "I Can't Read",
-      "th": "ฉันอ่านไม่ออก",
-      "effect": "คุณไม่ได้รับผลจากไพ่ Trap ที่กำลังทำงานอยู่",
-      "code": "C11"
-    },
-    {
-      "en": "Look Out",
-      "th": "ระวัง!",
-      "effect": "หยุดผู้เล่นคนอื่นไม่ให้ขโมยไพ่ของคุณหรือของผู้เล่นคนอื่น",
-      "code": "C12"
-    },
-    {
-      "en": "Me! Me! Me!",
-      "th": "ฉัน! ฉัน! ฉัน!",
-      "effect": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และเลื่อนเทิร์นไปเป็นเทิร์นของคุณ",
-      "code": "C13"
-    },
-    {
-      "en": "Aw, Come On!",
-      "th": "โธ่ เอาน่า!",
-      "effect": "หยุดไพ่ Action ที่ผู้เล่นคนอื่นกำลังใช้ และบังคับให้ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ",
-      "code": "C14"
-    },
-    {
-      "en": "Beep Beep I'm a Sheep",
-      "th": "บี๊บ บี๊บ ฉันเป็นแกะ",
-      "effect": "ไพ่ Action ที่ถูกใช้เจาะจงใส่คุณ จะเปลี่ยนเป็นมีผลกับผู้เล่นทุกคน",
-      "code": "C15"
-    },
-    {
-      "en": "Bomb Squad",
-      "th": "หน่วยกู้ระเบิด",
-      "effect": "หยุดไพ่ “Mine Turtle” และจั่วไพ่ให้ตัวเอง 3 ใบ",
-      "code": "C16"
-    },
-    {
-      "en": "Can't Tell Me",
-      "th": "สั่งฉันไม่ได้หรอก",
-      "effect": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และจั่วไพ่ใหม่ให้ตัวเอง 1 ใบ",
-      "code": "C17"
-    },
-    {
-      "en": "Catch The Knife",
-      "th": "รับมีดไป!",
-      "effect": "หยุดไพ่ Counter ที่กำลังทำงานอยู่",
-      "code": "C18"
-    },
-    {
-      "en": "Chase Me!",
-      "th": "จับฉันให้ได้สิ!",
-      "effect": "หากผู้เล่นคนอื่นขโมยไพ่ใบนี้จากคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ทั้งหมดในมือ",
-      "code": "C19"
-    },
-    {
-      "en": "Dead To Me",
-      "th": "ตายไปจากใจฉันแล้ว",
-      "effect": "หยุดไพ่ Action หรือ Trap ที่กำลังทำงานอยู่ และบังคับให้ผู้เล่นที่ใช้ไพ่ใบนั้นข้ามเทิร์นถัดไป",
-      "code": "C20"
-    },
-    {
-      "en": "Evil Butterfly",
-      "th": "ผีเสื้อปีศาจ",
-      "effect": "หยุดไพ่ Counter ที่กำลังทำงานอยู่ แล้วขโมยไพ่ Counter ใบนั้นมาเป็นของคุณ",
-      "code": "C21"
-    },
-    {
-      "en": "Meow Meow I'm a Cow",
-      "th": "เหมียว เหมียว ฉันเป็นวัว",
-      "effect": "ไพ่ Action ที่มีผลกับผู้เล่นทุกคน จะเปลี่ยนเป็นมีผลกับผู้เล่นเพียง 1 คนที่คุณเลือก",
-      "code": "C22"
-    },
-    {
-      "en": "My Favorite",
-      "th": "ของโปรดของฉัน",
-      "effect": "เพิ่มผลของไพ่ Action ที่ถูกใช้ใส่คุณเป็นสองเท่า",
-      "code": "C23"
-    },
-    {
-      "en": "Never Take Me Alive",
-      "th": "ไม่มีวันจับฉันได้หรอก",
-      "effect": "หยุดไพ่ Action ที่กำลังทำงานอยู่ แต่คุณต้องข้ามเทิร์นถัดไป",
-      "code": "C24"
-    },
-    {
-      "en": "No One Likes You",
-      "th": "ไม่มีใครชอบนาย",
-      "effect": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และนำไพ่ใบนั้นออกจากเกมตลอดเกมที่เหลือ",
-      "code": "C25"
-    },
-    {
-      "en": "No U",
-      "th": "นายต่างหาก",
-      "effect": "หยุดผู้เล่นคนอื่นจากการขโมยไพ่ของคุณ แล้วขโมยไพ่จากผู้เล่นคนนั้นกลับในจำนวนเท่ากัน",
-      "code": "C26"
-    },
-    {
-      "en": "NO!!!",
-      "th": "ไม่!!!",
-      "effect": "หยุดไพ่ Action ของผู้เล่นคนอื่น แล้วขโมยไพ่ Action ใบนั้นมาเป็นของคุณ",
-      "code": "C27"
-    },
-    {
-      "en": "Nope!",
-      "th": "ไม่เอา!",
-      "effect": "หยุดผู้เล่นคนอื่นไม่ให้ขโมยไพ่ของคุณ",
-      "code": "C28"
-    },
-    {
-      "en": "Not Today!",
-      "th": "วันนี้ไม่ใช่วันของนาย!",
-      "effect": "หยุดไพ่ Action, Trap หรือ Counter ที่กำลังทำงานอยู่",
-      "code": "C29"
-    },
-    {
-      "en": "Oh... Okay?",
-      "th": "อ๋อ... โอเค?",
-      "effect": "หยุดการถูกบังคับให้ทิ้งไพ่ และจั่วไพ่ในจำนวนเท่ากันแทน",
-      "code": "C30"
-    },
-    {
-      "en": "Out Of Muffins",
-      "th": "มัฟฟินหมดแล้ว",
-      "effect": "หยุดไพ่ “Muffin Time” (หมายถึงไพ่ Action ชื่อ Muffin Time ไม่ใช่หยุดเกม)",
-      "code": "C31"
-    },
-    {
-      "en": "Really Far Away",
-      "th": "ไกลมาก ๆ",
-      "effect": "หยุดไพ่ Trap ที่กำลังทำงานอยู่ และคุณจะไม่ได้รับผลจาก Trap ทุกใบจนถึงเทิร์นถัดไปของคุณ",
-      "code": "C32"
-    },
-    {
-      "en": "Shoot It Down",
-      "th": "ยิงมันลงมา!",
-      "effect": "หยุดไพ่ “Magical Pony”",
-      "code": "C33"
-    },
-    {
-      "en": "Static",
-      "th": "ไฟฟ้าสถิต",
-      "effect": "เบี่ยงไพ่ Action หรือ Trap ที่ถูกใช้ใส่คุณ ให้ไปมีผลกับผู้เล่นคนถัดไปแทน",
-      "code": "C34"
-    },
-    {
-      "en": "Stegosaurus",
-      "th": "สเตโกซอรัส",
-      "effect": "เลือกผู้เล่นคนอื่น 1 คนให้รับผลของไพ่ Action หรือ Trap ที่ถูกใช้ใส่คุณแทน",
-      "code": "C35"
-    },
-    {
-      "en": "Thanks, You Too",
-      "th": "ขอบใจ นายด้วยนะ",
-      "effect": "ผลของไพ่ Trap ที่ถูกใช้เจาะจงใส่คุณ จะมีผลกับผู้เล่นที่ใช้ไพ่ใบนั้นด้วย",
-      "code": "C36"
-    },
-    {
-      "en": "The Hole",
-      "th": "หลุม",
-      "effect": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และบังคับให้ผู้เล่นที่ใช้ไพ่ใบนั้นทิ้งไพ่ทั้งหมดในมือ",
-      "code": "C37"
-    },
-    {
-      "en": "Tree Powers",
-      "th": "พลังต้นไม้",
-      "effect": "หยุดผู้เล่นคนอื่นไม่ให้ขโมยไพ่ของคุณ แต่คุณต้องข้ามเทิร์นถัดไป",
-      "code": "C38"
-    },
-    {
-      "en": "We Failed",
-      "th": "เราพลาดแล้ว",
-      "effect": "เลือกผู้เล่นคนอื่น 1 คนให้ได้รับผลของไพ่ Action หรือ Trap ที่ถูกใช้ใส่คุณด้วย",
-      "code": "C39"
-    },
-    {
-      "en": "Opposite Day",
-      "th": "วันตรงข้าม",
-      "effect": "ผลของไพ่ Action ที่ถูกใช้เจาะจงใส่คุณ จะเปลี่ยนไปมีผลกับผู้เล่นที่ใช้ไพ่ใบนั้นแทน",
-      "code": "C40"
+      "code": "A138",
+      "name_en": "You're A Nerd",
+      "name_th": "นายมันเด็กเนิร์ด",
+      "description_en": "All players wearing glasses draw 2 cards.",
+      "description_th": "ผู้เล่นทุกคนที่สวมแว่น จั่วไพ่คนละ 2 ใบ"
     }
   ],
   "trap": [
     {
-      "en": "Where Is It?",
-      "th": "มันอยู่ไหน?",
-      "effect": "(Kickstarter-exclusive) Hide something belonging to another player. If they ask where it is, they discard 3 cards.",
-      "code": "T01"
+      "code": "T01",
+      "name_en": "Where Is It?",
+      "name_th": "มันอยู่ไหน?",
+      "description_en": "(Kickstarter-exclusive) Hide something belonging to another player. If they ask where it is, they discard 3 cards.",
+      "description_th": "ซ่อนของบางอย่างที่เป็นของผู้เล่นคนอื่น หากผู้เล่นคนนั้นถามว่าของอยู่ไหน ให้เขาทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Sniper Pug",
-      "th": "ปั๊กสไนเปอร์",
-      "effect": "(Kickstarter-exclusive) If another player forces specifically you to discard any cards, all other players discard 1 card each.",
-      "code": "T02"
+      "code": "T02",
+      "name_en": "Sniper Pug",
+      "name_th": "ปั๊กสไนเปอร์",
+      "description_en": "(Kickstarter-exclusive) If another player forces specifically you to discard any cards, all other players discard 1 card each.",
+      "description_th": "หากผู้เล่นคนอื่นบังคับให้คุณทิ้งไพ่ ผู้เล่นคนอื่นทั้งหมดต้องทิ้งไพ่คนละ 1 ใบ"
     },
     {
-      "en": "That's a Shame",
-      "th": "น่าเสียดายจัง",
-      "effect": "(Kickstarter-exclusive) If another player forces you to discard any cards, all players must also discard the same amount.",
-      "code": "T03"
+      "code": "T03",
+      "name_en": "That's a Shame",
+      "name_th": "น่าเสียดายจัง",
+      "description_en": "(Kickstarter-exclusive) If another player forces you to discard any cards, all players must also discard the same amount.",
+      "description_th": "หากผู้เล่นคนอื่นบังคับให้คุณทิ้งไพ่ ผู้เล่นทุกคนต้องทิ้งไพ่ในจำนวนเท่ากันด้วย"
     },
     {
-      "en": "Nice To Me",
-      "th": "ดีกับฉันหน่อย",
-      "effect": "(Kickstarter-exclusive) If another player steals any cards from you, they discard 5 cards.",
-      "code": "T04"
+      "code": "T04",
+      "name_en": "Nice To Me",
+      "name_th": "ดีกับฉันหน่อย",
+      "description_en": "(Kickstarter-exclusive) If another player steals any cards from you, they discard 5 cards.",
+      "description_th": "หากผู้เล่นคนอื่นขโมยไพ่จากคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ 5 ใบ"
     },
     {
-      "en": "Needles",
-      "th": "เข็ม",
-      "effect": "(Kickstarter-exclusive) If another player steals any of your cards, they discard 5 cards.",
-      "code": "T05"
+      "code": "T05",
+      "name_en": "Needles",
+      "name_th": "เข็ม",
+      "description_en": "(Kickstarter-exclusive) If another player steals any of your cards, they discard 5 cards.",
+      "description_th": "หากผู้เล่นคนอื่นขโมยไพ่ของคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ 5 ใบ"
     },
     {
-      "en": "Inappropriate",
-      "th": "ไม่สุภาพเลยนะ",
-      "effect": "(Kickstarter-exclusive) If another player swears, steal 3 of their cards.",
-      "code": "T06"
+      "code": "T06",
+      "name_en": "Inappropriate",
+      "name_th": "ไม่สุภาพเลยนะ",
+      "description_en": "(Kickstarter-exclusive) If another player swears, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดคำหยาบ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Did Somebody Say _____?",
-      "th": "เมื่อกี้ใครพูดว่า _____?",
-      "effect": "(Kickstarter-exclusive) If you successfully trick another player into repeating something you said, they discard 3 cards.",
-      "code": "T07"
+      "code": "T07",
+      "name_en": "Did Somebody Say _____?",
+      "name_th": "เมื่อกี้ใครพูดว่า _____?",
+      "description_en": "(Kickstarter-exclusive) If you successfully trick another player into repeating something you said, they discard 3 cards.",
+      "description_th": "หากคุณหลอกให้ผู้เล่นคนอื่นพูดซ้ำสิ่งที่คุณพูดได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "日本語テキスト",
-      "th": "ข้อความภาษาญี่ปุ่น",
-      "effect": "(Kickstarter-exclusive) If you successfully trick another player into saying something in a foreign language, they discard 3 cards.",
-      "code": "T08"
+      "code": "T08",
+      "name_en": "日本語テキスト",
+      "name_th": "ข้อความภาษาญี่ปุ่น",
+      "description_en": "(Kickstarter-exclusive) If you successfully trick another player into saying something in a foreign language, they discard 3 cards.",
+      "description_th": "หากคุณหลอกให้ผู้เล่นคนอื่นพูดอะไรบางอย่างเป็นภาษาต่างประเทศได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Card Sick",
-      "th": "เมาไพ่",
-      "effect": "As soon as you exceed 10 cards, discard the extras.",
-      "code": "T09"
+      "code": "T09",
+      "name_en": "Card Sick",
+      "name_th": "เมาไพ่",
+      "description_en": "As soon as you exceed 10 cards, discard the extras.",
+      "description_th": "ทันทีที่คุณมีไพ่มากกว่า 10 ใบ ให้ทิ้งไพ่ส่วนที่เกิน 10 ใบ"
     },
     {
-      "en": "Just Friends",
-      "th": "เป็นแค่เพื่อนกันนะ",
-      "effect": "Ask another player to go out with you. If they refuse, steal 3 of their cards.",
-      "code": "T10"
+      "code": "T10",
+      "name_en": "Just Friends",
+      "name_th": "เป็นแค่เพื่อนกันนะ",
+      "description_en": "Ask another player to go out with you. If they refuse, steal 3 of their cards.",
+      "description_th": "ชวนผู้เล่นคนอื่นไปเดตกับคุณ หากเขาปฏิเสธ ขโมยไพ่จากเขา 3 ใบ"
     },
     {
-      "en": "A Robbery",
-      "th": "นี่คือการปล้น!",
-      "effect": "Call another player's phone and if they answer, steal 3 of their cards.",
-      "code": "T11"
+      "code": "T11",
+      "name_en": "A Robbery",
+      "name_th": "นี่คือการปล้น!",
+      "description_en": "Call another player's phone and if they answer, steal 3 of their cards.",
+      "description_th": "โทรหาผู้เล่นคนอื่น หากเขารับสาย ขโมยไพ่จากเขา 3 ใบ"
     },
     {
-      "en": "Gullible",
-      "th": "หลอกง่ายจัง",
-      "effect": "Create a distraction and steal 1 card from every player you fooled.",
-      "code": "T12"
+      "code": "T12",
+      "name_en": "Gullible",
+      "name_th": "หลอกง่ายจัง",
+      "description_en": "Create a distraction and steal 1 card from every player you fooled.",
+      "description_th": "สร้างสิ่งเบี่ยงเบนความสนใจ แล้วขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่คุณหลอกสำเร็จ"
     },
     {
-      "en": "Caught You",
-      "th": "จับได้แล้ว!",
-      "effect": "If another player acknowledges you lying, steal 3 of their cards.",
-      "code": "T13"
+      "code": "T13",
+      "name_en": "Caught You",
+      "name_th": "จับได้แล้ว!",
+      "description_en": "If another player acknowledges you lying, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นจับได้ว่าคุณกำลังโกหก ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "What Time Is It?",
-      "th": "กี่โมงแล้ว?",
-      "effect": "If another player asks the time, steal 4 of their cards.",
-      "code": "T14"
+      "code": "T14",
+      "name_en": "What Time Is It?",
+      "name_th": "กี่โมงแล้ว?",
+      "description_en": "If another player asks the time, steal 4 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นถามเวลา ขโมยไพ่จากผู้เล่นคนนั้น 4 ใบ"
     },
     {
-      "en": "Catch!",
-      "th": "รับนะ!",
-      "effect": "If another player catches something you throw at them, they discard 3 cards.",
-      "code": "T15"
+      "code": "T15",
+      "name_en": "Catch!",
+      "name_th": "รับนะ!",
+      "description_en": "If another player catches something you throw at them, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นรับสิ่งของที่คุณโยนให้ได้ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Do a Book",
-      "th": "เปิดตำราหน่อย",
-      "effect": "If another player checks the rules, they discard 3 cards.",
-      "code": "T16"
+      "code": "T16",
+      "name_en": "Do a Book",
+      "name_th": "เปิดตำราหน่อย",
+      "description_en": "If another player checks the rules, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นเปิดดูกฎของเกม ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "We There Yet?",
-      "th": "ยังไม่จบอีกเหรอ?",
-      "effect": "If another player complains about the game taking too long, steal 3 of their cards.",
-      "code": "T17"
+      "code": "T17",
+      "name_en": "We There Yet?",
+      "name_th": "ยังไม่จบอีกเหรอ?",
+      "description_en": "If another player complains about the game taking too long, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นบ่นว่าเกมใช้เวลานานเกินไป ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Crybaby",
-      "th": "ขี้บ่น",
-      "effect": "If another player complains, steal 3 of their cards.",
-      "code": "T18"
+      "code": "T18",
+      "name_en": "Crybaby",
+      "name_th": "ขี้บ่น",
+      "description_en": "If another player complains, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นบ่น ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Who Ate This?",
-      "th": "ใครกินเนี่ย?",
-      "effect": "If another player eats any food, steal 3 of their cards.",
-      "code": "T19"
+      "code": "T19",
+      "name_en": "Who Ate This?",
+      "name_th": "ใครกินเนี่ย?",
+      "description_en": "If another player eats any food, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นกินอาหาร ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Farting Butt",
-      "th": "ก้นตด",
-      "effect": "If another player farts, burps, coughs, or sneezes, steal 3 of their cards.",
-      "code": "T20"
+      "code": "T20",
+      "name_en": "Farting Butt",
+      "name_th": "ก้นตด",
+      "description_en": "If another player farts, burps, coughs, or sneezes, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นตด เรอ ไอ หรือจาม ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Don't Cry",
-      "th": "อย่าร้องสิ",
-      "effect": "If another player forces you to discard any cards, they must also discard the same amount.",
-      "code": "T21"
+      "code": "T21",
+      "name_en": "Don't Cry",
+      "name_th": "อย่าร้องสิ",
+      "description_en": "If another player forces you to discard any cards, they must also discard the same amount.",
+      "description_th": "หากผู้เล่นคนอื่นบังคับให้คุณทิ้งไพ่ ผู้เล่นคนนั้นต้องทิ้งไพ่ในจำนวนเท่ากันด้วย"
     },
     {
-      "en": "Bad Direction",
-      "th": "บอกผิดแล้ว",
-      "effect": "If another player gets the rules wrong, steal 3 of their cards.",
-      "code": "T22"
+      "code": "T22",
+      "name_en": "Bad Direction",
+      "name_th": "บอกผิดแล้ว",
+      "description_en": "If another player gets the rules wrong, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นเข้าใจกฎผิด ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "You Fool",
-      "th": "เจ้าโง่!",
-      "effect": "If another player is forced to discard any cards, take them for yourself.",
-      "code": "T23"
+      "code": "T23",
+      "name_en": "You Fool",
+      "name_th": "เจ้าโง่!",
+      "description_en": "If another player is forced to discard any cards, take them for yourself.",
+      "description_th": "หากผู้เล่นคนอื่นถูกบังคับให้ทิ้งไพ่ ให้นำไพ่ที่เขาทิ้งมาเป็นของคุณ"
     },
     {
-      "en": "Best Sarcasm",
-      "th": "ประชดเก่ง",
-      "effect": "If another player is sarcastic, steal 3 of their cards.",
-      "code": "T24"
+      "code": "T24",
+      "name_en": "Best Sarcasm",
+      "name_th": "ประชดเก่ง",
+      "description_en": "If another player is sarcastic, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดประชด ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Comedy",
-      "th": "ตลกดีนะ",
-      "effect": "If another player laughs out loud, steal 3 of their cards.",
-      "code": "T25"
+      "code": "T25",
+      "name_en": "Comedy",
+      "name_th": "ตลกดีนะ",
+      "description_en": "If another player laughs out loud, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นหัวเราะออกมาดัง ๆ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Goodbye, World",
-      "th": "ลาก่อน โลกนี้",
-      "effect": "If another player leaves the room, steal 5 of their cards.",
-      "code": "T26"
+      "code": "T26",
+      "name_en": "Goodbye, World",
+      "name_th": "ลาก่อน โลกนี้",
+      "description_en": "If another player leaves the room, steal 5 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นออกจากห้อง ขโมยไพ่จากผู้เล่นคนนั้น 5 ใบ"
     },
     {
-      "en": "Don't Think About Cats",
-      "th": "อย่าคิดถึงแมว",
-      "effect": "If another player mentions a cat, they discard 3 cards.",
-      "code": "T27"
+      "code": "T27",
+      "name_en": "Don't Think About Cats",
+      "name_th": "อย่าคิดถึงแมว",
+      "description_en": "If another player mentions a cat, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดถึงแมว ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Friends",
-      "th": "เพื่อน",
-      "effect": "If another player mentions a friend who isn’t currently playing, steal 3 of their cards",
-      "code": "T28"
+      "code": "T28",
+      "name_en": "Friends",
+      "name_th": "เพื่อน",
+      "description_en": "If another player mentions a friend who isn’t currently playing, steal 3 of their cards",
+      "description_th": "หากผู้เล่นคนอื่นพูดถึงเพื่อนที่ไม่ได้กำลังเล่นเกมอยู่ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Love you, Baby",
-      "th": "รักนะ เบบี๋",
-      "effect": "If another player plays a card with \"baby\" in its title, steal 3 of their cards.",
-      "code": "T29"
+      "code": "T29",
+      "name_en": "Love you, Baby",
+      "name_th": "รักนะ เบบี๋",
+      "description_en": "If another player plays a card with \"baby\" in its title, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นเล่นไพ่ที่มีคำว่า “baby” อยู่ในชื่อ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Baby on Fire",
-      "th": "เด็กไฟลุก",
-      "effect": "If another player plays a card with \"baby\" in its title, they discard 3 cards.",
-      "code": "T30"
+      "code": "T30",
+      "name_en": "Baby on Fire",
+      "name_th": "เด็กไฟลุก",
+      "description_en": "If another player plays a card with \"baby\" in its title, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นเล่นไพ่ที่มีคำว่า “baby” อยู่ในชื่อ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "What Have You Done?",
-      "th": "นายทำอะไรลงไป?!",
-      "effect": "If another player plays an action card specifically on you, the same effect also applies to them.",
-      "code": "T31"
+      "code": "T31",
+      "name_en": "What Have You Done?",
+      "name_th": "นายทำอะไรลงไป?!",
+      "description_en": "If another player plays an action card specifically on you, the same effect also applies to them.",
+      "description_th": "หากผู้เล่นคนอื่นเล่นไพ่ Action โดยเจาะจงใส่คุณ Effect เดียวกันนั้นจะมีผลกับผู้เล่นคนนั้นด้วย"
     },
     {
-      "en": "Gonna Eat That?",
-      "th": "จะกินนั่นไหม?",
-      "effect": "If another player puts down their hand, steal it.",
-      "code": "T32"
+      "code": "T32",
+      "name_en": "Gonna Eat That?",
+      "name_th": "จะกินนั่นไหม?",
+      "description_en": "If another player puts down their hand, steal it.",
+      "description_th": "หากผู้เล่นคนอื่นวางไพ่ในมือของตัวเองลง ให้ขโมยไพ่ในมือนั้นทั้งหมด"
     },
     {
-      "en": "Backstories",
-      "th": "เรื่องเก่าเล่าใหม่",
-      "effect": "If another player recalls an event from over a year ago, they discard 3 cards.",
-      "code": "T33"
+      "code": "T33",
+      "name_en": "Backstories",
+      "name_th": "เรื่องเก่าเล่าใหม่",
+      "description_en": "If another player recalls an event from over a year ago, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดถึงเหตุการณ์ที่เกิดขึ้นนานกว่า 1 ปีที่แล้ว ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Inanimate Object",
-      "th": "วัตถุไร้ชีวิต",
-      "effect": "If another player refuses to answer a question from you, they discard 3 cards.",
-      "code": "T34"
+      "code": "T34",
+      "name_en": "Inanimate Object",
+      "name_th": "วัตถุไร้ชีวิต",
+      "description_en": "If another player refuses to answer a question from you, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นปฏิเสธที่จะตอบคำถามของคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "LOL Out Loud",
-      "th": "ขำออกมาดัง ๆ",
-      "effect": "If another player says \"Muffin Time\", they discard 3 cards.",
-      "code": "T35"
+      "code": "T35",
+      "name_en": "LOL Out Loud",
+      "name_th": "ขำออกมาดัง ๆ",
+      "description_en": "If another player says \"Muffin Time\", they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดว่า “Muffin Time” ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Magic Word",
-      "th": "คำวิเศษ",
-      "effect": "If another player says \"please\", they discard 3 cards.",
-      "code": "T36"
+      "code": "T36",
+      "name_en": "Magic Word",
+      "name_th": "คำวิเศษ",
+      "description_en": "If another player says \"please\", they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดว่า “please” ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Named This Way",
-      "th": "เรียกชื่อนี้แหละ",
-      "effect": "If another player says your first name, they discard 3 cards.",
-      "code": "T37"
+      "code": "T37",
+      "name_en": "Named This Way",
+      "name_th": "เรียกชื่อนี้แหละ",
+      "description_en": "If another player says your first name, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นเรียกชื่อจริงของคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "If You're Happy",
-      "th": "ถ้าคุณมีความสุข",
-      "effect": "If another player sings out loud, steal 3 of their cards.",
-      "code": "T38"
+      "code": "T38",
+      "name_en": "If You're Happy",
+      "name_th": "ถ้าคุณมีความสุข",
+      "description_en": "If another player sings out loud, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นร้องเพลงออกมาดัง ๆ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ"
     },
     {
-      "en": "Super Guy",
-      "th": "ยอดมนุษย์",
-      "effect": "If another player uses a counter card on you, it does nothing.",
-      "code": "T39"
+      "code": "T39",
+      "name_en": "Super Guy",
+      "name_th": "ยอดมนุษย์",
+      "description_en": "If another player uses a counter card on you, it does nothing.",
+      "description_th": "หากผู้เล่นคนอื่นใช้ไพ่ Counter กับคุณ ไพ่ Counter ใบนั้นจะไม่มีผล"
     },
     {
-      "en": "Tired?",
-      "th": "ง่วงเหรอ?",
-      "effect": "If another player yawns, they discard 4 cards.",
-      "code": "T40"
+      "code": "T40",
+      "name_en": "Tired?",
+      "name_th": "ง่วงเหรอ?",
+      "description_en": "If another player yawns, they discard 4 cards.",
+      "description_th": "หากผู้เล่นคนอื่นหาว ผู้เล่นคนนั้นต้องทิ้งไพ่ 4 ใบ"
     },
     {
-      "en": "Countdown",
-      "th": "นับถอยหลัง",
-      "effect": "If another players asks you how many cards you have, they discard 3 cards.",
-      "code": "T41"
+      "code": "T41",
+      "name_en": "Countdown",
+      "name_th": "นับถอยหลัง",
+      "description_en": "If another players asks you how many cards you have, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นถามว่าคุณมีไพ่กี่ใบ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Jack in the Box",
-      "th": "แจ็คอินเดอะบ็อกซ์",
-      "effect": "If any of your placed trap cards are activated, steal 1 card from all other players.",
-      "code": "T42"
+      "code": "T42",
+      "name_en": "Jack in the Box",
+      "name_th": "แจ็คอินเดอะบ็อกซ์",
+      "description_en": "If any of your placed trap cards are activated, steal 1 card from all other players.",
+      "description_th": "หากไพ่ Trap ที่คุณวางไว้ใบใดก็ตามถูกใช้งาน ขโมยไพ่ 1 ใบจากผู้เล่นคนอื่นทุกคน"
     },
     {
-      "en": "Upside Down",
-      "th": "กลับตาลปัตร",
-      "effect": "If you activate another player's trap card, the effect applies to them instead.",
-      "code": "T43"
+      "code": "T43",
+      "name_en": "Upside Down",
+      "name_th": "กลับตาลปัตร",
+      "description_en": "If you activate another player's trap card, the effect applies to them instead.",
+      "description_th": "หากคุณเป็นคนทำให้ Trap ของผู้เล่นคนอื่นทำงาน Effect ของ Trap นั้นจะมีผลกับเจ้าของ Trap แทน"
     },
     {
-      "en": "Do An Internet",
-      "th": "เล่นเน็ตหน่อย",
-      "effect": "If you catch another player browsing the internet, they discard 3 cards.",
-      "code": "T44"
+      "code": "T44",
+      "name_en": "Do An Internet",
+      "name_th": "เล่นเน็ตหน่อย",
+      "description_en": "If you catch another player browsing the internet, they discard 3 cards.",
+      "description_th": "หากคุณจับได้ว่าผู้เล่นคนอื่นกำลังใช้อินเทอร์เน็ต ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "What a Twist",
-      "th": "หักมุมซะงั้น!",
-      "effect": "If you have 0 cards, draw 10 cards.",
-      "code": "T45"
+      "code": "T45",
+      "name_en": "What a Twist",
+      "name_th": "หักมุมซะงั้น!",
+      "description_en": "If you have 0 cards, draw 10 cards.",
+      "description_th": "หากคุณไม่มีไพ่เหลือเลย ให้จั่วไพ่ 10 ใบ"
     },
     {
-      "en": "Don't Beat Me",
-      "th": "อย่าตีฉัน",
-      "effect": "If you have 0 cards, steal the entire hand of any other player.",
-      "code": "T46"
+      "code": "T46",
+      "name_en": "Don't Beat Me",
+      "name_th": "อย่าตีฉัน",
+      "description_en": "If you have 0 cards, steal the entire hand of any other player.",
+      "description_th": "หากคุณไม่มีไพ่เหลือเลย ขโมยไพ่ในมือทั้งหมดของผู้เล่นคนใดก็ได้ 1 คน"
     },
     {
-      "en": "High Five",
-      "th": "ไฮไฟว์!",
-      "effect": "If you successfully high-five another player, they discard 5 cards.",
-      "code": "T47"
+      "code": "T47",
+      "name_en": "High Five",
+      "name_th": "ไฮไฟว์!",
+      "description_en": "If you successfully high-five another player, they discard 5 cards.",
+      "description_th": "หากคุณไฮไฟว์กับผู้เล่นคนอื่นได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 5 ใบ"
     },
     {
-      "en": "Made Ya Jump",
-      "th": "ตกใจล่ะสิ!",
-      "effect": "If you successfully scare another player, they discard 3 cards.",
-      "code": "T48"
+      "code": "T48",
+      "name_en": "Made Ya Jump",
+      "name_th": "ตกใจล่ะสิ!",
+      "description_en": "If you successfully scare another player, they discard 3 cards.",
+      "description_th": "หากคุณทำให้ผู้เล่นคนอื่นตกใจได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "What?!",
-      "th": "อะไรนะ?!",
-      "effect": "If you successfully trick another player into saying \"what\", they discard 3 cards.",
-      "code": "T49"
+      "code": "T49",
+      "name_en": "What?!",
+      "name_th": "อะไรนะ?!",
+      "description_en": "If you successfully trick another player into saying \"what\", they discard 3 cards.",
+      "description_th": "หากคุณหลอกให้ผู้เล่นคนอื่นพูดว่า “what” ได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ"
     },
     {
-      "en": "Don't Touch",
-      "th": "ห้ามแตะ!",
-      "effect": "Place this card face-down anywhere. If another player picks it up, they discard 5 cards.",
-      "code": "T50"
+      "code": "T50",
+      "name_en": "Don't Touch",
+      "name_th": "ห้ามแตะ!",
+      "description_en": "Place this card face-down anywhere. If another player picks it up, they discard 5 cards.",
+      "description_th": "วางไพ่ใบนี้คว่ำหน้าไว้ที่ใดก็ได้ หากผู้เล่นคนอื่นหยิบไพ่ใบนี้ขึ้นมา ผู้เล่นคนนั้นต้องทิ้งไพ่ 5 ใบ"
     },
     {
-      "en": "Hello There",
-      "th": "หวัดดี!",
-      "effect": "Say \"hello\" to another player and steal 3 of their cards if they say \"hello\" back.",
-      "code": "T51"
+      "code": "T51",
+      "name_en": "Hello There",
+      "name_th": "หวัดดี!",
+      "description_en": "Say \"hello\" to another player and steal 3 of their cards if they say \"hello\" back.",
+      "description_th": "พูด “hello” กับผู้เล่นคนอื่น หากเขาพูด “hello” ตอบกลับมา ขโมยไพ่จากเขา 3 ใบ"
     },
     {
-      "en": "On Your Face",
-      "th": "แปะหน้าซะ",
-      "effect": "Stick this card to your forehead. If nobody mentions it by your next turn, all other players discard 3 cards.",
-      "code": "T52"
+      "code": "T52",
+      "name_en": "On Your Face",
+      "name_th": "แปะหน้าซะ",
+      "description_en": "Stick this card to your forehead. If nobody mentions it by your next turn, all other players discard 3 cards.",
+      "description_th": "แปะไพ่ใบนี้ไว้ที่หน้าผากของคุณ หากไม่มีใครพูดถึงมันจนถึงเทิร์นถัดไปของคุณ ผู้เล่นคนอื่นทั้งหมดต้องทิ้งไพ่คนละ 3 ใบ"
     },
     {
-      "en": "Face in a Face",
-      "th": "หน้าในหน้า",
-      "effect": "Stick this card to your forehead. If nobody mentions it by your next turn, all players draw 2 cards.",
-      "code": "T53"
+      "code": "T53",
+      "name_en": "Face in a Face",
+      "name_th": "หน้าในหน้า",
+      "description_en": "Stick this card to your forehead. If nobody mentions it by your next turn, all players draw 2 cards.",
+      "description_th": "แปะไพ่ใบนี้ไว้ที่หน้าผากของคุณ หากไม่มีใครพูดถึงมันจนถึงเทิร์นถัดไปของคุณ ผู้เล่นทุกคนจั่วไพ่คนละ 2 ใบ"
+    }
+  ],
+  "counter": [
+    {
+      "code": "C01",
+      "name_en": "Baby with Two Guns",
+      "name_th": "เด็กกับปืนสองกระบอก",
+      "description_en": "Stop the card \"Baby With a Gun\", and steal as many cards as you want from whoever played it.",
+      "description_th": "หยุดไพ่ “Baby With a Gun” และขโมยไพ่จากผู้เล่นที่ใช้ไพ่ใบนั้นกี่ใบก็ได้ตามที่คุณต้องการ"
+    },
+    {
+      "code": "C02",
+      "name_en": "Don't Jump!",
+      "name_th": "อย่ากระโดด!",
+      "description_en": "Stop another player from discarding their cards.",
+      "description_th": "หยุดไม่ให้ผู้เล่นคนอื่นทิ้งไพ่ของตัวเอง."
+    },
+    {
+      "code": "C03",
+      "name_en": "Here They Are",
+      "name_th": "อยู่นี่ไง",
+      "description_en": "If you're being forced to discard cards, keep 2 of them.",
+      "description_th": "หากคุณกำลังถูกบังคับให้ทิ้งไพ่ ให้เก็บไพ่ไว้ได้ 2 ใบ"
+    },
+    {
+      "code": "C04",
+      "name_en": "Not My Hand!",
+      "name_th": "อย่าเอาไพ่ฉัน!",
+      "description_en": "Stop your cards from being stolen and choose another player to have their cards stolen instead.",
+      "description_th": "หยุดไม่ให้ไพ่ของคุณถูกขโมย แล้วเลือกผู้เล่นคนอื่นให้ถูกขโมยไพ่แทน"
+    },
+    {
+      "code": "C05",
+      "name_en": "Put It Back",
+      "name_th": "เอาคืนไป",
+      "description_en": "Put the current action, counter or trap card back into its player's hand.",
+      "description_th": "นำไพ่ Action, Counter หรือ Trap ที่กำลังถูกใช้ กลับคืนสู่มือของผู้เล่นที่ใช้ไพ่ใบนั้น"
+    },
+    {
+      "code": "C06",
+      "name_en": "Stop It!",
+      "name_th": "หยุดนะ!",
+      "description_en": "Stop being forced to draw or steal cards.",
+      "description_th": "หยุดการถูกบังคับให้จั่วหรือขโมยไพ่"
+    },
+    {
+      "code": "C07",
+      "name_en": "Wannabe",
+      "name_th": "เอาด้วยคน",
+      "description_en": "Choose to also be affected by the current action or trap card.",
+      "description_th": "เลือกให้ตัวคุณได้รับผลจากไพ่ Action หรือ Trap ที่กำลังทำงานอยู่ด้วย"
+    },
+    {
+      "code": "C08",
+      "name_en": "Can't Fire Me",
+      "name_th": "ไล่ฉันออกไม่ได้หรอก",
+      "description_en": "If another player attempts to steal your cards, discard that many instead.",
+      "description_th": "หากผู้เล่นคนอื่นพยายามขโมยไพ่ของคุณ ให้คุณทิ้งไพ่ในจำนวนเท่ากันแทน"
+    },
+    {
+      "code": "C09",
+      "name_en": "Dog With A Knife",
+      "name_th": "หมาถือมีด",
+      "description_en": "Stop the current trap card.",
+      "description_th": "หยุดไพ่ Trap ที่กำลังทำงานอยู่"
+    },
+    {
+      "code": "C10",
+      "name_en": "I'm A Ghost",
+      "name_th": "ฉันเป็นผี",
+      "description_en": "Stop the current action but discard all your placed trap cards.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ แต่คุณต้องทิ้งไพ่ Trap ที่วางไว้ทั้งหมดของคุณ"
+    },
+    {
+      "code": "C11",
+      "name_en": "I Can't Read",
+      "name_th": "ฉันอ่านไม่ออก",
+      "description_en": "You are not affected by the current trap card.",
+      "description_th": "คุณไม่ได้รับผลจากไพ่ Trap ที่กำลังทำงานอยู่"
+    },
+    {
+      "code": "C12",
+      "name_en": "Look Out",
+      "name_th": "ระวัง!",
+      "description_en": "Stop another player from stealing your cards or another player's.",
+      "description_th": "หยุดผู้เล่นคนอื่นไม่ให้ขโมยไพ่ของคุณหรือของผู้เล่นคนอื่น"
+    },
+    {
+      "code": "C13",
+      "name_en": "Me! Me! Me!",
+      "name_th": "ฉัน! ฉัน! ฉัน!",
+      "description_en": "Stop the current action card and skip ahead of your turn.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และเลื่อนเทิร์นไปเป็นเทิร์นของคุณ"
+    },
+    {
+      "code": "C14",
+      "name_en": "Aw, Come On!",
+      "name_th": "โธ่ เอาน่า!",
+      "description_en": "Stop another player's current action card and force them to discard 3 cards.",
+      "description_th": "หยุดไพ่ Action ที่ผู้เล่นคนอื่นกำลังใช้ และบังคับให้ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "C15",
+      "name_en": "Beep Beep I'm a Sheep",
+      "name_th": "บี๊บ บี๊บ ฉันเป็นแกะ",
+      "description_en": "Any action card played specifically on you now affects all players.",
+      "description_th": "ไพ่ Action ที่ถูกใช้เจาะจงใส่คุณ จะเปลี่ยนเป็นมีผลกับผู้เล่นทุกคน"
+    },
+    {
+      "code": "C16",
+      "name_en": "Bomb Squad",
+      "name_th": "หน่วยกู้ระเบิด",
+      "description_en": "Stop the card \"Mine Turtle\" and draw 3 cards for yourself.",
+      "description_th": "หยุดไพ่ “Mine Turtle” และจั่วไพ่ให้ตัวเอง 3 ใบ"
+    },
+    {
+      "code": "C17",
+      "name_en": "Can't Tell Me",
+      "name_th": "สั่งฉันไม่ได้หรอก",
+      "description_en": "Stop the current action card and draw a new card for yourself.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และจั่วไพ่ใหม่ให้ตัวเอง 1 ใบ"
+    },
+    {
+      "code": "C18",
+      "name_en": "Catch The Knife",
+      "name_th": "รับมีดไป!",
+      "description_en": "Stops the current counter card.",
+      "description_th": "หยุดไพ่ Counter ที่กำลังทำงานอยู่"
+    },
+    {
+      "code": "C19",
+      "name_en": "Chase Me!",
+      "name_th": "จับฉันให้ได้สิ!",
+      "description_en": "If another player steals this card from you, they discard their entire hand.",
+      "description_th": "หากผู้เล่นคนอื่นขโมยไพ่ใบนี้จากคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ทั้งหมดในมือ"
+    },
+    {
+      "code": "C20",
+      "name_en": "Dead To Me",
+      "name_th": "ตายไปจากใจฉันแล้ว",
+      "description_en": "Stop the current action or trap card and force that player to skip their next turn.",
+      "description_th": "หยุดไพ่ Action หรือ Trap ที่กำลังทำงานอยู่ และบังคับให้ผู้เล่นที่ใช้ไพ่ใบนั้นข้ามเทิร์นถัดไป"
+    },
+    {
+      "code": "C21",
+      "name_en": "Evil Butterfly",
+      "name_th": "ผีเสื้อปีศาจ",
+      "description_en": "Stop the current counter card and steal it yourself.",
+      "description_th": "หยุดไพ่ Counter ที่กำลังทำงานอยู่ แล้วขโมยไพ่ Counter ใบนั้นมาเป็นของคุณ"
+    },
+    {
+      "code": "C22",
+      "name_en": "Meow Meow I'm a Cow",
+      "name_th": "เหมียว เหมียว ฉันเป็นวัว",
+      "description_en": "Any action card that affects all players now only affects one player of your choice.",
+      "description_th": "ไพ่ Action ที่มีผลกับผู้เล่นทุกคน จะเปลี่ยนเป็นมีผลกับผู้เล่นเพียง 1 คนที่คุณเลือก"
+    },
+    {
+      "code": "C23",
+      "name_en": "My Favorite",
+      "name_th": "ของโปรดของฉัน",
+      "description_en": "Double the effect of the action card played against you.",
+      "description_th": "เพิ่มผลของไพ่ Action ที่ถูกใช้ใส่คุณเป็นสองเท่า"
+    },
+    {
+      "code": "C24",
+      "name_en": "Never Take Me Alive",
+      "name_th": "ไม่มีวันจับฉันได้หรอก",
+      "description_en": "Stop the current action card but skip your next turn.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ แต่คุณต้องข้ามเทิร์นถัดไป"
+    },
+    {
+      "code": "C25",
+      "name_en": "No One Likes You",
+      "name_th": "ไม่มีใครชอบนาย",
+      "description_en": "Stop the current action and banish that card from the rest of the game.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และนำไพ่ใบนั้นออกจากเกมตลอดเกมที่เหลือ"
+    },
+    {
+      "code": "C26",
+      "name_en": "No U",
+      "name_th": "นายต่างหาก",
+      "description_en": "Stop another player stealing your cards and instead steal that many from them.",
+      "description_th": "หยุดผู้เล่นคนอื่นจากการขโมยไพ่ของคุณ แล้วขโมยไพ่จากผู้เล่นคนนั้นกลับในจำนวนเท่ากัน"
+    },
+    {
+      "code": "C27",
+      "name_en": "NO!!!",
+      "name_th": "ไม่!!!",
+      "description_en": "Stop another player's action card and steal that card from them.",
+      "description_th": "หยุดไพ่ Action ของผู้เล่นคนอื่น แล้วขโมยไพ่ Action ใบนั้นมาเป็นของคุณ"
+    },
+    {
+      "code": "C28",
+      "name_en": "Nope!",
+      "name_th": "ไม่เอา!",
+      "description_en": "Stop another player from stealing your cards.",
+      "description_th": "หยุดผู้เล่นคนอื่นไม่ให้ขโมยไพ่ของคุณ"
+    },
+    {
+      "code": "C29",
+      "name_en": "Not Today!",
+      "name_th": "วันนี้ไม่ใช่วันของนาย!",
+      "description_en": "Stops the current action, trap, or counter card.",
+      "description_th": "หยุดไพ่ Action, Trap หรือ Counter ที่กำลังทำงานอยู่"
+    },
+    {
+      "code": "C30",
+      "name_en": "Oh... Okay?",
+      "name_th": "อ๋อ... โอเค?",
+      "description_en": "Stop being forced to discard cards and draw that many instead.",
+      "description_th": "หยุดการถูกบังคับให้ทิ้งไพ่ และจั่วไพ่ในจำนวนเท่ากันแทน"
+    },
+    {
+      "code": "C31",
+      "name_en": "Out Of Muffins",
+      "name_th": "มัฟฟินหมดแล้ว",
+      "description_en": "Stops Muffin Time, (this means the action card and not the game itself).",
+      "description_th": "หยุดไพ่ “Muffin Time” (หมายถึงไพ่ Action ชื่อ Muffin Time ไม่ใช่หยุดเกม)"
+    },
+    {
+      "code": "C32",
+      "name_en": "Really Far Away",
+      "name_th": "ไกลมาก ๆ",
+      "description_en": "Stop the current trap card and be unaffected by all traps until your next turn.",
+      "description_th": "หยุดไพ่ Trap ที่กำลังทำงานอยู่ และคุณจะไม่ได้รับผลจาก Trap ทุกใบจนถึงเทิร์นถัดไปของคุณ"
+    },
+    {
+      "code": "C33",
+      "name_en": "Shoot It Down",
+      "name_th": "ยิงมันลงมา!",
+      "description_en": "Stops Magical Pony.",
+      "description_th": "หยุดไพ่ “Magical Pony”"
+    },
+    {
+      "code": "C34",
+      "name_en": "Static",
+      "name_th": "ไฟฟ้าสถิต",
+      "description_en": "Deflect an action or trap card played against you onto the next player.",
+      "description_th": "เบี่ยงไพ่ Action หรือ Trap ที่ถูกใช้ใส่คุณ ให้ไปมีผลกับผู้เล่นคนถัดไปแทน"
+    },
+    {
+      "code": "C35",
+      "name_en": "Stegosaurus",
+      "name_th": "สเตโกซอรัส",
+      "description_en": "Choose another player to take the effect of the action or trap card played against you instead.",
+      "description_th": "เลือกผู้เล่นคนอื่น 1 คนให้รับผลของไพ่ Action หรือ Trap ที่ถูกใช้ใส่คุณแทน"
+    },
+    {
+      "code": "C36",
+      "name_en": "Thanks, You Too",
+      "name_th": "ขอบใจ นายด้วยนะ",
+      "description_en": "The effects of a trap card played specifically against you now also affect whoever played it.",
+      "description_th": "ผลของไพ่ Trap ที่ถูกใช้เจาะจงใส่คุณ จะมีผลกับผู้เล่นที่ใช้ไพ่ใบนั้นด้วย"
+    },
+    {
+      "code": "C37",
+      "name_en": "The Hole",
+      "name_th": "หลุม",
+      "description_en": "Stop the current action card and force that player to discard their entire hand.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ และบังคับให้ผู้เล่นที่ใช้ไพ่ใบนั้นทิ้งไพ่ทั้งหมดในมือ"
+    },
+    {
+      "code": "C38",
+      "name_en": "Tree Powers",
+      "name_th": "พลังต้นไม้",
+      "description_en": "Stop another player stealing your cards but skip your next turn.",
+      "description_th": "หยุดผู้เล่นคนอื่นไม่ให้ขโมยไพ่ของคุณ แต่คุณต้องข้ามเทิร์นถัดไป"
+    },
+    {
+      "code": "C39",
+      "name_en": "We Failed",
+      "name_th": "เราพลาดแล้ว",
+      "description_en": "Choose another player to also be affected by an action or trap card played against you.",
+      "description_th": "เลือกผู้เล่นคนอื่น 1 คนให้ได้รับผลของไพ่ Action หรือ Trap ที่ถูกใช้ใส่คุณด้วย"
+    },
+    {
+      "code": "C40",
+      "name_en": "Opposite Day",
+      "name_th": "วันตรงข้าม",
+      "description_en": "The effects of an action card played specifically against you now affect whoever played it instead.",
+      "description_th": "ผลของไพ่ Action ที่ถูกใช้เจาะจงใส่คุณ จะเปลี่ยนไปมีผลกับผู้เล่นที่ใช้ไพ่ใบนั้นแทน"
     }
   ]
 }

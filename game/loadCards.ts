@@ -35,10 +35,15 @@ export interface LoadCardsResult {
 }
 
 interface FallbackCardEntry {
-  en: string;
-  th: string;
-  effect: string;
   code: string;
+  name_en?: string;
+  name_th?: string;
+  description_en?: string;
+  description_th?: string;
+  // legacy aliases for backward compatibility
+  en?: string;
+  th?: string;
+  effect?: string;
 }
 
 interface FallbackJson {
@@ -61,7 +66,13 @@ function fallbackJsonToCards(json: FallbackJson): Card[] {
   const cards: Card[] = [];
   for (const type of ['action', 'counter', 'trap'] as const) {
     for (const c of json[type] || []) {
-      cards.push({ type, en: c.en, th: c.th, effect: c.effect, code: c.code });
+      cards.push({
+        type,
+        en: c.name_en ?? c.en ?? '',
+        th: c.name_th ?? c.th ?? '',
+        effect: c.description_th ?? c.effect ?? '',
+        code: c.code,
+      });
     }
   }
   return cards;

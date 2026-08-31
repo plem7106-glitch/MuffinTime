@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sync-cards": "node scripts/sync-cards.js",
+    "sync-card-images": "node scripts/sync-card-images.mjs",
     "verify-supabase": "node --env-file=.env.local scripts/verify-supabase.mjs"
   },
   "devDependencies": {
