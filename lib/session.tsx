@@ -102,7 +102,7 @@ function reducer(state: SessionState, action: Action): SessionState {
     case 'JOIN_ROOM': {
       const summary = state.rooms.find((r) => r.code === action.code);
       const maxPlayers = summary?.maxPlayers ?? 4;
-      const hostName = summary?.hostName ?? 'Host';
+      const hostName = summary?.hostName ?? 'เจ้าของห้อง';
       const existingOthers = Math.max((summary?.currentPlayers ?? 1) - 1, 0);
       let roomState = engineCreateRoom('bot-0', hostName);
       for (let i = 1; i <= existingOthers; i++) {

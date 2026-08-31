@@ -52,6 +52,7 @@ export function GameTable() {
   function handleSelectCard(cardCode: CardCode) {
     if (!isMyTurn || pendingResponse) return;
     const card = getDemoCard(cardCode);
+    if (card.type === 'trap' && me.traps.length >= 3) return;
     if (card.type === 'action' || card.type === 'trap') {
       setPendingCard(card);
     }
