@@ -19,7 +19,7 @@ export function CounterResultModal({
     <BottomSheet open={show} onClose={onClose}>
       {counterCard && (
         <div className="flex flex-col gap-3">
-          <span className="text-xs font-bold text-counter">โดน COUNTER!</span>
+          <span className="text-xs font-bold text-counter">โดนสวนกลับ!</span>
           <h2 className="text-lg font-bold text-ink">
             {counterActorName} เล่นการ์ด &quot;{counterCard.th}&quot;
           </h2>

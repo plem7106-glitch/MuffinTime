@@ -18,12 +18,12 @@ export function CounterModal({
   return (
     <BottomSheet open={open} onClose={onSkip}>
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold text-ink">เล่น Counter ไหม?</h2>
+        <h2 className="text-lg font-bold text-ink">เล่นการ์ดสวนกลับไหม?</h2>
         <div className="flex gap-2 overflow-x-auto">
-          {counterCards.map((code) => {
+          {counterCards.map((code, i) => {
             const card = getDemoCard(code);
             return (
-              <Card key={code} type="counter" title={card.th} description={card.effect} onClick={() => onPlay(code)} />
+              <Card key={`${code}-${i}`} type="counter" title={card.th} description={card.effect} onClick={() => onPlay(code)} />
             );
           })}
         </div>
