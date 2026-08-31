@@ -43,8 +43,9 @@ export function TrapAlertModal({
       const demo = getDemoCard(trapCode);
       return {
         id: demo.code,
+        number: 0,
         name_th: demo.th,
-        name_en: demo.en,
+        name_en: demo.th,
         type: 'trap' as const,
         description_th: demo.effect,
         description_en: demo.effect,
@@ -53,6 +54,7 @@ export function TrapAlertModal({
     } catch {
       return {
         id: trapCode,
+        number: 0,
         name_th: trapCode,
         name_en: trapCode,
         type: 'trap' as const,

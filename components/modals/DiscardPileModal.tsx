@@ -38,8 +38,9 @@ export function DiscardPileModal({
         const demo = getDemoCard(code);
         const demoCard: CardModel = {
           id: demo.code,
+          number: 0,
           name_th: demo.th,
-          name_en: demo.en || demo.th,
+          name_en: demo.th,
           type: demo.type,
           description_th: demo.effect,
           description_en: demo.effect,
