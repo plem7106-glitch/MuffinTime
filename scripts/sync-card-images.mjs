@@ -9,18 +9,18 @@ const DEST_ROOT = path.join(projectRoot, 'public', 'cards');
 const CATEGORIES = [
   {
     type: 'action',
-    pattern: /^A(0[0-9]{2}|1[0-3][0-9]|138)\.jpe?g$/i,
-    expectedFormat: 'A001.jpg - A138.jpg',
+    pattern: /^A(0(0[1-9]|[1-9][0-9])|1([0-6][0-9]|7[0-3]))\.jpe?g$/i,
+    expectedFormat: 'A001.jpg - A173.jpg',
   },
   {
     type: 'trap',
-    pattern: /^T(0[1-9]|[1-4][0-9]|5[0-3])\.jpe?g$/i,
-    expectedFormat: 'T01.jpg - T53.jpg',
+    pattern: /^T(0[1-9]|[1-5][0-9]|6[0-6])\.jpe?g$/i,
+    expectedFormat: 'T01.jpg - T66.jpg',
   },
   {
     type: 'counter',
-    pattern: /^C(0[1-9]|[1-3][0-9]|40)\.jpe?g$/i,
-    expectedFormat: 'C01.jpg - C40.jpg',
+    pattern: /^C(0[1-9]|[1-4][0-9]|50)\.jpe?g$/i,
+    expectedFormat: 'C01.jpg - C50.jpg',
   },
 ];
 
