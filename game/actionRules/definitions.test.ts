@@ -275,9 +275,12 @@ describe('Family D batch (via resolveActionEffect)', () => {
     const state = threePlayerState();
     state.discardPile = ['A125'];
     const next = resolveActionEffect(state, 'A125', 'me', 'p2');
-    expect(next.players.p2.hand).toContain('A125');
-    expect(next.players.p2.hand.length).toBe(3); // gained A125, lost 1 stolen
+    // p2 gains A125 (+1) then loses 1 random card back to the actor (-1) --
+    // net zero, but the random steal-back can grab A125 itself, so don't
+    // assert which specific card p2 ends up holding.
+    expect(next.players.p2.hand.length).toBe(3);
     expect(next.players.me.hand.length).toBe(2);
+    expect(next.discardPile).toEqual([]);
   });
 
   it('A164 hands this card off to the next player (no target)', () => {
@@ -444,6 +447,79 @@ describe('Family G1 batch (via resolveActionEffect)', () => {
     expect(next.players.p1.traps).toEqual([]);
     expect(next.players.p2.traps).toEqual([]);
     expect(next.discardPile).toEqual(expect.arrayContaining(['T01', 'T02', 'T03', 'T04']));
+  });
+});
+
+function deckState(): RoomState {
+  return {
+    status: 'playing',
+    hostId: 'p1',
+    turnOrder: ['p1', 'p2'],
+    currentTurnIndex: 0,
+    direction: 1,
+    muffinTimeTarget: 10,
+    drawPile: Array.from({ length: 20 }, (_, i) => `D${i + 1}`),
+    discardPile: Array.from({ length: 12 }, (_, i) => `X${i + 1}`),
+    players: {
+      p1: { name: 'One', hand: ['h1'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+    },
+  };
+}
+
+describe('Family H1 batch (via resolveActionEffect)', () => {
+  it('A026 draws the actor 1 card', () => {
+    const next = resolveActionEffect(deckState(), 'A026', 'p1');
+    expect(next.players.p1.hand.length).toBe(2);
+    expect(next.drawPile.length).toBe(19);
+  });
+
+  it('A046 takes 1 card from the top-5 peek into the actor\'s hand', () => {
+    const state = deckState();
+    const topFive = state.drawPile.slice(-5);
+    const next = resolveActionEffect(state, 'A046', 'p1');
+    expect(next.players.p1.hand.length).toBe(2);
+    expect(next.drawPile.length).toBe(19);
+    const takenCard = next.players.p1.hand.find((c) => !state.players.p1.hand.includes(c));
+    expect(topFive).toContain(takenCard);
+  });
+
+  it('A106 takes 1 card from the last-10-discarded window into the actor\'s hand', () => {
+    const state = deckState();
+    const window = state.discardPile.slice(-10);
+    const next = resolveActionEffect(state, 'A106', 'p1');
+    expect(next.discardPile.length).toBe(11);
+    const takenCard = next.players.p1.hand.find((c) => c !== 'h1');
+    expect(window).toContain(takenCard);
+  });
+
+  it('A116 takes 1 random card from the whole discard pile into the actor\'s hand', () => {
+    const next = resolveActionEffect(deckState(), 'A116', 'p1');
+    expect(next.discardPile.length).toBe(11);
+    expect(next.players.p1.hand.length).toBe(2);
+  });
+
+  it('A117 moves the entire discard pile onto the draw pile, unshuffled, and clears it', () => {
+    const state = deckState();
+    const next = resolveActionEffect(state, 'A117', 'p1');
+    expect(next.discardPile).toEqual([]);
+    expect(next.drawPile).toEqual([...state.drawPile, ...state.discardPile]);
+  });
+
+  it('A122 takes the 3 most-recently-discarded cards into the actor\'s hand', () => {
+    const state = deckState();
+    const lastThree = state.discardPile.slice(-3);
+    const next = resolveActionEffect(state, 'A122', 'p1');
+    expect(next.discardPile.length).toBe(9);
+    expect(next.players.p1.hand).toEqual(expect.arrayContaining(lastThree));
+  });
+
+  it('A133 draws the actor 3 cards from the bottom of the draw pile', () => {
+    const state = deckState();
+    const bottomThree = state.drawPile.slice(0, 3);
+    const next = resolveActionEffect(state, 'A133', 'p1');
+    expect(next.players.p1.hand).toEqual(expect.arrayContaining(bottomThree));
+    expect(next.drawPile.length).toBe(17);
   });
 });
 

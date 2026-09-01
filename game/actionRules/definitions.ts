@@ -8,8 +8,31 @@ import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
 import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand } from '../trapPile';
+import { drawFromBottom } from '../pile';
+import { returnCardToHand } from '../misc';
+import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
 import type { ActionRuleDefinition } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+
+/** A046/A026: peek N from the top of the draw pile and take one -- no
+ * card-picker UI exists yet, so this takes a random one of the peeked cards
+ * rather than letting the actor choose which. */
+function takeRandomFromPeek(state: RoomState, actorId: PlayerId, n: number, rng: Rng = Math.random): RoomState {
+  const peeked = peekTopN(state, n);
+  if (peeked.length === 0) return state;
+  const code = peeked[Math.floor(rng() * peeked.length)];
+  return takeChosenFromPeek(state, actorId, code);
+}
+
+/** A106: same "no picker" simplification, but choosing among the last N
+ * discarded cards instead of the top of the draw pile. */
+function takeRandomFromDiscardWindow(state: RoomState, actorId: PlayerId, windowSize: number, rng: Rng = Math.random): RoomState {
+  const count = Math.min(windowSize, state.discardPile.length);
+  if (count === 0) return state;
+  const window = state.discardPile.slice(state.discardPile.length - count);
+  const code = window[Math.floor(rng() * window.length)];
+  return returnCardToHand(state, code, actorId);
+}
 
 /** A059 "Mine Now" steals a random one of the target's placed traps. */
 function stealRandomTrapToHand(state: RoomState, fromId: PlayerId, toId: PlayerId, rng: Rng = Math.random): RoomState {
@@ -723,6 +746,73 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       return next;
     },
   },
+
+  // -- Family H1: deck & discard-pile manipulation (classification doc §Family H) --
+
+  A026: {
+    code: 'A026', name_en: 'Magic Trick', name_th: 'มายากล',
+    description_th: 'คุณมีเวลา 10 วินาทีในการเลือกไพ่ 1 ใบจากกองมาเก็บไว้',
+    kind: 'auto',
+    // ponytail: "spread the deck and pick one under time pressure" has no
+    // digital equivalent (the deck isn't shown card-by-card) -- treated as a
+    // plain draw of 1 from the top.
+    executeEffect: (state, frame) => draw(state, frame.actorId, 1),
+  },
+  A046: {
+    code: 'A046', name_en: 'Homework', name_th: 'การบ้าน',
+    description_th: 'ดูไพ่ 5 ใบถัดไปจากกอง เลือกเก็บไว้ 1 ใบ',
+    kind: 'auto',
+    // ponytail: no card-picker UI exists yet, so this takes a random one of
+    // the 5 peeked cards instead of letting the actor choose.
+    executeEffect: (state, frame) => takeRandomFromPeek(state, frame.actorId, 5),
+  },
+  A106: {
+    code: 'A106', name_en: 'Pie Flavor', name_th: 'พายรสอะไร?',
+    description_th: 'เลือกไพ่ 1 ใบจากไพ่ 10 ใบล่าสุดในกองทิ้งมาเก็บไว้',
+    kind: 'auto',
+    executeEffect: (state, frame) => takeRandomFromDiscardWindow(state, frame.actorId, 10),
+  },
+  A116: {
+    code: 'A116', name_en: 'Time Machine', name_th: 'ไทม์แมชชีน',
+    description_th: 'นำไพ่ของคุณ 1 ใบจากกองทิ้งกลับมา',
+    kind: 'auto',
+    // Scope reduction, not just a UI simplification: discardPile has no
+    // per-card "who discarded this" ownership tracking, so "one of YOUR
+    // cards" can't be identified -- this takes back a random discarded card
+    // from anyone's.
+    executeEffect: (state, frame) => {
+      if (state.discardPile.length === 0) return state;
+      const code = state.discardPile[Math.floor(Math.random() * state.discardPile.length)];
+      return returnCardToHand(state, code, frame.actorId);
+    },
+  },
+  A117: {
+    code: 'A117', name_en: 'What Are You Doing?!', name_th: 'นายทำอะไรเนี่ย?!',
+    description_th: 'นำกองทิ้งทั้งหมดโดยไม่สับ ไปวางไว้ด้านบนของกองจั่ว',
+    kind: 'auto',
+    executeEffect: (state) => {
+      if (state.discardPile.length === 0) return state;
+      return { ...state, drawPile: [...state.drawPile, ...state.discardPile], discardPile: [] };
+    },
+  },
+  A122: {
+    code: 'A122', name_en: "You're Adopted", name_th: 'นายถูกรับเลี้ยงแล้ว',
+    description_th: 'นำไพ่ 3 ใบล่าสุดจากกองทิ้งมาเป็นของคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => takeTopNFromDiscard(state, frame.actorId, 3),
+  },
+  A133: {
+    code: 'A133', name_en: 'Screw Gravity', name_th: 'ช่างหัวแรงโน้มถ่วง!',
+    description_th: 'จั่วไพ่ 3 ใบจากด้านล่างของกองจั่ว',
+    kind: 'auto',
+    executeEffect: (state, frame) => drawFromBottom(state, frame.actorId, 3),
+  },
+
+  // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
+  // deferred-trigger mechanism (mark a specific card in the draw pile so
+  // drawing it later fires an extra effect). No existing hook for that in
+  // the draw flow (game/pile.ts's draw / lib/session.tsx's drawCard); needs
+  // a real design, not a same-shape addition to this batch.
 
   // A172 "Seat Swap Chaos" (Family F1) intentionally NOT included here -- needs
   // a "pick exactly 2 players" UI. GameTable's TargetSelector supports
