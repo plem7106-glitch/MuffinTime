@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
 import { getTurnPreviewSequence } from '../../game/turn';
@@ -105,20 +105,6 @@ export function TurnOrderSetup() {
     leaveRoom();
     router.push('/');
   };
-
-  // Bot host auto-confirm
-  useEffect(() => {
-    if (!activeRoom) return;
-    if (activeRoom.state.status !== 'setup') return;
-    if (!activeRoom.state.hostId.startsWith('bot-')) return;
-    if (isConfirming || Object.keys(activeRoom.state.players).length < 3) return;
-    const timer = setTimeout(() => {
-      setIsConfirming(true);
-      confirmTurnOrder();
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [activeRoom, isConfirming, confirmTurnOrder]);
-
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3 p-4 pb-8 bg-gray-50/50">
