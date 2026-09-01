@@ -383,16 +383,16 @@ export function GameTable() {
         actorName={pendingResponse?.actorId ? state.players[pendingResponse.actorId]?.name : 'ฝ่ายตรงข้าม'}
         counterCards={validCounterCards}
         responseId={pendingResponse?.responseId}
-        onPlayCounter={playCounter}
-        onDecline={skipCounter}
+        onPlayCounter={(code) => pendingResponse && playCounter(code, pendingResponse.responseId)}
+        onDecline={() => pendingResponse && skipCounter(pendingResponse.responseId)}
       />
 
       {/* 14. Counter Card Response Window Modal (For Action responses) */}
       <CounterModal
         open={pendingResponse?.kind === 'action' && validCounterCards.length > 0}
         counterCards={validCounterCards}
-        onPlay={playCounter}
-        onSkip={skipCounter}
+        onPlay={(code) => pendingResponse && playCounter(code, pendingResponse.responseId)}
+        onSkip={() => pendingResponse && skipCounter(pendingResponse.responseId)}
       />
 
 
