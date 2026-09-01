@@ -18,7 +18,7 @@ export default function RoomPage() {
   const { audioPhase, setAudioPhase } = useAudio();
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !activeRoom) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
