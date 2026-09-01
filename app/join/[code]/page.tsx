@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameSession } from '../../../lib/session';
 import { useAuth } from '../../../lib/auth';
+import type { RoomState } from '../../../game/types';
 import {
   ChevronLeftIcon,
   InfoIcon,
@@ -17,25 +18,56 @@ export default function JoinRoomPage() {
   const pathname = usePathname();
   const params = useParams<{ code: string }>();
   const roomCode = params.code || '';
-  const { user, loading } = useAuth();
-  const { rooms, joinRoom } = useGameSession();
+  const { user, loading: authLoading } = useAuth();
+  const { previewRoom, joinRoom } = useGameSession();
+
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const [preview, setPreview] = useState<RoomState | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
-  }, [loading, user, router, pathname]);
+  }, [authLoading, user, router, pathname]);
 
-  const summary = rooms.find((r) => r.code === roomCode);
-  const isFull = summary ? summary.currentPlayers >= summary.maxPlayers : false;
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    previewRoom(roomCode).then((state) => {
+      if (cancelled) return;
+      setPreview(state);
+      setPreviewLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, roomCode, previewRoom]);
 
-  function handleJoin() {
-    if (!user || !summary || isFull) return;
-    joinRoom(roomCode);
-    router.push(`/room/${roomCode}`);
+  const currentPlayers = preview ? Object.keys(preview.players).length : 0;
+  const maxPlayers = preview?.maxPlayers ?? 15;
+  const alreadyMember = !!preview && !!user && !!preview.players[user.id];
+  const isLobbyStatus = preview?.status === 'lobby';
+  const isFull = !!preview && !alreadyMember && currentPlayers >= maxPlayers;
+  const canJoin = !!preview && (alreadyMember || (isLobbyStatus && !isFull));
+  const hostName = preview?.players[preview.hostId]?.name ?? 'เจ้าของห้อง';
+
+  async function handleJoin() {
+    if (!canJoin || joining) return;
+    setJoining(true);
+    setJoinError('');
+    try {
+      await joinRoom(roomCode);
+      router.push(`/room/${roomCode}`);
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : 'เข้าร่วมห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
+      setJoining(false);
+    }
   }
 
-  if (loading || !user) return null;
+  if (authLoading || !user) return null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3.5 p-4 pb-8 bg-white">
@@ -73,19 +105,26 @@ export default function JoinRoomPage() {
         </div>
       </section>
 
-      {summary ? (
+      {previewLoading ? (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-6 text-center">
+          <p className="text-xs font-bold text-ink-secondary">กำลังตรวจสอบห้อง...</p>
+        </div>
+      ) : preview ? (
         <section className="flex flex-col gap-1.5">
           <span className="text-xs font-bold text-ink-secondary px-0.5">
             ห้องที่คุณกำลังจะเข้าร่วม
           </span>
           <div className="flex flex-col gap-2.5 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
             <div className="flex items-center justify-between">
-              <p className="text-sm sm:text-base font-bold text-ink">
-                ห้องของ {summary.hostName}
-              </p>
+              <p className="text-sm sm:text-base font-bold text-ink">ห้องของ {hostName}</p>
               {isFull && (
                 <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-[10px] font-bold text-red-600">
                   ห้องเต็มแล้ว
+                </span>
+              )}
+              {!isLobbyStatus && !alreadyMember && (
+                <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+                  เกมเริ่มไปแล้ว
                 </span>
               )}
             </div>
@@ -102,7 +141,7 @@ export default function JoinRoomPage() {
                   <span>ผู้เล่นในห้อง</span>
                 </span>
                 <span className="text-base font-black text-ink">
-                  {summary.currentPlayers} / {summary.maxPlayers} คน
+                  {currentPlayers} / {maxPlayers} คน
                 </span>
               </div>
             </div>
@@ -121,6 +160,12 @@ export default function JoinRoomPage() {
           >
             กลับหน้าหลัก
           </Link>
+        </div>
+      )}
+
+      {joinError && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-bold text-red-600">
+          {joinError}
         </div>
       )}
 
@@ -160,11 +205,11 @@ export default function JoinRoomPage() {
       <button
         type="button"
         onClick={handleJoin}
-        disabled={!summary || isFull}
+        disabled={!canJoin || joining}
         className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-base font-black text-white shadow-[0_6px_18px_rgba(237,31,79,0.3)] transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
       >
         <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
-        <span>เข้าร่วมห้อง</span>
+        <span>{joining ? 'กำลังเข้าร่วม...' : 'เข้าร่วมห้อง'}</span>
       </button>
     </main>
   );
