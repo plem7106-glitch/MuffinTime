@@ -4,13 +4,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-The stack is Next.js (App Router) + React + TypeScript + Tailwind CSS v4, with Supabase (Postgres + Realtime) replacing the originally-planned Firebase backend — see
+The stack is Next.js (App Router) + React + TypeScript + Tailwind CSS v4, with Supabase (Postgres + Realtime + Auth)
+replacing the originally-planned Firebase backend — see
 `docs/superpowers/specs/2026-08-31-nextjs-supabase-foundation-design.md` for why and how.
 
-The game engine (`game/*.ts`) and card-loading pipeline are ported and tested (Vitest). The Supabase schema
-(`supabase/migrations/0001_create_rooms.sql`) and the multiplayer read/write/realtime layer (`multiplayer/`) exist.
-UI components, the lobby/room-flow screens, and `multiplayer/player.ts` (localStorage player identity) are NOT built
-yet — they're deferred to a follow-up design spec, per the foundation spec's own scope section.
+As of 2026-09-01 the app is feature-complete for real multiplayer play and merged to `main`:
+
+- **Auth**: real accounts via Supabase Auth magic-link email login (`lib/auth.tsx`, `app/login/page.tsx`) — a
+  friend signs up once and logs back in as the same person from any device. `supabase/migrations/0002_require_auth_for_rooms.sql`
+  requires an authenticated session (`auth.uid() is not null`) to read/write the `rooms` table; the older
+  "no accounts" scope note in `docs/superpowers/specs/2026-08-31-muffin-time-web-design.md` (v1 design spec) is
+  **superseded** by this — that spec's game rules/data model/turn-effect handling are still accurate, only its
+  account-less assumption is not.
+- **Multiplayer sync**: `lib/session.tsx` is a full Supabase-backed `GameSessionProvider` — every game action
+  writes to Postgres via `multiplayer/room.ts`'s `updateRoomWithRetry` (optimistic concurrency, no local-only
+  state), and all connected clients receive updates via a `multiplayer/realtime.ts` Realtime subscription. Rooms
+  are created/joined by a real 4-character code (`multiplayer/room.ts`'s `createRoomWithRetry`/`insertRoom`).
+  `pendingResponse`/`lastResult` (the counter/trap response-window state) live in `RoomState` itself
+  (`game/types.ts`), guarded by a `responseId` idempotency token so racing clients can't double-apply an effect.
+  The old fake seeded-rooms list and local bots are gone.
+- **UI**: all lobby/room-flow screens are built (`app/create`, `app/join/[code]`, `app/room/[code]`,
+  `components/room/*`) and wired to the real backend above — none of this is placeholder/mock data anymore.
+
+**Known gaps, not yet built:**
+- No presence/reconnect tracking (`PlayerState.connected` exists in the type but nothing writes `false` yet) —
+  `leaveRoom` only tears down the local subscription, it doesn't remove the player server-side. A host-only
+  "unstick" button (`GameSettingsModal.tsx`'s `onHostUnstick`, backed by `lib/session.tsx`'s `hostSkipTurn` and
+  the existing `skipCounter`) is a stopgap for a departed player stalling the current turn or a response window —
+  real presence tracking is deferred to a follow-up spec.
+- No sign-out UI affordance (`lib/auth.tsx` exports `signOut()`, nothing calls it yet) — a mistyped display name
+  at first signup is permanently stuck (Supabase's `user_metadata` only sets on first-ever signup).
+- The one manual end-to-end check this multiplayer rewrite has (two real accounts, live join + Realtime sync +
+  gameplay across two browser sessions) has not been fully run — completed: real magic-link login, real room
+  creation, `WaitingRoom` rendering live Supabase state. Not yet completed: a second account joining and observed
+  live sync, mid-game refresh/resume, host-controlled shuffle sync. Worth a real two-device playtest before
+  trusting this fully.
+- Deployed to Vercel at `https://muffin-time-ruddy.vercel.app` — its Supabase env vars
+  (`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`) need to be set in the Vercel project settings
+  separately from local `.env.local` (which isn't committed); the Supabase Auth Redirect URLs allowlist already
+  includes this domain.
 
 ## What this project is
 
