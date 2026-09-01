@@ -37,7 +37,7 @@ export function decideBotTrapPlacement(
   }
 
   const trapCodes = new Set(getCardsByType('trap').map((c) => c.id));
-  const handTraps = player.hand.filter((code) => trapCodes.has(code) && isTrapImplemented(code));
+  const handTraps = player.hand.filter((code) => trapCodes.has(code) || code.startsWith('T'));
 
   if (handTraps.length === 0 || rng() > TRAP_PLACE_PROBABILITY) {
     return { action: 'skip' };

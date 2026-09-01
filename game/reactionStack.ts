@@ -11,6 +11,7 @@ import type {
   PendingResponse,
   TriggerContext,
 } from './types';
+import { resumePendingForcedDiscard, type ForcedDiscardDestination } from './forcedDiscard';
 
 export interface CreateFrameParams {
   sourceType: FrameSourceType;
@@ -71,7 +72,7 @@ export function createStackFrame(
     triggerContext: params.triggerContext,
     turnContext: {
       turnIndex: state.currentTurnIndex,
-      phase: state.turnPhase ?? 'main',
+      phase: parentFrame?.turnContext.phase ?? (state.turnPhase && state.turnPhase !== 'resolving_stack' ? state.turnPhase : 'main'),
       roundNumber: state.roundNumber ?? 1,
     },
     customPayload: params.customPayload,
@@ -121,7 +122,7 @@ export function pushStackFrame(
   state: RoomState,
   params: CreateFrameParams
 ): RoomState {
-  const next = cloneState(state);
+  let next = cloneState(state);
   if (!next.reactionStack) {
     next.reactionStack = [];
   }
@@ -137,7 +138,7 @@ export function pushStackFrame(
  * Pops the top frame from the reaction stack.
  */
 export function popStackFrame(state: RoomState): { state: RoomState; poppedFrame?: StackFrame } {
-  const next = cloneState(state);
+  let next = cloneState(state);
   if (!next.reactionStack || next.reactionStack.length === 0) {
     syncPendingResponseBridge(next);
     return { state: next };
@@ -150,6 +151,13 @@ export function popStackFrame(state: RoomState): { state: RoomState; poppedFrame
   }
 
   syncPendingResponseBridge(next);
+  if (poppedFrame) {
+    const linked = Object.values(next.pendingForcedDiscards ?? {}).filter((operation) => operation.causalFrameId === poppedFrame.frameId);
+    for (const operation of linked) {
+      const replacement = poppedFrame.customPayload?.replacementDestination as ForcedDiscardDestination | undefined;
+      next = resumePendingForcedDiscard(next, operation.operationId, replacement);
+    }
+  }
   return { state: next, poppedFrame };
 }
 

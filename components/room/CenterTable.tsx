@@ -11,6 +11,7 @@ export function CenterTable({
   discardPile,
   isMyTurn,
   canAct,
+  hasDrawnThisTurn,
   onDraw,
   onOpenDiscardPile,
 }: {
@@ -18,9 +19,11 @@ export function CenterTable({
   discardPile: CardCode[];
   isMyTurn: boolean;
   canAct: boolean;
+  hasDrawnThisTurn?: boolean;
   onDraw: () => void;
   onOpenDiscardPile?: () => void;
 }) {
+  const canClickDeck = isMyTurn && canAct && !hasDrawnThisTurn && drawPileCount > 0;
 
   // Retrieve top discarded card details if available
   const topDiscardCode = discardPile.length > 0 ? discardPile[discardPile.length - 1] : null;
@@ -40,7 +43,7 @@ export function CenterTable({
       aria-label="พื้นที่กลางโต๊ะ กองจั่วและกองทิ้ง"
       className="flex items-center justify-center gap-7 sm:gap-9 py-2 px-2 sm:px-3 rounded-2xl border border-gray-100/90 bg-white/90 backdrop-blur-xs shadow-2xs select-none w-full shrink-0"
     >
-      {/* 1. Draw Pile (กองจั่ว - 120x180px Portrait 2:3 Main Pile) */}
+      {/* 1. Draw Pile (กองจั่ว - 120x180px Portrait 2:3 Main Pile - Interactive Center Deck) */}
       <div className="flex flex-col items-center gap-4 shrink-0">
         <div className="relative w-[118px] sm:w-32 aspect-[2/3]">
           <div aria-hidden="true" className="absolute -right-1.5 top-2.5 bottom-[-8px] left-2 rotate-[1.4deg] rounded-2xl border border-pink-950/15 bg-pink-800 shadow-sm" />
@@ -51,14 +54,14 @@ export function CenterTable({
           <button
             type="button"
             onClick={() => {
-              if (isMyTurn && canAct) onDraw();
+              if (canClickDeck) onDraw();
             }}
-            disabled={!isMyTurn || !canAct}
-            aria-label={`กองจั่ว เหลือ ${drawPileCount} ใบ${isMyTurn && canAct ? ' (แตะเพื่อจั่ว)' : ''}`}
+            disabled={!canClickDeck}
+            aria-label={`กองจั่ว เหลือ ${drawPileCount} ใบ${canClickDeck ? ' (แตะเพื่อจั่ว)' : ''}`}
             className={`group relative z-10 flex w-full h-full flex-col items-center justify-between overflow-hidden rounded-2xl border-2 p-2.5 sm:p-3 text-center shadow-[0_12px_22px_rgba(157,23,77,0.22)] transition-all before:absolute before:inset-1 before:rounded-xl before:border before:border-white/35 before:content-[''] after:absolute after:-right-5 after:-top-8 after:h-20 after:w-12 after:rotate-[24deg] after:bg-white/20 after:content-[''] ${
-              isMyTurn && canAct
-                ? 'border-pink-900/30 bg-pink-600 hover:-translate-y-0.5 hover:scale-[1.035] active:translate-y-0 active:scale-[0.985] cursor-pointer ring-2 ring-primary/40 hover:shadow-[0_16px_26px_rgba(157,23,77,0.28)]'
-                : 'border-pink-950/20 bg-pink-600 cursor-default opacity-95'
+              canClickDeck
+                ? 'border-pink-900/30 bg-pink-600 hover:-translate-y-0.5 hover:scale-[1.035] active:translate-y-0 active:scale-[0.985] cursor-pointer ring-2 ring-primary/40 hover:shadow-[0_16px_26px_rgba(157,23,77,0.28)] ring-offset-1'
+                : 'border-pink-950/20 bg-pink-600/80 cursor-not-allowed opacity-75'
             }`}
           >
           {/* Top Header */}
@@ -78,7 +81,7 @@ export function CenterTable({
           </div>
 
           {/* Bottom Action Prompt when active */}
-          {isMyTurn && canAct ? (
+          {canClickDeck ? (
             <span className="relative z-10 w-full rounded-lg bg-white/95 py-1 text-[9px] sm:text-[10px] font-black text-primary shadow-2xs animate-pulse">
               แตะเพื่อจั่ว
             </span>

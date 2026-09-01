@@ -1,9 +1,10 @@
 import type { CardCode } from '../types';
 import type { TrapRuleDefinition } from './types';
-import { TRAP_RULES_BATCH_1 } from './definitions';
+import { TRAP_RULES_BATCH_1, TRAP_RULES_BATCH_2 } from './definitions';
 
 const REGISTRY: Record<string, TrapRuleDefinition> = {
   ...TRAP_RULES_BATCH_1,
+  ...TRAP_RULES_BATCH_2,
 };
 
 export function getTrapRule(code: CardCode): TrapRuleDefinition | undefined {

@@ -4,6 +4,8 @@ import { pushStackFrame } from '../reactionStack';
 import { getTrapRule } from './registry';
 import type { RoomState, PlayerId, CardCode, StackFrame } from '../types';
 import type { GameEvent } from '../events';
+import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from '../events';
+import type { ForcedDiscardOperation, PreDiscardReaction } from '../forcedDiscard';
 
 /**
  * Checks all active placed traps across all players for automatic triggers (event or state based).
@@ -42,6 +44,9 @@ export function checkAndTriggerAutomaticTraps(
 
           // 1. Remove trap from active placed traps
           const afterRemove = removeTrap(next, ownerId, trapCode);
+          appendGameEvent(afterRemove, createGameEvent(GAME_EVENT_TYPES.TRAP_ACTIVATED, ownerId, {
+            ownerId, trapCode, triggerPlayerIds, affectedPlayerIds, targetIds: affectedPlayerIds,
+          }, affectedPlayerIds));
 
           // 2. Push onto Reaction Stack
           next = pushStackFrame(afterRemove, {
@@ -87,6 +92,19 @@ export function activateManualTrap(
 
   const rule = getTrapRule(trapCode);
   if (!rule) return cloneState(state);
+
+  if (trapCode === 'T52' || trapCode === 'T53') {
+    const meta = state.placedTrapMeta?.[`${ownerId}_${trapCode}`];
+    if (meta) {
+      const activePlayerId = state.turnOrder[state.currentTurnIndex];
+      const isOwnerTurnNow = activePlayerId === ownerId;
+      const currentSeq = state.sequenceNumber ?? 0;
+      const hasTurnAdvanced = currentSeq > meta.placedSequence;
+      if (!isOwnerTurnNow || !hasTurnAdvanced) {
+        throw new Error(`${trapCode} cannot be claimed until your next turn`);
+      }
+    }
+  }
   const triggerPlayerIds = targetPlayerIds;
   const affectedPlayerIds = rule.resolveAffectedPlayers(state, ownerId, triggerPlayerIds);
   const eligibleResponderIds = rule.resolveEligibleResponders
@@ -94,6 +112,10 @@ export function activateManualTrap(
     : affectedPlayerIds.filter((id) => id !== ownerId);
 
   const afterRemove = removeTrap(state, ownerId, trapCode);
+
+  appendGameEvent(afterRemove, createGameEvent(GAME_EVENT_TYPES.TRAP_ACTIVATED, ownerId, {
+    ownerId, trapCode, triggerPlayerIds, affectedPlayerIds, targetIds: affectedPlayerIds,
+  }, affectedPlayerIds));
 
   return pushStackFrame(afterRemove, {
     sourceType: 'trap',
@@ -210,4 +232,25 @@ export function executeTrapFrameEffect(
     return rule.executeEffect(state, frame);
   }
   return state;
+}
+
+export function resolveT23PreDiscardReaction(
+  state: RoomState,
+  operation: ForcedDiscardOperation
+): PreDiscardReaction | null {
+  const ownerId = Object.keys(state.players).find((id) =>
+    id !== operation.targetPlayerId && state.players[id]?.traps.includes('T23')
+  );
+  if (!ownerId) return null;
+  return {
+    frameParams: {
+      sourceType: 'trap', sourceCode: 'T23', actorId: ownerId,
+      targetIds: [operation.targetPlayerId],
+      affectedPlayerIds: [operation.targetPlayerId],
+      triggerPlayerIds: [operation.targetPlayerId],
+      eligibleResponderIds: [operation.targetPlayerId],
+      customPayload: { cardCodes: operation.cardCodes },
+    },
+    replacementDestination: { playerId: ownerId },
+  };
 }

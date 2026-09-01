@@ -33,7 +33,7 @@ import { DiscardPileModal } from '../modals/DiscardPileModal';
 import { HostSkipConfirmModal } from './HostSkipConfirmModal';
 
 
-import { CardsIcon, TrapIcon, CardStackIcon } from '../ui/Icons';
+import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon } from '../ui/Icons';
 import type { CardCode, PlayerId } from '../../game/types';
 
 
@@ -43,6 +43,7 @@ export function GameTable() {
     activeRoom,
     myPlayerId,
     drawCard,
+    endTurn,
     hostSkipTurn,
     declareMuffinTime,
     playAction,
@@ -144,10 +145,13 @@ export function GameTable() {
     : undefined;
 
   // Check if local player is the target of an active Trap response
-  const isLocalTrapTarget =
+  const isLocalTrapTarget = Boolean(
     pendingResponse?.kind === 'trap' &&
-    pendingResponse.actorId !== myPlayerId &&
-    (!pendingResponse.targetId || pendingResponse.targetId === myPlayerId);
+      pendingResponse.actorId !== myPlayerId &&
+      (!pendingResponse.targetId || pendingResponse.targetId === myPlayerId) &&
+      pendingResponse.responses?.[myPlayerId]?.status !== 'skipped' &&
+      pendingResponse.responses?.[myPlayerId]?.status !== 'countered'
+  );
 
 
 
@@ -185,28 +189,28 @@ export function GameTable() {
   // Handlers for Opening Active Traps
   const handleOpenTrapTap = (trapCode: CardCode) => {
     if (pendingResponse) return;
-    const rule = getTrapRule(trapCode);
-    if (rule && rule.needsTargetSelection) {
-      setPendingTrapCode(trapCode);
-      setTrapTargetPrompt(rule.targetPrompt ?? 'เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
-      setAwaitingTrapTarget(true);
-      if (trapCode === 'T12') setChosenTrapTargets([]);
-      return;
-    }
     const card = getCardDisplay(trapCode);
-    if (card.needsTarget) {
-        setPendingTrapCode(trapCode);
-        setTrapTargetPrompt('เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
-        setAwaitingTrapTarget(true);
-        return;
-    }
-    openTrapCard(trapCode);
+    setPendingTrapOpen(card);
   };
 
   const handleConfirmOpenTrap = () => {
     if (!pendingTrapOpen) return;
-    openTrapCard(pendingTrapOpen.code);
+    const trapCode = pendingTrapOpen.code;
+    const rule = getTrapRule(trapCode);
+    const card = pendingTrapOpen;
+
     setPendingTrapOpen(null);
+
+    const needsTarget = Boolean((rule && rule.needsTargetSelection) || card.needsTarget);
+    if (needsTarget) {
+      setPendingTrapCode(trapCode);
+      setTrapTargetPrompt(rule?.targetPrompt ?? 'เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
+      setAwaitingTrapTarget(true);
+      if (trapCode === 'T12') setChosenTrapTargets([]);
+      return;
+    }
+
+    openTrapCard(trapCode);
   };
 
   const handleConfirmTrapTarget = () => {
@@ -276,6 +280,7 @@ export function GameTable() {
           discardPile={state.discardPile}
           isMyTurn={isMyTurn}
           canAct={canAct}
+          hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
           onDraw={drawCard}
           onOpenDiscardPile={() => setIsDiscardPileOpen(true)}
         />
@@ -315,34 +320,50 @@ export function GameTable() {
       {/* =================================================== */}
       {/* D. BOTTOM ACTION BAR (Persistent fixed bar)         */}
       {/* =================================================== */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-center p-2.5 bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-lg pointer-events-auto">
-        <div className="max-w-md w-full flex items-center gap-2 px-3">
-          {/* Left Action: Open Hand Tray */}
-          <button
-            type="button"
-            onClick={() => setIsHandTrayOpen(true)}
-            className="flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-[#FF2E63] via-[#ED1F4F] to-[#E52B50] px-3 text-xs sm:text-sm font-black text-white shadow-md shadow-primary/25 transition-all hover:opacity-95 active:scale-[0.98]"
-          >
-            <CardsIcon className="h-4 w-4 stroke-[2.5]" />
-            <span>ดูไพ่ในมือ ({me.hand.length})</span>
-          </button>
+      {(() => {
+        const hasDrawnThisTurn = Boolean(me.hasDrawnThisTurn);
+        const canEndTurn =
+          isMyTurn &&
+          state.turnPhase === 'main' &&
+          hasDrawnThisTurn &&
+          !pendingResponse &&
+          !state.pendingInteraction &&
+          (!state.reactionStack || state.reactionStack.length === 0) &&
+          !isFinished &&
+          !isShuffling &&
+          !isRoundTransitionActive;
 
-          {/* Right Action: Quick Draw Card */}
-          <button
-            type="button"
-            onClick={drawCard}
-            disabled={!isMyTurn || !canAct}
-            className={`flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl border-2 px-3 text-xs sm:text-sm font-black transition-all ${
-              isMyTurn && canAct
-                ? 'border-primary bg-primary/10 text-primary shadow-sm hover:bg-primary/15 active:scale-[0.98]'
-                : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-75'
-            }`}
-          >
-            <CardStackIcon className="h-4 w-4" />
-            <span>จั่วไพ่</span>
-          </button>
-        </div>
-      </div>
+        return (
+          <div className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-center p-2.5 bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-lg pointer-events-auto">
+            <div className="max-w-md w-full flex items-center gap-2 px-3">
+              {/* Left Action: Open Hand Tray */}
+              <button
+                type="button"
+                onClick={() => setIsHandTrayOpen(true)}
+                className="flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-[#FF2E63] via-[#ED1F4F] to-[#E52B50] px-3 text-xs sm:text-sm font-black text-white shadow-md shadow-primary/25 transition-all hover:opacity-95 active:scale-[0.98]"
+              >
+                <CardsIcon className="h-4 w-4 stroke-[2.5]" />
+                <span>ดูไพ่ในมือ ({me.hand.length})</span>
+              </button>
+
+              {/* Right Action: End Turn (จบเทิร์น) */}
+              <button
+                type="button"
+                onClick={endTurn}
+                disabled={!canEndTurn}
+                className={`flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl border-2 px-3 text-xs sm:text-sm font-black transition-all ${
+                  canEndTurn
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.98] cursor-pointer animate-pulse'
+                    : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <CheckIcon className="h-4 w-4 stroke-[2.5]" />
+                <span>จบเทิร์น</span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
 
 
@@ -353,6 +374,9 @@ export function GameTable() {
         hand={me.hand}
         isMyTurn={isMyTurn}
         canAct={canAct}
+        hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
+        hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
+        isTrapPlacementPhase={state.turnPhase === 'trap_placement'}
         trapsCount={me.traps.length}
         onClose={() => setIsHandTrayOpen(false)}
         onPlayAction={handlePlayActionDirect}

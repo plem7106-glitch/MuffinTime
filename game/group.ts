@@ -1,5 +1,6 @@
 import { cloneState } from './util';
-import { draw, discard } from './pile';
+import { draw } from './pile';
+import { executeDiscard } from './primitives';
 import type { RoomState, PlayerId, Rng } from './types';
 
 export function everyoneDraws(
@@ -20,12 +21,13 @@ export function everyoneDiscards(
   state: RoomState,
   n: number,
   excludeIds: PlayerId[] = [],
-  rng: Rng = Math.random
+  _rng: Rng = Math.random,
+  sourcePlayerId?: PlayerId
 ): RoomState {
   let next = cloneState(state);
   for (const playerId of Object.keys(next.players)) {
     if (excludeIds.includes(playerId)) continue;
-    next = discard(next, playerId, n, null, rng);
+    next = executeDiscard(next, playerId, n, undefined, 'clamp_to_available', sourcePlayerId).state;
   }
   return next;
 }

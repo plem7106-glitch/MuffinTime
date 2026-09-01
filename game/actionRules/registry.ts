@@ -1,5 +1,6 @@
 import { everyoneDraws, everyoneDiscards } from '../group';
-import { draw, discard } from '../pile';
+import { draw } from '../pile';
+import { executeDiscard } from '../primitives';
 import { stealRandom } from '../transfer';
 import type { CardCode, PlayerId, RoomState } from '../types';
 
@@ -32,9 +33,9 @@ export function resolveActionEffect(
   switch (code) {
     case 'A001': return everyoneDraws(state, 2, [actorId]);
     case 'A004': return draw(state, actorId, state.players[actorId].hand.length);
-    case 'A008': return everyoneDiscards(state, 1, [actorId]);
+    case 'A008': return everyoneDiscards(state, 1, [actorId], Math.random, actorId);
     case 'A014': return targetId ? stealRandom(state, actorId, targetId, 1) : state;
-    case 'A016': return targetId ? discard(state, targetId, state.players[targetId].hand.length) : state;
+    case 'A016': return targetId ? executeDiscard(state, targetId, state.players[targetId].hand.length, undefined, 'clamp_to_available', actorId).state : state;
     default: return state;
   }
 }

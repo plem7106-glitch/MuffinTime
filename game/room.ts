@@ -139,7 +139,16 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   }
   next.status = 'playing';
   next.currentTurnIndex = 0;
+  next.turnPhase = 'trap_placement';
+  for (const pid of Object.keys(next.players)) {
+    next.players[pid].placedTrapThisTurn = false;
+    next.players[pid].hasDrawnThisTurn = false;
+    next.players[pid].hasPlayedActionThisTurn = false;
+  }
   next.roundNumber = 1;
+  next.gameEndReason = undefined;
+  next.winnerPlayerIds = undefined;
+  next.finalHandCounts = undefined;
   return next;
 }
 
@@ -215,12 +224,18 @@ export function resetForPlayAgain(state: RoomState): RoomState {
       traps: [],
       hasCalledMuffinTime: false,
       skipNextTurn: false,
+      placedTrapThisTurn: false,
+      hasDrawnThisTurn: false,
+      hasPlayedActionThisTurn: false,
     };
   }
 
   next.status = 'lobby';
   next.winnerId = undefined;
   next.finishReason = undefined;
+  next.gameEndReason = undefined;
+  next.winnerPlayerIds = undefined;
+  next.finalHandCounts = undefined;
   next.joinOrder =
     next.joinOrder && next.joinOrder.length === playerIds.length && next.joinOrder.every((id) => next.players[id])
       ? next.joinOrder
@@ -237,5 +252,3 @@ export function resetForPlayAgain(state: RoomState): RoomState {
   next.roundNumber = 1;
   return next;
 }
-
-

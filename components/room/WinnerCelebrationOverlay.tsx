@@ -34,6 +34,9 @@ function StarShape({ className = 'h-4 w-4 text-amber-400' }: { className?: strin
 
 export function WinnerCelebrationOverlay({
   winnerId,
+  winnerPlayerIds,
+  finalHandCounts,
+  gameEndReason,
   finishReason = 'normal',
   players,
   isHost,
@@ -42,6 +45,9 @@ export function WinnerCelebrationOverlay({
   onLeaveRoom,
 }: {
   winnerId: PlayerId;
+  winnerPlayerIds?: PlayerId[];
+  finalHandCounts?: Record<PlayerId, number>;
+  gameEndReason?: 'deck_exhausted' | 'muffin_time' | 'manual';
   finishReason?: 'normal' | 'manual';
   players: Record<PlayerId, PlayerState>;
   isHost: boolean;
@@ -57,6 +63,7 @@ export function WinnerCelebrationOverlay({
 
   const winner = players[winnerId];
   const winnerName = winner?.name ?? 'ผู้เล่น';
+  const winnerNames = (winnerPlayerIds?.length ? winnerPlayerIds : [winnerId]).map((id) => players[id]?.name ?? 'ผู้เล่น');
   const isMe = myPlayerId === winnerId;
 
   // 1. Play Succes.mp3 sound ONCE on mount at -15 dB volume
@@ -183,6 +190,12 @@ export function WinnerCelebrationOverlay({
             <StarShape className="h-4 w-4 shrink-0 text-amber-500" />
           </div>
 
+          {gameEndReason === 'deck_exhausted' && (
+            <p className="mt-2 text-sm font-bold text-ink-secondary">
+              กองจั่วหมดแล้ว ผู้ชนะ: {winnerNames.join(' / ')}
+              {finalHandCounts && winnerPlayerIds?.length ? ` (${winnerPlayerIds.map((id) => finalHandCounts[id]).join(' / ')} ใบ)` : ''}
+            </p>
+          )}
           {finishReason === 'manual' && (
             <span className="mt-1.5 inline-flex items-center rounded-full bg-amber-100 border border-amber-300/80 px-2 py-0.2 text-[9px] font-black text-amber-900 uppercase tracking-wide">
               จบเกมโดย Host

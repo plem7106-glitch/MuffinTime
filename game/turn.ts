@@ -71,14 +71,47 @@ export function advanceTurn(state: RoomState): RoomState {
   const activePlayerId = order[index];
   if (next.players[activePlayerId]) {
     next.players[activePlayerId].placedTrapThisTurn = false;
+    next.players[activePlayerId].hasDrawnThisTurn = false;
+    next.players[activePlayerId].hasPlayedActionThisTurn = false;
   }
   next.turnPhase = 'trap_placement';
+  next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
 
   if (wrapped) {
     next.roundNumber = (next.roundNumber ?? 1) + 1;
   } else if (!next.roundNumber) {
     next.roundNumber = 1;
   }
+  return next;
+}
+
+export function finishByDeckExhaustion(state: RoomState): RoomState {
+  if (state.drawPile.length > 0) return state;
+  const next = cloneState(state);
+  const playerIds = Object.keys(next.players);
+  if (playerIds.length === 0) return next;
+
+  const finalHandCounts: Record<PlayerId, number> = {};
+  let minDistance = Infinity;
+
+  playerIds.forEach((id) => {
+    const count = next.players[id]?.hand.length ?? 0;
+    finalHandCounts[id] = count;
+    const dist = Math.abs(count - 10);
+    if (dist < minDistance) {
+      minDistance = dist;
+    }
+  });
+
+  const winners = playerIds.filter((id) => Math.abs((next.players[id]?.hand.length ?? 0) - 10) === minDistance);
+
+  next.status = 'finished';
+  next.finishReason = 'normal';
+  next.gameEndReason = 'deck_exhausted';
+  next.winnerId = winners[0];
+  next.winnerPlayerIds = winners;
+  next.finalHandCounts = finalHandCounts;
+
   return next;
 }
 
@@ -141,7 +174,11 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
   next.currentTurnIndex = getNextPlayerIndex(order.length, next.currentTurnIndex, dir);
   next.turnPhase = 'trap_placement';
   const activePlayerId = order[next.currentTurnIndex];
-  if (next.players[activePlayerId]) next.players[activePlayerId].placedTrapThisTurn = false;
+  if (next.players[activePlayerId]) {
+    next.players[activePlayerId].placedTrapThisTurn = false;
+    next.players[activePlayerId].hasDrawnThisTurn = false;
+    next.players[activePlayerId].hasPlayedActionThisTurn = false;
+  }
   return next;
 }
 
