@@ -13,8 +13,23 @@ import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
 import { rosterDraws, rosterDiscards, rosterStolenBy, rosterSkipTurn } from '../roster';
 import type { ActionRuleDefinition } from './types';
-import { rosterIdsFromFrame } from './types';
+import { rosterIdsFromFrame, outcomeFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+
+/** A105: steals every Action-type card (not the whole hand) from one player to another. */
+function stealAllActionCards(state: RoomState, fromId: PlayerId, toId: PlayerId): RoomState {
+  const hand = state.players[fromId].hand;
+  const matching = hand.filter((code) => getCardById(code)?.type === 'action');
+  if (matching.length === 0) return state;
+  let next = cloneState(state);
+  for (const code of matching) {
+    const pos = next.players[fromId].hand.indexOf(code);
+    if (pos === -1) continue;
+    next.players[fromId].hand.splice(pos, 1);
+    next.players[toId].hand.push(code);
+  }
+  return next;
+}
 
 /** Players tied for the min/max hand size (J1/J2/J3-style "extreme, ties all
  * included" resolution, for the subset of those cards whose comparator is
@@ -1008,6 +1023,305 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'ผู้เล่นทุกคนที่กินเนื้อสัตว์ ข้ามเทิร์นถัดไป',
     kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่กินเนื้อสัตว์',
     executeEffect: (state, frame) => rosterSkipTurn(state, rosterIdsFromFrame(frame)),
+  },
+
+  // -- Family E: dare / challenge / social-judgment (classification doc §Family E) --
+  // The group decides the real-world outcome among themselves; the app just
+  // records who it applies to. For E2/E3/E7/E8 ("steal/discard only if X
+  // happened"), the target picker doubles as the outcome: pick the player it
+  // applies to, or cancel if nobody triggered the effect -- no separate
+  // pass/fail step needed.
+
+  // E1: single-target contest, winner draws 3
+  A006: {
+    code: 'A006', name_en: 'Showdown', name_th: 'ดวลสายตา',
+    description_th: 'Mini-Game: แข่งจ้องตากับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะการดวลตา?',
+    executeEffect: (state, frame) => {
+      const winnerId = frame.targetIds[0];
+      return winnerId ? draw(state, winnerId, 3) : state;
+    },
+  },
+  A067: {
+    code: 'A067', name_en: "Can't Breathe", name_th: 'หายใจไม่ออก',
+    description_th: 'Mini-Game: แข่งกลั้นหายใจ ผู้เล่นที่กลั้นได้นานที่สุดจั่วไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครกลั้นหายใจได้นานที่สุด?',
+    executeEffect: (state, frame) => {
+      const winnerId = frame.targetIds[0];
+      return winnerId ? draw(state, winnerId, 3) : state;
+    },
+  },
+  A096: {
+    code: 'A096', name_en: 'Joust Time', name_th: 'ถึงเวลาดวล!',
+    description_th: 'Mini-Game: เป่ายิ้งฉุบกับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะเป่ายิ้งฉุบ?',
+    executeEffect: (state, frame) => {
+      const winnerId = frame.targetIds[0];
+      return winnerId ? draw(state, winnerId, 3) : state;
+    },
+  },
+  A114: {
+    code: 'A114', name_en: 'Take It Outside', name_th: 'ไปเคลียร์กันข้างนอก!',
+    description_th: 'Mini-Game: ท้าอีก 1 คนงัดข้อหรือเล่นสงครามนิ้วโป้ง ผู้ชนะจั่วไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะ?',
+    executeEffect: (state, frame) => {
+      const winnerId = frame.targetIds[0];
+      return winnerId ? draw(state, winnerId, 3) : state;
+    },
+  },
+  A160: {
+    code: 'A160', name_en: 'Duel of Sips', name_th: 'คู่ดวลดื่ม',
+    description_th: 'ท้าผู้เล่นอีกคนดื่มแข่งกัน คนที่ดื่มหมดก่อนจั่วไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครดื่มหมดก่อน?',
+    executeEffect: (state, frame) => {
+      const winnerId = frame.targetIds[0];
+      return winnerId ? draw(state, winnerId, 3) : state;
+    },
+  },
+
+  // E2: single-target dare; success favors the ACTOR (steal from target)
+  A033: {
+    code: 'A033', name_en: 'Can You Do This?', name_th: 'ทำแบบนี้ได้ไหม?',
+    description_th: 'Mini-Game: ทำท่าทางอย่างหนึ่ง แล้วเลือกผู้เล่นอีก 1 คนให้ทำตาม หากทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำท่าตามไม่ได้? (ถ้าทุกคนทำได้ ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+    },
+  },
+  A062: {
+    code: 'A062', name_en: 'Baby Voice', name_th: 'เสียงเด็กน้อย',
+    description_th: 'Mini-Game: เลือกผู้เล่นอีก 1 คนให้พูดด้วยเสียงเด็กจนถึงเทิร์นถัดไปของคุณ หากทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำไม่ได้? (ถ้าทำได้ ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+    },
+  },
+  A105: {
+    code: 'A105', name_en: 'Oh No!', name_th: 'โอ้ไม่นะ!',
+    description_th: 'Mini-Game: ทายจำนวน Action ที่อยู่ในมือของผู้เล่นอีก 1 คน หากทายจำนวนได้ถูกต้องพอดี ขโมย Action ทั้งหมดของผู้เล่นคนนั้น',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ทายถูกไหม? เลือกผู้เล่นที่ทายถูก (ถ้าทายผิด ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealAllActionCards(state, targetId, frame.actorId) : state;
+    },
+  },
+  A136: {
+    code: 'A136', name_en: "What's Their Name?", name_th: 'เขาชื่ออะไรนะ?',
+    description_th: 'เลือกผู้เล่นอีก 1 คน หากผู้เล่นคนนั้นไม่รู้ชื่อเต็มของคุณ ขโมยไพ่จากเขา 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครไม่รู้ชื่อเต็มของคุณ? (ถ้ารู้หมด ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+    },
+  },
+  A147: {
+    code: 'A147', name_en: 'Dance for Me', name_th: 'เต้นให้ดู',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้เต้นท่าที่คุณสั่ง 10 วินาที ถ้าทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำไม่ได้? (ถ้าทำได้ ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+    },
+  },
+  A149: {
+    code: 'A149', name_en: 'Whisper Dare', name_th: 'กระซิบท้าทาย',
+    description_th: 'กระซิบคำสั่งอายๆ ให้ผู้เล่นอีกคนทำทันที ถ้าทำสำเร็จขโมยไพ่ 2 ใบจากเขา',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำสำเร็จ? (ถ้าไม่มี ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+    },
+  },
+  A170: {
+    code: 'A170', name_en: 'Guess the Buzz', name_th: 'เกมทายใจ',
+    description_th: 'ทายว่าผู้เล่นอีก 1 คนดื่มไปกี่แก้วแล้ว ถ้าทายถูก ขโมยไพ่ 2 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ทายถูกไหม? เลือกผู้เล่นที่ทายถูก (ถ้าทายผิด ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+    },
+  },
+
+  // E3: single-target dare; failure/refusal -> TARGET discards N
+  A057: {
+    code: 'A057', name_en: 'Lie to Me', name_th: 'โกหกฉันสิ',
+    description_th: 'Mini-Game: บอกผู้เล่นอีก 1 คนด้วยเรื่องจริง 1 เรื่องและเรื่องโกหก 1 เรื่อง หากเขาแยกไม่ได้ว่าเรื่องไหนจริงหรือโกหก เขาต้องทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครแยกไม่ได้? (ถ้าแยกได้ ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 3) : state;
+    },
+  },
+  A061: {
+    code: 'A061', name_en: 'Alphabet', name_th: 'ท่องตัวอักษร',
+    description_th: 'Mini-Game: เลือกผู้เล่นอีก 1 คนให้ท่องตัวอักษรภาษาอังกฤษจาก Z → A หากพูดผิด ให้ทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครพูดผิด? (ถ้าไม่มีใครพูดผิด ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 3) : state;
+    },
+  },
+  A151: {
+    code: 'A151', name_en: 'Butterfingers', name_th: 'เก็บของตกไม่ทัน',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ถือแก้วด้วยมือเดียวไปจนถึงเทิร์นถัดไปของคุณ ถ้าวางแก้วลงหรือทำหล่น ให้ทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำแก้วหล่น/วางลง? (ถ้าไม่มี ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 3) : state;
+    },
+  },
+  A152: {
+    code: 'A152', name_en: 'Forced Karaoke', name_th: 'คาราโอเกะบังคับ',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ร้องเพลง 1 ท่อนตอนนี้เลย ถ้าปฏิเสธ ทิ้งไพ่ 4 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครปฏิเสธ? (ถ้าร้องหมด ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 4) : state;
+    },
+  },
+  A162: {
+    code: 'A162', name_en: 'Awkward Pose', name_th: 'แต๊ะอิงแขนขา',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ค้างท่าทางแปลกๆ จนกว่าจะถึงเทิร์นถัดไปของคุณ ถ้าขยับก่อน ทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครขยับก่อน? (ถ้าไม่มี ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 3) : state;
+    },
+  },
+
+  // E4: self performs for the group; verdict -> self draw/discard (binary, no target)
+  A148: {
+    code: 'A148', name_en: 'Dad Joke Roulette', name_th: 'มุกแป้กหรือปัง',
+    description_th: 'เล่ามุกตลก ถ้าไม่มีใครหัวเราะ ทิ้งไพ่ 2 ใบ ถ้ามีคนหัวเราะ จั่ว 2 ใบ',
+    kind: 'outcome_entry', needsOutcomeEntry: true, outcomePrompt: 'มีใครหัวเราะไหม?', outcomeYesLabel: 'มีคนหัวเราะ', outcomeNoLabel: 'ไม่มีใครหัวเราะ',
+    executeEffect: (state, frame) => {
+      const laughed = outcomeFromFrame(frame);
+      if (laughed === true) return draw(state, frame.actorId, 2);
+      if (laughed === false) return discard(state, frame.actorId, 2);
+      return state;
+    },
+  },
+  A150: {
+    code: 'A150', name_en: 'Drunk Impression', name_th: 'เลียนแบบเสียงเมา',
+    description_th: 'พูดประโยคที่กำหนดด้วยเสียงเหมือนคนเมา ถ้าทำให้คนอื่นหัวเราะได้ จั่วไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsOutcomeEntry: true, outcomePrompt: 'ทำให้คนอื่นหัวเราะได้ไหม?', outcomeYesLabel: 'หัวเราะ', outcomeNoLabel: 'ไม่หัวเราะ',
+    executeEffect: (state, frame) => (outcomeFromFrame(frame) === true ? draw(state, frame.actorId, 3) : state),
+  },
+
+  // E5: 2-3 chosen players compete, group-judged; loser(s) discard N
+  A146: {
+    code: 'A146', name_en: 'Red Face Loses', name_th: 'หน้าแดงก่อนแพ้',
+    description_th: 'เลือกผู้เล่น 2 คนมาแข่งกันใครหน้าแดงกว่ากัน (ให้คนอื่นตัดสิน) คนแพ้ทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่แพ้ (หน้าแดงกว่า)',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A157: {
+    code: 'A157', name_en: 'Stage Director', name_th: 'จอมบงการเวที',
+    description_th: 'เลือกผู้เล่น 2 คนให้แสดงบทสนทนาสั้นๆ ที่คุณกำหนด คนที่แสดงได้แย่กว่าทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่แสดงแย่กว่า',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A165: {
+    code: 'A165', name_en: 'Command Chain', name_th: 'เจ้าพ่อคำสั่ง',
+    description_th: 'สั่งให้ผู้เล่น 3 คนทำท่าทางต่างกันพร้อมกัน คนที่ทำผิดจังหวะทิ้งไพ่ 2 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ทำผิดจังหวะ',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+
+  // E6: all players do a simultaneous challenge; straggler(s) discard N
+  A083: {
+    code: 'A083', name_en: 'Hit The Apple', name_th: 'ตีแอปเปิล!',
+    description_th: 'Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องแตะไพ่ใบนี้ คนสุดท้ายที่แตะต้องทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่แตะช้าสุด',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A104: {
+    code: 'A104', name_en: 'Okay, Draw!', name_th: 'โอเค ชักปืน!',
+    description_th: 'Mini-Game: ผู้เล่นทุกคนทำมือเป็นปืนแล้วเล็งใส่กัน ผู้เล่นที่ถูกเล็งมากที่สุดทิ้งไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ถูกเล็งมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A134: {
+    code: 'A134', name_en: 'Standing Up School', name_th: 'โรงเรียนยืนขึ้น',
+    description_th: 'Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องยืนขึ้น คนสุดท้ายที่ยืนต้องทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ยืนช้าสุด',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A143: {
+    code: 'A143', name_en: "King's Toast", name_th: 'ประกาศศักดา',
+    description_th: 'ประกาศตัวเองเป็นราชา ผู้เล่นทุกคนต้องดื่มก่อนคุณ ไม่งั้นทิ้งไพ่ 2 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ดื่มไม่ทันก่อนคุณ',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+  A163: {
+    code: 'A163', name_en: 'Hands Up', name_th: 'ยกมือขึ้น!',
+    description_th: 'ทุกคนต้องยกแก้วขึ้นเหนือหัวไปจนจบรอบนี้ คนที่ลืมทิ้งไพ่ 2 ใบ',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ลืมยกแก้ว',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+
+  // E7: whole group votes a target; target discards N
+  A142: {
+    code: 'A142', name_en: "Who's the Drunkest", name_th: 'ใครเมาสุด',
+    description_th: 'โหวตกันว่าใครดูเมาที่สุดตอนนี้ คนนั้นทิ้งไพ่ 3 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าเมาสุด?',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 3) : state;
+    },
+  },
+  A173: {
+    code: 'A173', name_en: 'Vote to Roast', name_th: 'โหวตไล่ล่า',
+    description_th: 'ทุกคนโหวตว่าใครทำตัวน่าอายที่สุดในรอบนี้ คนนั้นทิ้งไพ่ 4 ใบ',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าน่าอายที่สุด?',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discard(state, targetId, 4) : state;
+    },
+  },
+
+  // E8: single target offered a choice; only one branch has a card effect
+  A153: {
+    code: 'A153', name_en: 'Truth Booze', name_th: 'จริงหรือดื่ม',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ตอบคำถามลับๆ หรือดื่ม ถ้าเลือกดื่ม ขโมยไพ่ 2 ใบจากเขา',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่น ถ้าเขาเลือก "ดื่ม" (ถ้าเขาตอบคำถาม ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+    },
+  },
+  A167: {
+    code: 'A167', name_en: 'Drunk Confession', name_th: 'บอกความลับตอนเมา',
+    description_th: 'ถามคำถามลับกับผู้เล่นอีก 1 คน ถ้าตอบ ขโมยไพ่ 1 ใบจากเขา ถ้าไม่ตอบ เขาดื่ม 1 อึก',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่น ถ้าเขาตอบคำถาม (ถ้าไม่ตอบ ให้กดยกเลิก)',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 1) : state;
+    },
+  },
+
+  // E9: purely social/physical, zero card-state change
+  A128: {
+    code: 'A128', name_en: 'New Camera', name_th: 'กล้องใหม่',
+    description_th: 'Mini-Game: ถ่ายรูปร่วมกับผู้เล่นทุกคน (ความทรงจำเหล่านี้มีค่านะ)',
+    kind: 'no_op', executeEffect: (state) => state,
+  },
+  A154: {
+    code: 'A154', name_en: 'The Puppet Master', name_th: 'ผู้บงการ',
+    description_th: 'เลือกผู้เล่น 1 คนให้เป็นหุ่นเชิดของคุณ เขาต้องทำตามคำสั่งของคุณ 1 คำสั่งในเทิร์นถัดไปของเขา',
+    kind: 'no_op', executeEffect: (state) => state,
+  },
+  A161: {
+    code: 'A161', name_en: 'Confess or Drink', name_th: 'ยอมสารภาพ',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้สารภาพความลับเล็กๆ หรือดื่ม 2 อึก',
+    kind: 'no_op', executeEffect: (state) => state,
+  },
+  A169: {
+    code: 'A169', name_en: 'Crowd Chant', name_th: 'เสียงเรียกร้อง',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ทุกคนตะโกนชื่อเขาพร้อมกัน 3 ครั้ง เขาต้องดื่ม 1 อึก',
+    kind: 'no_op', executeEffect: (state) => state,
   },
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a

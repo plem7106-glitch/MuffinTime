@@ -413,6 +413,8 @@ export function GameTable() {
       <OutcomeToggle
         open={pendingTargetCard !== null && pendingActionRule?.needsOutcomeEntry === true}
         prompt={pendingActionRule?.outcomePrompt ?? pendingTargetCard?.effect ?? ''}
+        yesLabel={pendingActionRule?.outcomeYesLabel}
+        noLabel={pendingActionRule?.outcomeNoLabel}
         onSelect={handleOutcomeSelect}
         onCancel={() => setPendingTargetCard(null)}
       />

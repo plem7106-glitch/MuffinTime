@@ -651,6 +651,116 @@ describe('Family A batch (via executeActionFrameEffect, since roster picks need 
   });
 });
 
+describe('Family E1/E7 batch (single target = winner/voted, via resolveActionEffect)', () => {
+  it.each(['A006', 'A067', 'A096', 'A114', 'A160'])('%s draws the picked winner 3', (code) => {
+    const next = resolveActionEffect(threePlayerState(), code, 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(6);
+  });
+
+  it.each(['A006', 'A067'])('%s is a no-op when nobody is picked as winner', (code) => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, code, 'me')).toEqual(state);
+  });
+
+  it('A142 discards the voted target 3', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A142', 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(0);
+  });
+
+  it('A173 discards the voted target 4', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e'];
+    const next = resolveActionEffect(state, 'A173', 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(1);
+  });
+});
+
+describe('Family E2/E8 batch (target = who the effect applies to, actor steals)', () => {
+  it.each([
+    ['A033', 3], ['A062', 3], ['A136', 3], ['A147', 3], ['A149', 2], ['A170', 2], ['A153', 2], ['A167', 1],
+  ])('%s steals %i from the picked target to the actor', (code, n) => {
+    const next = resolveActionEffect(threePlayerState(), code, 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(1 + n);
+    expect(next.players.p2.hand.length).toBe(3 - n);
+  });
+
+  it.each(['A033', 'A153'])('%s is a no-op when nobody is picked (nothing happened)', (code) => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, code, 'me')).toEqual(state);
+  });
+
+  it('A105 steals every Action-type card (not the whole hand) from the target', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['A001', 'T01', 'A002', 'C09'];
+    const next = resolveActionEffect(state, 'A105', 'me', 'p2');
+    expect(next.players.p2.hand).toEqual(expect.arrayContaining(['T01', 'C09']));
+    expect(next.players.me.hand).toEqual(expect.arrayContaining(['A001', 'A002']));
+  });
+});
+
+describe('Family E3 batch (target discards, via resolveActionEffect)', () => {
+  it.each([
+    ['A057', 3], ['A061', 3], ['A151', 3], ['A152', 4], ['A162', 3],
+  ])('%s discards %i from the picked target', (code, n) => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e'];
+    const next = resolveActionEffect(state, code, 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(5 - n);
+  });
+
+  it('A057 is a no-op when nobody is picked', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A057', 'me')).toEqual(state);
+  });
+});
+
+describe('Family E4 batch (self-only binary outcome, via executeActionFrameEffect)', () => {
+  it('A148 draws the actor 2 when the outcome is true (someone laughed)', () => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload('A148', 'me', { outcome: true }));
+    expect(next.players.me.hand.length).toBe(3);
+  });
+
+  it('A148 discards the actor 2 when the outcome is false (nobody laughed)', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b', 'c'];
+    const next = executeActionFrameEffect(state, frameWithPayload('A148', 'me', { outcome: false }));
+    expect(next.players.me.hand.length).toBe(1);
+  });
+
+  it('A150 draws the actor 3 only when the outcome is true', () => {
+    const trueNext = executeActionFrameEffect(threePlayerState(), frameWithPayload('A150', 'me', { outcome: true }));
+    expect(trueNext.players.me.hand.length).toBe(4);
+    const falseState = threePlayerState();
+    const falseNext = executeActionFrameEffect(falseState, frameWithPayload('A150', 'me', { outcome: false }));
+    expect(falseNext).toEqual(falseState);
+  });
+});
+
+describe('Family E5/E6 batch (roster = loser(s), via executeActionFrameEffect)', () => {
+  it.each([
+    ['A146', 3], ['A157', 3], ['A165', 2], ['A083', 3], ['A134', 3], ['A143', 2], ['A163', 2],
+  ])('%s discards %i from each roster member', (code, n) => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e'];
+    const next = executeActionFrameEffect(state, frameWithPayload(code, 'me', { rosterIds: ['p2'] }));
+    expect(next.players.p2.hand.length).toBe(5 - n);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it('A104 discards from every tied roster member', () => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload('A104', 'me', { rosterIds: ['p2', 'p3'] }));
+    expect(next.players.p2.hand.length).toBe(0);
+    expect(next.players.p3.hand.length).toBe(0);
+  });
+});
+
+describe('Family E9 batch (no_op)', () => {
+  it.each(['A128', 'A154', 'A161', 'A169'])('%s is always a no-op', (code) => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, code, 'me', 'p2')).toEqual(state);
+  });
+});
+
 describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they

@@ -14,6 +14,8 @@ export interface ActionRuleDefinition {
   rosterPrompt?: string;
   needsOutcomeEntry?: boolean;
   outcomePrompt?: string;
+  outcomeYesLabel?: string;
+  outcomeNoLabel?: string;
   executeEffect: (state: RoomState, frame: StackFrame) => RoomState;
 }
 
