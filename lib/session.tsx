@@ -7,6 +7,7 @@ import { fetchRoom, updateRoomWithRetry, createRoomWithRetry } from '../multipla
 import { subscribeToRoom, unsubscribeFromRoom } from '../multiplayer/realtime';
 import {
   addPlayer,
+  removePlayer,
   createRoom as engineCreateRoom,
   startSetup as engineStartSetup,
   updateSeatOrder as engineUpdateSeatOrder,
@@ -267,6 +268,16 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const leaveRoom = useCallback(() => {
+    // Best-effort: remove this player from the room server-side so others stop
+    // seeing them listed. Fire-and-forget -- the leaver's own screen moves on
+    // immediately regardless of whether this write succeeds.
+    if (roomCode && !roomCode.startsWith('bot-') && myPlayerId) {
+      const codeToLeave = roomCode;
+      const idToRemove = myPlayerId;
+      updateRoomWithRetry(supabase, codeToLeave, (state) => removePlayer(state, idToRemove)).catch(() => {
+        // ignore -- nothing left to show an error to once we've navigated away
+      });
+    }
     if (channelRef.current) {
       unsubscribeFromRoom(channelRef.current);
       channelRef.current = null;
@@ -282,7 +293,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     setRoomCode(null);
     setRoomState(null);
     setError(null);
-  }, [roomCode]);
+  }, [roomCode, myPlayerId]);
 
   const startSetupFn = useCallback(
     () =>
