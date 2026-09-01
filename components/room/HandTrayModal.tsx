@@ -123,7 +123,7 @@ export function HandTrayModal({
         </div>
 
         {/* 1. Overlapping Hand Cards Track (fanned like real cards in hand) */}
-        <div className="flex overflow-x-auto py-2 pl-1 pr-8 pb-3 scrollbar-none shrink-0">
+        <div className="flex overflow-x-auto pt-7 pl-1 pr-8 pb-3 scrollbar-none shrink-0">
           {hand.length === 0 ? (
             <div className="flex h-36 w-full items-center justify-center rounded-2xl border border-dashed border-gray-200 text-xs font-bold text-gray-400">
               ไม่มีไพ่ในมือ
