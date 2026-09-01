@@ -43,7 +43,7 @@ import {
 import { createGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getPlayableCounters } from '../game/counterRules/registry';
 import { resolveCounterEffect } from '../game/counterRules/engine';
-import { getPlayableActions, isActionImplemented, resolveActionEffect } from '../game/actionRules/registry';
+import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
 import { isTrapImplemented } from '../game/trapRules/registry';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
@@ -99,7 +99,7 @@ export interface GameSessionValue {
   confirmTurnOrder: () => void;
   drawCard: () => void;
   hostSkipTurn: () => void;
-  playAction: (code: CardCode, targetId?: PlayerId) => void;
+  playAction: (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => void;
   placeTrapCard: (code: CardCode) => void;
   skipTrapPlacement: () => void;
   openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
@@ -395,7 +395,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const playAction = useCallback(
-    (code: CardCode, targetId?: PlayerId) =>
+    (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) =>
       run((state) => {
         if (state.reactionStack && state.reactionStack.length > 0) return state;
         if (state.pendingResponse) return state;
@@ -410,6 +410,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           sourceCode: code,
           actorId,
           targetIds: targetId ? [targetId] : [],
+          ...(customPayload ? { customPayload } : {}),
         });
       }),
     [run, myPlayerId]
@@ -545,7 +546,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
             if (currentTop.sourceType === 'trap') {
               next = executeTrapFrameEffect(next, currentTop);
             } else {
-              next = resolveActionEffect(next, currentTop.sourceCode, currentTop.actorId, currentTop.targetIds[0]);
+              next = executeActionFrameEffect(next, currentTop);
             }
           }
 

@@ -24,8 +24,13 @@ export function getCardDisplay(code: CardCode): CardDisplay {
     effect: card.description_th,
     titleEn: card.name_en,
     image: card.image,
-    // Single-select target flow only -- roster_select/outcome_entry Action kinds
-    // need their own UI wiring (added alongside the first card that uses them).
-    needsTarget: getActionRule(card.id)?.needsTargetSelection === true,
+    // True for any Action rule that needs a manual picker before it can
+    // resolve (single target, multi-select roster, or an outcome toggle) --
+    // GameTable.tsx's handleRequestTarget picks the right modal per rule.kind.
+    needsTarget: Boolean(
+      getActionRule(card.id)?.needsTargetSelection ||
+        getActionRule(card.id)?.needsRosterSelection ||
+        getActionRule(card.id)?.needsOutcomeEntry
+    ),
   };
 }

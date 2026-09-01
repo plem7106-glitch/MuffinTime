@@ -61,3 +61,14 @@ export function resolveActionEffect(
   if (!rule) return state;
   return rule.executeEffect(state, buildLegacyFrame(code, actorId, targetId));
 }
+
+/**
+ * Executes an Action rule from a real StackFrame (preserving frame.customPayload
+ * -- rosterIds, winnerId, outcome, etc.) instead of the (code, actorId, targetId)-only
+ * legacy adapter above. Use this wherever the caller already has the frame.
+ */
+export function executeActionFrameEffect(state: RoomState, frame: StackFrame): RoomState {
+  const rule = getActionRule(frame.sourceCode);
+  if (!rule) return state;
+  return rule.executeEffect(state, frame);
+}

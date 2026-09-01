@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { resolveActionEffect } from './registry';
-import type { RoomState } from '../types';
+import { resolveActionEffect, executeActionFrameEffect } from './registry';
+import type { PlayerId, RoomState, StackFrame } from '../types';
+
+/** Builds a minimal StackFrame carrying customPayload, for roster_select/
+ * outcome_entry rules that resolveActionEffect's legacy (code, actorId,
+ * targetId) adapter can't express. */
+function frameWithPayload(
+  code: string,
+  actorId: PlayerId,
+  customPayload: Record<string, unknown>
+): StackFrame {
+  return {
+    frameId: 'test', parentFrameId: null, sourceType: 'action', sourceCode: code, actorId,
+    targetIds: [], targetScope: 'multi', eligibleResponderIds: [], responses: {}, modifiers: [],
+    status: 'resolving', turnContext: { turnIndex: 0, phase: 'main', roundNumber: 0 }, customPayload,
+  };
+}
 
 function baseState(): RoomState {
   return {
@@ -20,10 +35,9 @@ function baseState(): RoomState {
 }
 
 describe('ACTION_RULES_BATCH_1 (via resolveActionEffect)', () => {
-  it('A001 makes everyone except the actor draw 2', () => {
-    const next = resolveActionEffect(baseState(), 'A001', 'me');
-    expect(next.players.me.hand.length).toBe(2);
-    expect(next.players['bot-1'].hand.length).toBe(4);
+  it('A001 is a no-op via the legacy (code, actorId) adapter -- it now needs a roster', () => {
+    const state = baseState();
+    expect(resolveActionEffect(state, 'A001', 'me')).toEqual(state);
   });
 
   it('A004 draws the actor a number of cards equal to their current hand size', () => {
@@ -594,6 +608,45 @@ describe('Family I2/I5/J-objective batch (via resolveActionEffect)', () => {
     const next = resolveActionEffect(threePlayerState(), 'A050', 'me');
     expect(next.players.me.skipNextTurn).toBe(false);
     expect(next.players.p2.skipNextTurn).toBe(true);
+    expect(next.players.p3.skipNextTurn).toBe(true);
+  });
+});
+
+describe('Family A batch (via executeActionFrameEffect, since roster picks need customPayload)', () => {
+  it.each([
+    ['A001', 2], ['A002', 3], ['A011', 2], ['A065', 2], ['A069', 3], ['A098', 2], ['A138', 2], ['A139', 1],
+  ])('%s makes only the players in the roster draw %i', (code, n) => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload(code, 'me', { rosterIds: ['p2'] }));
+    expect(next.players.me.hand.length).toBe(1);
+    expect(next.players.p2.hand.length).toBe(3 + n);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it.each(['A001', 'A002'])('%s is a no-op when nobody is picked (empty roster)', (code) => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload(code, 'me', { rosterIds: [] }))).toEqual(state);
+  });
+
+  it.each([
+    ['A012', 3], ['A013', 1], ['A042', 2], ['A068', 2], ['A102', 2], ['A131', 1],
+  ])('%s makes only the players in the roster discard %i', (code, n) => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e'];
+    const next = executeActionFrameEffect(state, frameWithPayload(code, 'me', { rosterIds: ['p2'] }));
+    expect(next.players.p2.hand.length).toBe(5 - n);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it.each(['A081', 'A103', 'A111'])('%s steals 1 from each roster member to the actor', (code) => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload(code, 'me', { rosterIds: ['p2', 'p3'] }));
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(2);
+    expect(next.players.p3.hand.length).toBe(2);
+  });
+
+  it('A089 makes only the roster players skip their next turn', () => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload('A089', 'me', { rosterIds: ['p3'] }));
+    expect(next.players.p2.skipNextTurn).toBe(false);
     expect(next.players.p3.skipNextTurn).toBe(true);
   });
 });

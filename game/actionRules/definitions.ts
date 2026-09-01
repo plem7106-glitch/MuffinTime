@@ -11,8 +11,9 @@ import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand } fro
 import { drawFromBottom } from '../pile';
 import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
-import { rosterDraws, rosterSkipTurn } from '../roster';
+import { rosterDraws, rosterDiscards, rosterStolenBy, rosterSkipTurn } from '../roster';
 import type { ActionRuleDefinition } from './types';
+import { rosterIdsFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
 
 /** Players tied for the min/max hand size (J1/J2/J3-style "extreme, ties all
@@ -147,13 +148,20 @@ function discardAllOfType(state: RoomState, playerId: PlayerId, type: 'action' |
  * existing registry.test.ts assertions keep passing unchanged.
  */
 export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
+  // Was originally migrated from the old demo switch as kind:'auto'
+  // ("everyone except the actor draws 2" -- a rough approximation that
+  // predates the classification doc). Corrected here to real roster_select,
+  // per the classification doc's Family A1 and the "who ate meat" example
+  // this whole system was designed around.
   A001: {
     code: 'A001',
     name_en: 'Wrong House',
     name_th: 'ผิดบ้านแล้ว!',
     description_th: 'ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ จั่วไพ่คนละ 2 ใบ',
-    kind: 'auto',
-    executeEffect: (state, frame) => everyoneDraws(state, 2, [frame.actorId]),
+    kind: 'roster_select',
+    needsRosterSelection: true,
+    rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อาศัยอยู่ที่นี่',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
   },
 
   A004: {
@@ -885,6 +893,122 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   //  - A118 (whoever suggested playing this game): no such one-time
   //    room-setup fact is collected or stored anywhere.
   //  - A158 (a live per-player drink-count tally): no such counter exists.
+
+  // -- Family A: condition-filtered player selection (classification doc §Family A) --
+  // "All players matching a real-world condition" -- the active player taps
+  // through a roster of everyone in the room and marks who qualifies (the
+  // "who ate meat in the last 24h" example this whole system was designed
+  // around), then the fixed effect applies to just the ones marked.
+
+  // A1: roster draws N
+  A002: {
+    code: 'A002', name_en: 'Oh No! Babies!', name_th: 'โอ้ไม่นะ! เด็กใหม่!',
+    description_th: 'ผู้เล่นทุกคนที่ไม่เคยเล่นเกมนี้มาก่อน จั่วไพ่คนละ 3 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่เคยเล่นเกมนี้มาก่อน',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
+  },
+  A011: {
+    code: 'A011', name_en: 'I Am Lonely', name_th: 'ฉันเหงา',
+    description_th: 'ผู้เล่นทุกคนที่ไม่ได้อยู่ในความสัมพันธ์ จั่วไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อยู่ในความสัมพันธ์',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
+  },
+  A065: {
+    code: 'A065', name_en: 'Big Bee', name_th: 'ผึ้งยักษ์',
+    description_th: 'ผู้เล่นทุกคนที่มีตัวอักษร "b" อยู่ในชื่อเต็ม จั่วไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่มีตัวอักษร "b" ในชื่อเต็ม',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
+  },
+  A069: {
+    code: 'A069', name_en: 'Cool Hat', name_th: 'หมวกเท่จัง',
+    description_th: 'ผู้เล่นทุกคนที่สวมหมวก จั่วไพ่คนละ 3 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมหมวก',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
+  },
+  A098: {
+    code: 'A098', name_en: 'Medication', name_th: 'ยา',
+    description_th: 'ผู้เล่นทุกคนที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา จั่วไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
+  },
+  A138: {
+    code: 'A138', name_en: "You're A Nerd", name_th: 'นายมันเด็กเนิร์ด',
+    description_th: 'ผู้เล่นทุกคนที่สวมแว่น จั่วไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมแว่น',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
+  },
+  A139: {
+    code: 'A139', name_en: 'Bottoms Up', name_th: 'หมดแก้ว!',
+    description_th: 'ผู้เล่นทุกคนที่ยังดื่มไม่หมดแก้วในมือ ดื่มให้หมด แล้วจั่วไพ่คนละ 1 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ยังดื่มไม่หมดแก้ว',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 1),
+  },
+
+  // A2: roster discards N
+  A012: {
+    code: 'A012', name_en: 'Nice Hat', name_th: 'หมวกสวยนะ',
+    description_th: 'ผู้เล่นทุกคนที่สวมหมวก ทิ้งไพ่คนละ 3 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมหมวก',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A013: {
+    code: 'A013', name_en: 'Parked Car', name_th: 'รถจอดอยู่',
+    description_th: 'ผู้เล่นทุกคนที่ขับรถเป็น ทิ้งไพ่คนละ 1 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ขับรถเป็น',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 1),
+  },
+  A042: {
+    code: 'A042', name_en: 'Get Off My Property', name_th: 'ออกไปจากบ้านฉัน!',
+    description_th: 'ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ ทิ้งไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อาศัยอยู่ที่นี่',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+  A068: {
+    code: 'A068', name_en: 'Cat Allergy', name_th: 'แพ้แมว',
+    description_th: 'ผู้เล่นทุกคนที่เลี้ยงแมว ทิ้งไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เลี้ยงแมว',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+  A102: {
+    code: 'A102', name_en: 'No Dog?!', name_th: 'ไม่มีหมาเหรอ?!',
+    description_th: 'ผู้เล่นทุกคนที่ไม่ได้เลี้ยงสุนัข ทิ้งไพ่คนละ 2 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้เลี้ยงสุนัข',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+  A131: {
+    code: 'A131', name_en: 'Rainbows', name_th: 'สายรุ้ง',
+    description_th: 'เลือกสีของสายรุ้ง 1 สี ผู้เล่นทุกคนที่สวมใส่สีนั้นทิ้งไพ่คนละ 1 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกสีก่อน แล้วเลือกผู้เล่นที่สวมใส่สีนั้น',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 1),
+  },
+
+  // A3: actor steals 1 from each roster member
+  A081: {
+    code: 'A081', name_en: 'Hey, Are You An Angel?', name_th: 'เฮ้ เธอเป็นนางฟ้าเหรอ?',
+    description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นผู้หญิงทุกคน',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เป็นผู้หญิง',
+    executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
+  },
+  A103: {
+    code: 'A103', name_en: 'No Llama No!', name_th: 'ไม่นะ ลามะ ไม่!',
+    description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่ขับรถไม่เป็น',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ขับรถไม่เป็น',
+    executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
+  },
+  A111: {
+    code: 'A111', name_en: 'Snake Arms', name_th: 'แขนงู',
+    description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นผู้ชายทุกคน',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เป็นผู้ชาย',
+    executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
+  },
+
+  // A4: roster skips their next turn
+  A089: {
+    code: 'A089', name_en: 'I Used To Be A Cow', name_th: 'ฉันเคยเป็นวัว',
+    description_th: 'ผู้เล่นทุกคนที่กินเนื้อสัตว์ ข้ามเทิร์นถัดไป',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่กินเนื้อสัตว์',
+    executeEffect: (state, frame) => rosterSkipTurn(state, rosterIdsFromFrame(frame)),
+  },
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so
