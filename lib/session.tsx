@@ -91,7 +91,11 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     const row = await fetchRoom(supabase, code);
     setRoomCode(code);
     setRoomState(row.state);
-    channelRef.current = subscribeToRoom(supabase, code, setRoomState);
+    channelRef.current = subscribeToRoom(supabase, code, setRoomState, (status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setError('การเชื่อมต่อแบบเรียลไทม์มีปัญหา ลองรีเฟรชหน้านี้อีกครั้ง');
+      }
+    });
   }, []);
 
   const run = useCallback(
