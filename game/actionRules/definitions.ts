@@ -2,7 +2,7 @@ import { everyoneDraws, everyoneDiscards, passHands } from '../group';
 import { draw, discard } from '../pile';
 import { stealRandom } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
-import { skipTurn } from '../turnFlow';
+import { skipTurn, reverseDirection } from '../turnFlow';
 import { getNextPlayerId } from '../turn';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
@@ -11,8 +11,20 @@ import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand } fro
 import { drawFromBottom } from '../pile';
 import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
+import { rosterDraws, rosterSkipTurn } from '../roster';
 import type { ActionRuleDefinition } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+
+/** Players tied for the min/max hand size (J1/J2/J3-style "extreme, ties all
+ * included" resolution, for the subset of those cards whose comparator is
+ * objectively computable from live state). */
+function extremeByHandSize(state: RoomState, direction: 'min' | 'max'): PlayerId[] {
+  const ids = Object.keys(state.players);
+  if (ids.length === 0) return [];
+  const sizes = ids.map((id) => state.players[id].hand.length);
+  const extreme = direction === 'min' ? Math.min(...sizes) : Math.max(...sizes);
+  return ids.filter((id) => state.players[id].hand.length === extreme);
+}
 
 /** A046/A026: peek N from the top of the draw pile and take one -- no
  * card-picker UI exists yet, so this takes a random one of the peeked cards
@@ -807,6 +819,72 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto',
     executeEffect: (state, frame) => drawFromBottom(state, frame.actorId, 3),
   },
+
+  // -- Family I2/I5 + J2(objective)/J3: meta/global one-off, named-card refs,
+  //    objective extreme-state cards (classification doc §Family I, §Family J) --
+
+  A076: {
+    code: 'A076', name_en: 'Falling Up', name_th: 'ตกขึ้นข้างบน',
+    description_th: 'กลับทิศทางการเล่น',
+    kind: 'auto',
+    executeEffect: (state) => reverseDirection(state),
+  },
+  A021: {
+    code: 'A021', name_en: 'Seen My Pony?', name_th: 'เห็นโพนี่ของฉันไหม?',
+    description_th: 'หาก "Magical Pony" อยู่ในกองทิ้ง ให้นำไพ่ใบนั้นมาใส่ในมือคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      if (!state.discardPile.includes('A097')) return state;
+      return returnCardToHand(state, 'A097', frame.actorId);
+    },
+  },
+  A048: {
+    code: 'A048', name_en: 'I Want My Lemons', name_th: 'เอามะนาวฉันคืนมา!',
+    description_th: 'ถามว่า "Do you have my lemons?" หากผู้เล่นคนอื่นมีไพ่ "My Lemons" ให้ขโมยไพ่ทั้งหมดในมือของผู้เล่นคนนั้น',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      const holderId = Object.keys(state.players).find(
+        (id) => id !== frame.actorId && state.players[id].hand.includes('A127')
+      );
+      return holderId ? executeFullHandTransfer(state, holderId, frame.actorId) : state;
+    },
+  },
+  A073: {
+    code: 'A073', name_en: 'Draw A Bear', name_th: 'จั่วหมี',
+    description_th: 'จั่วไพ่ 3 ใบ หากหนึ่งในนั้นคือ "Desmond The Moon Bear" ให้จั่วเพิ่มอีก 3 ใบ',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      const gotBear = peekTopN(state, 3).includes('A070');
+      const afterDraw = draw(state, frame.actorId, 3);
+      return gotBear ? draw(afterDraw, frame.actorId, 3) : afterDraw;
+    },
+  },
+  A088: {
+    code: 'A088', name_en: 'I Suck At This Game', name_th: 'ฉันห่วยเกมนี้',
+    description_th: 'ผู้เล่นที่มีไพ่ในมือน้อยที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว',
+    kind: 'auto',
+    executeEffect: (state) => rosterDraws(state, extremeByHandSize(state, 'min'), 3),
+  },
+  A050: {
+    code: 'A050', name_en: 'Intervention', name_th: 'ต้องคุยกันหน่อยแล้ว',
+    description_th: 'ผู้เล่นที่มีไพ่ในมือมากที่สุดต้องข้ามเทิร์นถัดไป หากเสมอกัน ผู้เล่นที่เสมอกันทั้งหมดข้ามเทิร์น',
+    kind: 'auto',
+    executeEffect: (state) => rosterSkipTurn(state, extremeByHandSize(state, 'max')),
+  },
+
+  // The following are deliberately NOT included in this batch -- each needs
+  // real new infrastructure this codebase doesn't have yet, not just a UI
+  // picker like the earlier "ponytail" simplifications:
+  //  - A135 (choose the new Muffin Time target number): needs a numeric-input UI.
+  //  - A024, A027, A023 (win/lose evaluated at the ACTOR's next turn, not now):
+  //    needs a scheduled/delayed check consulted by game/turn.ts's
+  //    checkWinnerAtTurnStart -- there's no "pending effect for a future
+  //    turn" mechanism to hook into.
+  //  - A037, A066, A137 (compare players' birthdates): no birthdate field
+  //    exists on PlayerState, and nothing collects one.
+  //  - A118 (whoever suggested playing this game): no such one-time
+  //    room-setup fact is collected or stored anywhere.
+  //  - A158 (a live per-player drink-count tally): no such counter exists.
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so

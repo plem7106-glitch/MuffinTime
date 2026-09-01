@@ -523,6 +523,81 @@ describe('Family H1 batch (via resolveActionEffect)', () => {
   });
 });
 
+describe('Family I2/I5/J-objective batch (via resolveActionEffect)', () => {
+  it('A076 reverses the play direction', () => {
+    const state = threePlayerState();
+    state.direction = 1;
+    expect(resolveActionEffect(state, 'A076', 'me').direction).toBe(-1);
+  });
+
+  it('A021 takes Magical Pony (A097) from the discard pile if it\'s there', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A097'];
+    const next = resolveActionEffect(state, 'A021', 'me');
+    expect(next.discardPile).toEqual([]);
+    expect(next.players.me.hand).toEqual(expect.arrayContaining(['A097']));
+  });
+
+  it('A021 is a no-op if Magical Pony is not in the discard pile', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A021', 'me')).toEqual(state);
+  });
+
+  it('A048 steals the whole hand of whoever holds My Lemons (A127)', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['A127', 'x', 'y'];
+    const next = resolveActionEffect(state, 'A048', 'me');
+    expect(next.players.p2.hand).toEqual([]);
+    expect(next.players.me.hand).toEqual(expect.arrayContaining(['A127', 'x', 'y']));
+  });
+
+  it('A048 is a no-op if nobody holds My Lemons', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A048', 'me')).toEqual(state);
+  });
+
+  it('A073 draws 3, and draws 3 more if Desmond The Moon Bear (A070) is among them', () => {
+    const state = threePlayerState();
+    // top 3 (from the end) are x4, x3, A070 -- includes the bear
+    state.drawPile = ['y1', 'y2', 'y3', 'x1', 'x2', 'A070', 'x3', 'x4'];
+    const next = resolveActionEffect(state, 'A073', 'me');
+    expect(next.players.me.hand.length).toBe(1 + 6);
+  });
+
+  it('A073 draws only 3 if Desmond The Moon Bear is not among the top 3', () => {
+    const state = threePlayerState();
+    state.drawPile = ['A070', 'x1', 'x2', 'x3', 'x4'];
+    const next = resolveActionEffect(state, 'A073', 'me');
+    expect(next.players.me.hand.length).toBe(1 + 3);
+  });
+
+  it('A088 makes only the fewest-cards player(s) draw 3', () => {
+    const state = threePlayerState();
+    state.players.me.hand = [];
+    const next = resolveActionEffect(state, 'A088', 'me');
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it('A088 makes every tied player draw when there\'s a tie for fewest', () => {
+    const state = threePlayerState();
+    state.players.me.hand = [];
+    state.players.p2.hand = [];
+    const next = resolveActionEffect(state, 'A088', 'me');
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3); // untouched, had more cards
+  });
+
+  it('A050 makes only the most-cards player(s) skip their next turn', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A050', 'me');
+    expect(next.players.me.skipNextTurn).toBe(false);
+    expect(next.players.p2.skipNextTurn).toBe(true);
+    expect(next.players.p3.skipNextTurn).toBe(true);
+  });
+});
+
 describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
