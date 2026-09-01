@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import type { CardCode } from '../../game/types';
 import { getCardById, type Card as CardModel } from '../../data/cards/index';
-import { getDemoCard } from '../../lib/demoCards';
 import { Card } from '../card/Card';
 import { CardDetailModal } from '../card/CardDetailModal';
 import { CloseIcon, CardStackIcon } from '../ui/Icons';
@@ -33,24 +32,7 @@ export function DiscardPileModal({
         return { isUnresolved: false, card: fromDb };
       }
 
-      // 2. Secondary fallback for demo runtime card definitions
-      try {
-        const demo = getDemoCard(code);
-        const demoCard: CardModel = {
-          id: demo.code,
-          number: 0,
-          name_th: demo.th,
-          name_en: demo.th,
-          type: demo.type,
-          description_th: demo.effect,
-          description_en: demo.effect,
-          image: undefined,
-        };
-        return { isUnresolved: false, card: demoCard };
-      } catch {
-        // 3. Truly unresolvable ID: return neutral missing-card state without fake type
-        return { isUnresolved: true, code };
-      }
+      return { isUnresolved: true, code };
     });
   }, [discardPile]);
 

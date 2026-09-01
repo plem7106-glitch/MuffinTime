@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import type { CardCode } from '../../game/types';
 import { getCardById } from '../../data/cards/index';
-import { getDemoCard, type DemoCard } from '../../lib/demoCards';
+import { getCardDisplay, type CardDisplay } from '../../data/cards/display';
 import { Card, CARD_TYPE_THEMES } from '../card/Card';
 import { CloseIcon, CardsIcon, CheckIcon } from '../ui/Icons';
 
@@ -26,37 +26,58 @@ export function HandTrayModal({
   onClose: () => void;
   onPlayAction: (code: CardCode) => void;
   onPlaceTrap: (code: CardCode) => void;
-  onRequestTarget: (demoCard: DemoCard) => void;
+  onRequestTarget: (card: CardDisplay) => void;
 }) {
   const [selectedCode, setSelectedCode] = useState<CardCode | null>(null);
+  const [fullscreenCode, setFullscreenCode] = useState<CardCode | null>(null);
+  const singleTapTimerRef = useRef<number | null>(null);
+  const lastTapRef = useRef<{ code: CardCode; timestamp: number } | null>(null);
 
   // Retrieve selected card details
   const selectedCardInfo = useMemo(() => {
     if (!selectedCode) return null;
     const full = getCardById(selectedCode);
-    let demo: DemoCard | null = null;
-    try {
-      demo = getDemoCard(selectedCode);
-    } catch {
-      // Not a demo card
-    }
+    const display = getCardDisplay(selectedCode);
 
     return {
       code: selectedCode,
-      type: full?.type ?? demo?.type ?? 'action',
-      title: full?.name_th ?? demo?.th ?? selectedCode,
+      type: full?.type ?? display.type,
+      title: full?.name_th ?? display.th,
       titleEn: full?.name_en,
-      description: full?.description_th ?? demo?.effect ?? '',
+      description: full?.description_th ?? display.effect,
       image: full?.image,
-      needsTarget: demo?.needsTarget ?? false,
-      demo,
+      needsTarget: display.needsTarget,
+      display,
     };
   }, [selectedCode]);
 
-  if (!isOpen) return null;
-
   const handleCardClick = (code: CardCode) => {
     setSelectedCode(code);
+  };
+
+  const handleHandCardPress = (code: CardCode) => {
+    const now = Date.now();
+    const lastTap = lastTapRef.current;
+    const isDoublePress = lastTap?.code === code && now - lastTap.timestamp <= 240;
+
+    if (singleTapTimerRef.current) {
+      window.clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+    }
+
+    if (isDoublePress) {
+      lastTapRef.current = null;
+      setSelectedCode(null);
+      setFullscreenCode(code);
+      return;
+    }
+
+    lastTapRef.current = { code, timestamp: now };
+    singleTapTimerRef.current = window.setTimeout(() => {
+      handleCardClick(code);
+      singleTapTimerRef.current = null;
+      lastTapRef.current = null;
+    }, 220);
   };
 
   const handleActionConfirm = () => {
@@ -71,8 +92,8 @@ export function HandTrayModal({
     }
 
     if (selectedCardInfo.type === 'action') {
-      if (selectedCardInfo.needsTarget && selectedCardInfo.demo) {
-        onRequestTarget(selectedCardInfo.demo);
+      if (selectedCardInfo.needsTarget) {
+        onRequestTarget(selectedCardInfo.display);
         setSelectedCode(null);
         onClose();
         return;
@@ -87,6 +108,55 @@ export function HandTrayModal({
   const theme = selectedCardInfo
     ? CARD_TYPE_THEMES[selectedCardInfo.type] ?? CARD_TYPE_THEMES.action
     : null;
+
+  const fullscreenCardInfo = useMemo(() => {
+    if (!fullscreenCode) return null;
+    const full = getCardById(fullscreenCode);
+    const display = getCardDisplay(fullscreenCode);
+
+    return {
+      code: fullscreenCode,
+      type: full?.type ?? display.type,
+      title: full?.name_th ?? display.th,
+      description: full?.description_th ?? display.effect,
+      image: full?.image,
+    };
+  }, [fullscreenCode]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (singleTapTimerRef.current) {
+        window.clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+      lastTapRef.current = null;
+      setSelectedCode(null);
+      setFullscreenCode(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!fullscreenCode) return undefined;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setFullscreenCode(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fullscreenCode]);
+
+  useEffect(() => {
+    return () => {
+      if (singleTapTimerRef.current) {
+        window.clearTimeout(singleTapTimerRef.current);
+      }
+    };
+  }, []);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -122,8 +192,31 @@ export function HandTrayModal({
           <span className="text-[10px] text-ink-secondary/70">← เลื่อนซ้าย-ขวา →</span>
         </div>
 
-        {/* 1. Overlapping Hand Cards Track (fanned like real cards in hand) */}
-        <div className="flex overflow-x-auto pt-7 pl-1 pr-8 pb-3 scrollbar-none shrink-0">
+        {/* 1. Hand Cards Track */}
+        <div
+          className="flex gap-3 overflow-x-auto px-1 pb-3 pt-3 scrollbar-none shrink-0 overscroll-x-contain"
+          style={{ scrollSnapType: 'x proximity' }}
+          onWheel={(event: WheelEvent<HTMLDivElement>) => {
+            const target = event.currentTarget;
+            const canScroll = target.scrollWidth > target.clientWidth;
+            if (!canScroll) return;
+
+            const horizontalIntent = Math.abs(event.deltaX) >= Math.abs(event.deltaY);
+            if (horizontalIntent) return;
+
+            const nextScrollLeft = target.scrollLeft + event.deltaY;
+            const maxScrollLeft = target.scrollWidth - target.clientWidth;
+            const isMovingLeft = event.deltaY < 0;
+            const isMovingRight = event.deltaY > 0;
+            const canMoveLeft = target.scrollLeft > 0;
+            const canMoveRight = target.scrollLeft < maxScrollLeft;
+
+            if ((isMovingLeft && canMoveLeft) || (isMovingRight && canMoveRight)) {
+              event.preventDefault();
+              target.scrollLeft = Math.max(0, Math.min(maxScrollLeft, nextScrollLeft));
+            }
+          }}
+        >
           {hand.length === 0 ? (
             <div className="flex h-36 w-full items-center justify-center rounded-2xl border border-dashed border-gray-200 text-xs font-bold text-gray-400">
               ไม่มีไพ่ในมือ
@@ -132,27 +225,18 @@ export function HandTrayModal({
             hand.map((code, idx) => {
               const isSelected = selectedCode === code;
               const fullCard = getCardById(code);
-              let demo: DemoCard | null = null;
-              try {
-                demo = getDemoCard(code);
-              } catch {
-                // Ignore
-              }
+              const display = getCardDisplay(code);
 
-              const cardType = fullCard?.type ?? demo?.type ?? 'action';
-              const title = fullCard?.name_th ?? demo?.th ?? code;
-              const desc = fullCard?.description_th ?? demo?.effect ?? '';
+              const cardType = fullCard?.type ?? display.type;
+              const title = fullCard?.name_th ?? display.th;
+              const desc = fullCard?.description_th ?? display.effect;
               const image = fullCard?.image;
 
               return (
                 <div
                   key={`${code}-${idx}`}
                   className="shrink-0 transition-transform duration-150"
-                  style={{
-                    marginLeft: idx === 0 ? 0 : -44,
-                    zIndex: isSelected ? 100 : idx,
-                    transform: isSelected ? 'translateY(-14px)' : undefined,
-                  }}
+                  style={{ scrollSnapAlign: 'start' }}
                 >
                   <Card
                     id={code}
@@ -162,7 +246,7 @@ export function HandTrayModal({
                     image={image}
                     variant="hand"
                     selected={isSelected}
-                    onClick={() => handleCardClick(code)}
+                    onClick={() => handleHandCardPress(code)}
                     className="cursor-pointer shadow-xs hover:shadow-md"
                   />
                 </div>
@@ -247,6 +331,43 @@ export function HandTrayModal({
           </div>
         ) : null}
       </div>
+
+      {fullscreenCardInfo ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setFullscreenCode(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`ดูไพ่ ${fullscreenCardInfo.title}`}
+        >
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setFullscreenCode(null);
+            }}
+            aria-label="ปิดมุมมองไพ่เต็มจอ"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-ink shadow-lg transition-colors hover:bg-white active:scale-95"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+
+          <div
+            className="w-full max-w-[min(78vw,360px)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Card
+              id={fullscreenCardInfo.code}
+              type={fullscreenCardInfo.type}
+              title={fullscreenCardInfo.title}
+              description={fullscreenCardInfo.description}
+              image={fullscreenCardInfo.image}
+              variant="full"
+              className="max-h-[82vh] shadow-2xl"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

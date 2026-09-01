@@ -1,7 +1,7 @@
 import { BottomSheet } from '../ui/BottomSheet';
 import { Card } from '../card/Card';
 import { SecondaryButton } from '../ui/SecondaryButton';
-import { getDemoCard } from '../../lib/demoCards';
+import { getCardDisplay } from '../../data/cards/display';
 import type { CardCode } from '../../game/types';
 
 export function CounterModal({
@@ -21,7 +21,7 @@ export function CounterModal({
         <h2 className="text-lg font-bold text-ink">เล่นการ์ดสวนกลับไหม?</h2>
         <div className="flex gap-2 overflow-x-auto">
           {counterCards.map((code, i) => {
-            const card = getDemoCard(code);
+            const card = getCardDisplay(code);
             return (
               <Card key={`${code}-${i}`} type="counter" title={card.th} description={card.effect} onClick={() => onPlay(code)} />
             );

@@ -1,6 +1,8 @@
 import type { RoomState, PlayerId, CardCode, Rng, PendingResponse, PendingInteraction } from '../game/types';
-import { demoCardsOfType, getValidCounterCards } from './demoCards';
-import { getTrapRule } from '../game/trapRules/registry';
+import { getPlayableCounters } from '../game/counterRules/registry';
+import { getTrapRule, isTrapImplemented } from '../game/trapRules/registry';
+import { getPlayableActions } from '../game/actionRules/registry';
+import { getCardsByType } from '../data/cards/index';
 
 export type BotDecision =
   | { action: 'draw' }
@@ -34,9 +36,8 @@ export function decideBotTrapPlacement(
     return { action: 'skip' };
   }
 
-  const trapCards = demoCardsOfType('trap');
-  const trapCodes = new Set(trapCards.map((c) => c.code));
-  const handTraps = player.hand.filter((code) => trapCodes.has(code));
+  const trapCodes = new Set(getCardsByType('trap').map((c) => c.id));
+  const handTraps = player.hand.filter((code) => trapCodes.has(code) && isTrapImplemented(code));
 
   if (handTraps.length === 0 || rng() > TRAP_PLACE_PROBABILITY) {
     return { action: 'skip' };
@@ -55,17 +56,15 @@ export function decideBotTurn(
   rng: Rng = Math.random
 ): BotDecision {
   const hand = state.players[botId]?.hand ?? [];
-  const actionCards = demoCardsOfType('action');
-  const actionCodes = new Set(actionCards.map((c) => c.code));
-  const playableActions = hand.filter((code) => actionCodes.has(code));
+  const playableActions = getPlayableActions(state, botId);
 
   if (playableActions.length === 0 || rng() >= ACTION_PLAY_PROBABILITY) {
     return { action: 'draw' };
   }
 
   const code = playableActions[Math.floor(rng() * playableActions.length)];
-  const card = actionCards.find((c) => c.code === code);
-  if (!card || !card.needsTarget) {
+  const needsTarget = code === 'A014' || code === 'A016';
+  if (!needsTarget) {
     return { action: 'play', code };
   }
 
@@ -91,7 +90,7 @@ export function decideBotCounter(
   const player = state.players[botId];
   if (!player) return { action: 'skip' };
 
-  const validCounters = getValidCounterCards(player.hand, pendingResponse);
+  const validCounters = getPlayableCounters(player.hand, pendingResponse);
   if (validCounters.length === 0 || rng() > COUNTER_PLAY_PROBABILITY) {
     return { action: 'skip' };
   }

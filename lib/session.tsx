@@ -41,8 +41,12 @@ import {
   executeTrapFrameEffect,
 } from '../game/trapRules/engine';
 import { createGameEvent, GAME_EVENT_TYPES } from '../game/events';
+import { getPlayableCounters } from '../game/counterRules/registry';
+import { resolveCounterEffect } from '../game/counterRules/engine';
+import { getPlayableActions, isActionImplemented, resolveActionEffect } from '../game/actionRules/registry';
+import { isTrapImplemented } from '../game/trapRules/registry';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
-import { buildDemoDeck, resolveActionCard, resolveTrapCard, resolveCounterCard, getValidCounterCards } from './demoCards';
+import { buildCanonicalDeck } from '../data/cards/deck';
 import {
   decideBotTurn,
   decideBotTrapPlacement,
@@ -98,7 +102,7 @@ export interface GameSessionValue {
   playAction: (code: CardCode, targetId?: PlayerId) => void;
   placeTrapCard: (code: CardCode) => void;
   skipTrapPlacement: () => void;
-  openTrapCard: (code: CardCode, targetId?: PlayerId) => void;
+  openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
   initiateTrapInteraction: (code: CardCode, targetId: PlayerId) => void;
   respondToTrapInteraction: (interactionId: string, decision: 'accept' | 'refuse') => void;
   playCounter: (code: CardCode, responseId: string) => void;
@@ -360,7 +364,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     () =>
       run((state) => {
         if (myPlayerId !== state.hostId) return state;
-        return engineStartGame(state, buildDemoDeck());
+        return engineStartGame(state, buildCanonicalDeck());
       }),
     [run, myPlayerId]
   );
@@ -397,6 +401,9 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (state.pendingResponse) return state;
         if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
         const actorId = myPlayerId!;
+        if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
+        if ((code === 'A014' || code === 'A016') && !targetId) return state;
+        if (targetId && !state.players[targetId]) return state;
         const afterDiscard = discard(state, actorId, 1, [code]);
         return pushStackFrame(afterDiscard, {
           sourceType: 'action',
@@ -418,6 +425,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (!player || player.placedTrapThisTurn || state.turnPhase !== 'trap_placement') return state;
         if (state.turnOrder[state.currentTurnIndex] !== pid) return state;
         if (!player.hand.includes(code)) return state;
+        if (!isTrapImplemented(code)) return state;
         return enginePlaceTrap(state, pid, code);
       }),
     [run, myPlayerId]
@@ -436,10 +444,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const openTrapCard = useCallback(
-    (code: CardCode, targetId?: PlayerId) =>
+    (code: CardCode, targetId?: PlayerId | PlayerId[]) =>
       run((state) => {
         const ownerId = myPlayerId!;
-        return activateManualTrap(state, ownerId, code, targetId ? [targetId] : []);
+        return activateManualTrap(state, ownerId, code, targetId ? (Array.isArray(targetId) ? targetId : [targetId]) : []);
       }),
     [run, myPlayerId]
   );
@@ -468,6 +476,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const top = getTopFrame(state);
         if (!top || top.frameId !== responseId) return state;
         const counterActorId = myPlayerId!;
+        if (!state.pendingResponse || !getPlayableCounters(state.players[counterActorId]?.hand ?? [], state.pendingResponse).includes(code)) return state;
         const afterDiscard = discard(state, counterActorId, 1, [code]);
 
         // Submit counter response to top frame
@@ -477,7 +486,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         });
 
         // Resolve counter card effect (e.g. demo draws)
-        next = resolveCounterCard(next, code, counterActorId);
+        next = resolveCounterEffect(next, code, counterActorId);
 
         // Add modifier to target frame
         next = addModifierToFrame(next, responseId, {
@@ -536,7 +545,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
             if (currentTop.sourceType === 'trap') {
               next = executeTrapFrameEffect(next, currentTop);
             } else {
-              next = resolveActionCard(next, currentTop.sourceCode, currentTop.actorId, currentTop.targetIds[0]);
+              next = resolveActionEffect(next, currentTop.sourceCode, currentTop.actorId, currentTop.targetIds[0]);
             }
           }
 
@@ -648,7 +657,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       const isHumanActor = pendingResponse.actorId === myPlayerId;
       const isHumanTarget = !pendingResponse.targetId || pendingResponse.targetId === myPlayerId;
       const humanHand = roomState.players[myPlayerId]?.hand ?? [];
-      const humanCanCounter = getValidCounterCards(humanHand, pendingResponse).length > 0;
+      const humanCanCounter = getPlayableCounters(humanHand, pendingResponse).length > 0;
 
       // 1. If human was hit by a trap, human sees TrapAlertModal to decide counter/decline
       if (!isHumanActor && isHumanTarget && pendingResponse.kind === 'trap') {
@@ -690,7 +699,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
               status: 'countered',
               counterCode: code,
             });
-            next = resolveCounterCard(next, code, actorId);
+            next = resolveCounterEffect(next, code, actorId);
             next = addModifierToFrame(next, responseId, {
               modifierId: `mod-${code}-${Date.now()}`,
               sourceFrameId: responseId,
@@ -737,7 +746,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
     const anyoneCanRespond = eligibleIds.some((id) => {
       const hand = roomState.players[id]?.hand ?? [];
-      return getValidCounterCards(hand, pendingResponse).length > 0;
+      return getPlayableCounters(hand, pendingResponse).length > 0;
     });
     if (anyoneCanRespond) return;
 

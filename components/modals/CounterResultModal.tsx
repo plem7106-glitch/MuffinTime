@@ -1,6 +1,6 @@
 import { BottomSheet } from '../ui/BottomSheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
-import { getDemoCard } from '../../lib/demoCards';
+import { getCardDisplay } from '../../data/cards/display';
 import type { LastResult } from '../../game/types';
 
 export function CounterResultModal({
@@ -13,7 +13,7 @@ export function CounterResultModal({
   onClose: () => void;
 }) {
   const show = result !== null && result.countered;
-  const counterCard = result?.counterCode ? getDemoCard(result.counterCode) : null;
+  const counterCard = result?.counterCode ? getCardDisplay(result.counterCode) : null;
 
   return (
     <BottomSheet open={show} onClose={onClose}>

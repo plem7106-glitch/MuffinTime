@@ -1,6 +1,6 @@
 import { BottomSheet } from '../ui/BottomSheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
-import { getDemoCard } from '../../lib/demoCards';
+import { getCardDisplay } from '../../data/cards/display';
 import type { LastResult } from '../../game/types';
 
 export function TrapResultModal({
@@ -15,7 +15,7 @@ export function TrapResultModal({
   onClose: () => void;
 }) {
   const show = result !== null && result.kind === 'trap' && !result.countered;
-  const card = result ? getDemoCard(result.code) : null;
+  const card = result ? getCardDisplay(result.code) : null;
 
   return (
     <BottomSheet open={show} onClose={onClose}>

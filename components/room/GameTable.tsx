@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
-import { isMuffinTimeEligible } from '../../game/turn';
-import { getDemoCard, demoCardsOfType, getValidCounterCards, type DemoCard } from '../../lib/demoCards';
+import { getNextPlayerId, isMuffinTimeEligible } from '../../game/turn';
+import { getPlayableCounters } from '../../game/counterRules/registry';
+import { getCardDisplay, type CardDisplay } from '../../data/cards/display';
 import { GameHeader } from './GameHeader';
 
 import { TurnStatusBar } from './TurnStatusBar';
@@ -29,6 +30,7 @@ import { CounterModal } from '../modals/CounterModal';
 import { TrapResultModal } from '../modals/TrapResultModal';
 import { CounterResultModal } from '../modals/CounterResultModal';
 import { DiscardPileModal } from '../modals/DiscardPileModal';
+import { HostSkipConfirmModal } from './HostSkipConfirmModal';
 
 
 import { CardsIcon, TrapIcon, CardStackIcon } from '../ui/Icons';
@@ -68,17 +70,19 @@ export function GameTable() {
   const [isManualFinishOpen, setIsManualFinishOpen] = useState(false);
   const [isShuffleConfirmOpen, setIsShuffleConfirmOpen] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const [isHostSkipConfirmOpen, setIsHostSkipConfirmOpen] = useState(false);
 
   // Action Target Flow State
-  const [pendingTargetCard, setPendingTargetCard] = useState<DemoCard | null>(null);
+  const [pendingTargetCard, setPendingTargetCard] = useState<CardDisplay | null>(null);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
 
   // Trap Open Flow State
   const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
   const [trapTargetPrompt, setTrapTargetPrompt] = useState<string>('เลือกผู้เล่นเป้าหมาย');
-  const [pendingTrapOpen, setPendingTrapOpen] = useState<DemoCard | null>(null);
+  const [pendingTrapOpen, setPendingTrapOpen] = useState<CardDisplay | null>(null);
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
+  const [chosenTrapTargets, setChosenTrapTargets] = useState<PlayerId[]>([]);
 
   // Auto-close trap open flow if a counter response window opens
   useEffect(() => {
@@ -167,8 +171,8 @@ export function GameTable() {
     placeTrapCard(cardCode);
   };
 
-  const handleRequestTarget = (demoCard: DemoCard) => {
-    setPendingTargetCard(demoCard);
+  const handleRequestTarget = (card: CardDisplay) => {
+    setPendingTargetCard(card);
   };
 
   const handleConfirmTargetAction = () => {
@@ -186,18 +190,15 @@ export function GameTable() {
       setPendingTrapCode(trapCode);
       setTrapTargetPrompt(rule.targetPrompt ?? 'เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
       setAwaitingTrapTarget(true);
+      if (trapCode === 'T12') setChosenTrapTargets([]);
       return;
     }
-    try {
-      const demo = getDemoCard(trapCode);
-      if (demo.needsTarget) {
+    const card = getCardDisplay(trapCode);
+    if (card.needsTarget) {
         setPendingTrapCode(trapCode);
         setTrapTargetPrompt('เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
         setAwaitingTrapTarget(true);
         return;
-      }
-    } catch {
-      // not in demo cards
     }
     openTrapCard(trapCode);
   };
@@ -209,6 +210,12 @@ export function GameTable() {
   };
 
   const handleConfirmTrapTarget = () => {
+    if (pendingTrapCode === 'T12') {
+      if (chosenTrapTargets.length === 0) return;
+      openTrapCard(pendingTrapCode, chosenTrapTargets);
+      setPendingTrapCode(null); setAwaitingTrapTarget(false); setChosenTrapTargets([]); setChosenTrapTarget(null);
+      return;
+    }
     if (!pendingTrapCode || !chosenTrapTarget) return;
     if (pendingTrapCode === 'T10') {
       initiateTrapInteraction('T10', chosenTrapTarget);
@@ -227,7 +234,7 @@ export function GameTable() {
 
   // Legally valid Counter response cards available in local hand for the active pendingResponse
   const validCounterCards = useMemo(() => {
-    return getValidCounterCards(me.hand, pendingResponse);
+    return getPlayableCounters(me.hand, pendingResponse);
   }, [me.hand, pendingResponse]);
 
 
@@ -383,7 +390,6 @@ export function GameTable() {
         open={awaitingTrapTarget}
         candidates={opponentCandidates}
         selectedId={chosenTrapTarget}
-        onSelect={setChosenTrapTarget}
         onConfirm={handleConfirmTrapTarget}
         onCancel={() => {
           setPendingTrapCode(null);
@@ -392,6 +398,12 @@ export function GameTable() {
           setChosenTrapTarget(null);
         }}
         prompt={trapTargetPrompt}
+        multiSelect={pendingTrapCode === 'T12'}
+        selectedIds={chosenTrapTargets}
+        onSelect={(id) => {
+          if (pendingTrapCode !== 'T12') { setChosenTrapTarget(id); return; }
+          setChosenTrapTargets((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+        }}
       />
 
       {/* 12.5 Interactive Trap Modal (e.g. T10 Date Invite) */}
@@ -461,10 +473,19 @@ export function GameTable() {
         isShuffleDisabled={isShuffleDisabled}
         shuffleDisabledReason={shuffleDisabledReason}
         onOpenManualFinish={() => setIsManualFinishOpen(true)}
-        onHostUnstick={() =>
-          pendingResponse ? skipCounter(pendingResponse.responseId) : hostSkipTurn()
-        }
+        onOpenHostUnstick={() => setIsHostSkipConfirmOpen(true)}
         hostUnstickLabel={pendingResponse ? 'บังคับข้ามการตอบโต้ที่ค้าง' : 'บังคับข้ามเทิร์นที่ค้าง'}
+      />
+
+      <HostSkipConfirmModal
+        isOpen={isHostSkipConfirmOpen}
+        currentPlayerName={state.players[state.turnOrder[state.currentTurnIndex]]?.name ?? 'ผู้เล่นปัจจุบัน'}
+        nextPlayerName={state.players[getNextPlayerId(state.turnOrder, state.turnOrder[state.currentTurnIndex], state.direction)]?.name ?? 'ผู้เล่นถัดไป'}
+        onClose={() => setIsHostSkipConfirmOpen(false)}
+        onConfirm={() => {
+          setIsHostSkipConfirmOpen(false);
+          hostSkipTurn();
+        }}
       />
 
       {/* 16. In-Game Card Gallery Browser Modal */}

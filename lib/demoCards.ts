@@ -2,6 +2,7 @@ import { everyoneDraws, everyoneDiscards } from '../game/group';
 import { draw, discard } from '../game/pile';
 import { stealRandom } from '../game/transfer';
 import type { RoomState, PlayerId, CardCode } from '../game/types';
+import { getCardsByType } from '../data/cards/index';
 
 export type DemoCardType = 'action' | 'counter' | 'trap';
 
@@ -165,7 +166,7 @@ export function getValidCounterCards(
   pending: { kind: 'action' | 'trap'; code: CardCode } | null
 ): CardCode[] {
   if (!pending) return [];
-  const allCounterCodes = new Set(demoCardsOfType('counter').map((c) => c.code));
+  const allCounterCodes = new Set(getCardsByType('counter').map((c) => c.id));
   return hand.filter((code) => {
     const isCounter = allCounterCodes.has(code) || code.startsWith('C');
     if (!isCounter) return false;

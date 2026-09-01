@@ -1,7 +1,7 @@
 import { BottomSheet } from '../ui/BottomSheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
-import type { DemoCard } from '../../lib/demoCards';
+import type { CardDisplay } from '../../data/cards/display';
 
 export function TrapModal({
   card,
@@ -9,7 +9,7 @@ export function TrapModal({
   onConfirm,
   onCancel,
 }: {
-  card: DemoCard | null;
+  card: CardDisplay | null;
   mode: 'place' | 'open';
   onConfirm: () => void;
   onCancel: () => void;

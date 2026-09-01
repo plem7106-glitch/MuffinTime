@@ -216,4 +216,49 @@ export const TRAP_RULES_BATCH_1: Record<string, TrapRuleDefinition> = {
       return executeRandomSteal(state, targetId, frame.actorId, 3).state;
     },
   },
+
+  ...([
+    ['T11', ['A Robbery', 'นี่คือการปล้น!', 'โทรหาผู้เล่นคนอื่น หากเขารับสาย ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่รับสาย', 'steal']],
+    ['T13', ['Caught You', 'จับได้แล้ว!', 'หากผู้เล่นคนอื่นจับได้ว่าคุณกำลังโกหก ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ', 3, 'เลือกผู้เล่นที่จับได้ว่าคุณโกหก', 'steal']],
+    ['T14', ['What Time Is It?', 'กี่โมงแล้ว?', 'หากผู้เล่นคนอื่นถามเวลา ขโมยไพ่จากผู้เล่นคนนั้น 4 ใบ', 4, 'เลือกผู้เล่นที่ถามเวลา', 'steal']],
+    ['T15', ['Catch!', 'รับนะ!', 'หากผู้เล่นคนอื่นรับสิ่งของที่คุณโยนให้ได้ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่รับสิ่งของ', 'discard']],
+    ['T16', ['Do a Book', 'เปิดตำราหน่อย', 'หากผู้เล่นคนอื่นเปิดดูกฎของเกม ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่เปิดดูกฎ', 'discard']],
+    ['T17', ['We There Yet?', 'ยังไม่จบอีกเหรอ?', 'หากผู้เล่นคนอื่นบ่นว่าเกมใช้เวลานานเกินไป ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ', 3, 'เลือกผู้เล่นที่บ่นว่าเกมนานเกินไป', 'steal']],
+    ['T18', ['Crybaby', 'ขี้บ่น', 'หากผู้เล่นคนอื่นบ่น ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ', 3, 'เลือกผู้เล่นที่บ่น', 'steal']],
+    ['T19', ['Who Ate This?', 'ใครกินเนี่ย?', 'หากผู้เล่นคนอื่นกินอาหาร ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ', 3, 'เลือกผู้เล่นที่กินอาหาร', 'steal']],
+    ['T20', ['Farting Butt', 'ก้นตด', 'หากผู้เล่นคนอื่นตด เรอ ไอ หรือจาม ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ', 3, 'เลือกผู้เล่นที่ทำพฤติกรรมตามการ์ด', 'steal']],
+  ].reduce((rules, [code, values]) => {
+    const [name_en, name_th, description_th, count, targetPrompt, effect] = values as string[];
+    rules[code as string] = {
+      code: code as string, name_en, name_th, mode: 'manual_honor', description_th,
+      needsTargetSelection: true, targetPrompt,
+      resolveAffectedPlayers: (_state: any, _ownerId: string, triggerPlayerIds: string[]) => triggerPlayerIds,
+      executeEffect: (state: any, frame: any) => {
+        const targets = frame.affectedPlayerIds ?? frame.targetIds;
+        let next = state;
+        for (const targetId of targets) {
+          const result = effect === 'discard'
+            ? executeDiscard(next, targetId, Number(count))
+            : executeRandomSteal(next, targetId, frame.actorId, Number(count));
+          next = result.state;
+        }
+        return next;
+      },
+    };
+    return rules;
+  }, {} as Record<string, TrapRuleDefinition>)),
+
+  T12: {
+    code: 'T12', name_en: 'Gullible', name_th: 'หลอกง่ายจัง', mode: 'manual_honor',
+    description_th: 'สร้างสิ่งเบี่ยงเบนความสนใจ แล้วขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่คุณหลอกสำเร็จ',
+    needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นทุกคนที่คุณหลอกสำเร็จ',
+    resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+    executeEffect: (state, frame) => {
+      let next = state;
+      for (const targetId of frame.affectedPlayerIds ?? frame.targetIds) {
+        next = executeRandomSteal(next, targetId, frame.actorId, 1).state;
+      }
+      return next;
+    },
+  },
 };

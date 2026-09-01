@@ -5,6 +5,7 @@ import {
   declareMuffinTime,
   checkWinnerAtTurnStart,
   clearMuffinTimeDeclaration,
+  emergencyForceSkipTurn,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -66,6 +67,31 @@ describe('advanceTurn', () => {
     expect(next.players.p1.skipNextTurn).toBe(false);
     expect(next.players.p2.skipNextTurn).toBe(false);
     expect(next.players.p3.skipNextTurn).toBe(false);
+  });
+});
+
+describe('emergencyForceSkipTurn', () => {
+  it('advances exactly one player in reverse direction, even when the next player is flagged', () => {
+    const state = {
+      status: 'playing',
+      turnOrder: ['p1', 'p2', 'p3'],
+      seatOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: -1,
+      players: {
+        p1: { hand: [], traps: [], skipNextTurn: false },
+        p2: { hand: [], traps: [], skipNextTurn: false },
+        p3: { hand: [], traps: [], skipNextTurn: true },
+      },
+      drawPile: [],
+      discardPile: [],
+      reactionStack: [],
+    } as unknown as RoomState;
+
+    const next = emergencyForceSkipTurn(state);
+    expect(next.currentTurnIndex).toBe(2);
+    expect(next.turnPhase).toBe('trap_placement');
+    expect(next.players.p3.skipNextTurn).toBe(true);
   });
 });
 

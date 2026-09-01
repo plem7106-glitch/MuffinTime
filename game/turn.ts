@@ -128,11 +128,20 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
   next.pendingResponse = null;
   next.pendingInteraction = null;
   next.lastResult = null;
+  next.isShufflingDrawPile = false;
 
   // Increment sequence number to invalidate any stale scheduled bot timers/callbacks
   next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
 
-  // Advance turn exactly once
-  return advanceTurn(next);
+  // Emergency recovery advances exactly one real turn-order position and ignores
+  // normal skip flags so a recovery can never skip more than one player.
+  const order = next.turnOrder.length > 0 ? next.turnOrder : (next.seatOrder ?? []);
+  if (order.length === 0) return next;
+  const dir = next.direction ?? (next.playDirection === 'counterclockwise' ? -1 : 1);
+  next.currentTurnIndex = getNextPlayerIndex(order.length, next.currentTurnIndex, dir);
+  next.turnPhase = 'trap_placement';
+  const activePlayerId = order[next.currentTurnIndex];
+  if (next.players[activePlayerId]) next.players[activePlayerId].placedTrapThisTurn = false;
+  return next;
 }
 

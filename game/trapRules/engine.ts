@@ -86,11 +86,10 @@ export function activateManualTrap(
   }
 
   const rule = getTrapRule(trapCode);
+  if (!rule) return cloneState(state);
   const triggerPlayerIds = targetPlayerIds;
-  const affectedPlayerIds = rule
-    ? rule.resolveAffectedPlayers(state, ownerId, triggerPlayerIds)
-    : triggerPlayerIds;
-  const eligibleResponderIds = rule?.resolveEligibleResponders
+  const affectedPlayerIds = rule.resolveAffectedPlayers(state, ownerId, triggerPlayerIds);
+  const eligibleResponderIds = rule.resolveEligibleResponders
     ? rule.resolveEligibleResponders(state, ownerId, affectedPlayerIds, triggerPlayerIds)
     : affectedPlayerIds.filter((id) => id !== ownerId);
 
@@ -173,12 +172,11 @@ export function respondToTrapInteraction(
   const ownerId = interaction.initiatorId;
   const trapCode = interaction.sourceCardCode;
   const rule = getTrapRule(trapCode);
+  if (!rule) return cloneState(state);
 
   const triggerPlayerIds = [responderId];
-  const affectedPlayerIds = rule
-    ? rule.resolveAffectedPlayers(next, ownerId, triggerPlayerIds)
-    : triggerPlayerIds;
-  const eligibleResponderIds = rule?.resolveEligibleResponders
+  const affectedPlayerIds = rule.resolveAffectedPlayers(next, ownerId, triggerPlayerIds);
+  const eligibleResponderIds = rule.resolveEligibleResponders
     ? rule.resolveEligibleResponders(next, ownerId, affectedPlayerIds, triggerPlayerIds)
     : affectedPlayerIds.filter((id) => id !== ownerId);
 

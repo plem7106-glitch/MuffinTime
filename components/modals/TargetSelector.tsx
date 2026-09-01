@@ -7,6 +7,8 @@ export function TargetSelector({
   open,
   candidates,
   selectedId,
+  selectedIds,
+  multiSelect = false,
   onSelect,
   onConfirm,
   onCancel,
@@ -15,6 +17,8 @@ export function TargetSelector({
   open: boolean;
   candidates: Array<{ id: PlayerId; player: PlayerState }>;
   selectedId: PlayerId | null;
+  selectedIds?: PlayerId[];
+  multiSelect?: boolean;
   onSelect: (id: PlayerId) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -31,17 +35,17 @@ export function TargetSelector({
               key={id}
               onClick={() => onSelect(id)}
               className={`flex items-center gap-2 rounded-card border p-2 text-left ${
-                selectedId === id ? 'border-primary bg-primary/10' : 'border-ink/20'
+                (multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'border-primary bg-primary/10' : 'border-ink/20'
               }`}
             >
               <span className={selectedId === id ? 'text-primary' : 'text-ink-secondary'}>
-                {selectedId === id ? '●' : '○'}
+                {(multiSelect ? selectedIds?.includes(id) : selectedId === id) ? '●' : '○'}
               </span>
               <span className="font-semibold text-ink">{player.name}</span>
             </button>
           ))}
         </div>
-        <PrimaryButton disabled={!selectedId} onClick={onConfirm}>
+        <PrimaryButton disabled={multiSelect ? !(selectedIds && selectedIds.length > 0) : !selectedId} onClick={onConfirm}>
           ยืนยัน
         </PrimaryButton>
         <SecondaryButton onClick={onCancel}>ยกเลิก</SecondaryButton>

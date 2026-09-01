@@ -1,5 +1,5 @@
 import { Card } from './Card';
-import { getDemoCard } from '../../lib/demoCards';
+import { getCardDisplay } from '../../data/cards/display';
 import type { CardCode } from '../../game/types';
 
 export function CardHand({
@@ -17,7 +17,7 @@ export function CardHand({
       style={{ scrollSnapType: 'x proximity' }}
     >
       {hand.map((code, i) => {
-        const card = getDemoCard(code);
+        const card = getCardDisplay(code);
         return (
           <div key={`${code}-${i}`} style={{ scrollSnapAlign: 'start' }}>
             <Card

@@ -24,6 +24,9 @@ export function getCardById(id: string): Card | undefined {
   return cardsById.get(id);
 }
 
+/** Runtime-safe canonical metadata lookup for every card in the deck. */
+export const getCardByCode = getCardById;
+
 export function getCardsByType(type: CardType): Card[] {
   switch (type) {
     case 'action':
@@ -60,4 +63,3 @@ export function getAdjacentCards(cardOrId: Card | string): AdjacentCards {
     total: list.length,
   };
 }
-

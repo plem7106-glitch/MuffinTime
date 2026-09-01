@@ -27,7 +27,7 @@ export function GameSettingsModal({
   isShuffleDisabled = false,
   shuffleDisabledReason,
   onOpenManualFinish,
-  onHostUnstick,
+  onOpenHostUnstick,
   hostUnstickLabel,
 }: {
   isOpen: boolean;
@@ -38,7 +38,7 @@ export function GameSettingsModal({
   isShuffleDisabled?: boolean;
   shuffleDisabledReason?: string;
   onOpenManualFinish?: () => void;
-  onHostUnstick?: () => void;
+  onOpenHostUnstick?: () => void;
   hostUnstickLabel?: string;
 }) {
 
@@ -210,14 +210,14 @@ export function GameSettingsModal({
           )}
 
           {/* 5.5. Host-only: Unstick a hung turn / response window (e.g. a player left mid-game) */}
-          {isHost && onHostUnstick && (
+          {isHost && onOpenHostUnstick && (
             <>
               <div className="my-1 border-t border-gray-100 pt-2" />
               <button
                 type="button"
                 onClick={() => {
                   onClose();
-                  onHostUnstick();
+                  onOpenHostUnstick();
                 }}
                 className="flex min-h-[44px] w-full items-center justify-between rounded-2xl border border-gray-200 bg-gray-50/70 px-3.5 text-xs font-bold text-ink-secondary hover:bg-gray-100 transition-colors active:scale-[0.98]"
               >

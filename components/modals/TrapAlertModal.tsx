@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAudio } from '../../lib/audio';
 import { Card } from '../card/Card';
 import { getCardById } from '../../data/cards/index';
-import { getDemoCard } from '../../lib/demoCards';
+import { getCardDisplay } from '../../data/cards/display';
 import { WarningIcon, ShieldIcon, CloseIcon } from '../ui/Icons';
 import type { CardCode, PlayerId } from '../../game/types';
 
@@ -40,7 +40,7 @@ export function TrapAlertModal({
     const fromDb = getCardById(trapCode);
     if (fromDb) return fromDb;
     try {
-      const demo = getDemoCard(trapCode);
+      const demo = getCardDisplay(trapCode);
       return {
         id: demo.code,
         number: 0,
@@ -231,7 +231,7 @@ export function TrapAlertModal({
           <div className="flex items-center gap-3 overflow-x-auto py-2 px-1 justify-center">
             {counterCards.map((code, idx) => {
               const fullCounter = getCardById(code);
-              const demo = fullCounter ? null : getDemoCard(code);
+              const demo = fullCounter ? null : getCardDisplay(code);
               const cardProps = fullCounter
                 ? {
                     card: fullCounter,

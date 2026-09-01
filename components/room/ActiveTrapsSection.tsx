@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import type { CardCode } from '../../game/types';
 import { getCardById } from '../../data/cards/index';
-import { getDemoCard } from '../../lib/demoCards';
 import { TrapIcon, PlusIcon } from '../ui/Icons';
 
 export function ActiveTrapsSection({
@@ -52,20 +51,8 @@ export function ActiveTrapsSection({
           // 1. Placed Trap Card (Preserves 2:3 portrait aspect ratio with real card artwork)
           if (code) {
             const cardData = getCardById(code);
-            const title = cardData?.name_th ?? (function () {
-              try {
-                return getDemoCard(code).th;
-              } catch {
-                return code;
-              }
-            })();
-            const description = cardData?.description_th ?? (function () {
-              try {
-                return getDemoCard(code).effect;
-              } catch {
-                return '';
-              }
-            })();
+            const title = cardData?.name_th ?? code;
+            const description = cardData?.description_th ?? '';
             const image = cardData?.image;
             const hasImageError = imageErrors[code];
 
