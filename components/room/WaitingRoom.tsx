@@ -33,41 +33,16 @@ const AVATAR_COLORS = [
 
 export function WaitingRoom() {
   const router = useRouter();
-  const { activeRoom, myPlayerId, joinNextBot, leaveRoom, startSetup } = useGameSession();
+  const { activeRoom, myPlayerId, leaveRoom, startSetup } = useGameSession();
   const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx, playGameStart } = useAudio();
   const [copied, setCopied] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStartingTransition, setIsStartingTransition] = useState(false);
 
-  // Prototype bot auto-join timer
-  useEffect(() => {
-    if (!activeRoom) return;
-    const currentCount = Object.keys(activeRoom.state.players).length;
-    if (currentCount >= activeRoom.maxPlayers) return;
-    const timer = setTimeout(() => joinNextBot(), 1200);
-    return () => clearTimeout(timer);
-  }, [activeRoom, joinNextBot]);
-
-  // If host is a bot, auto-start when full
-  useEffect(() => {
-    if (!activeRoom) return;
-    const currentCount = Object.keys(activeRoom.state.players).length;
-    if (currentCount < activeRoom.maxPlayers) return;
-    if (!activeRoom.state.hostId.startsWith('bot-')) return;
-    if (isStartingTransition) return;
-    const timer = setTimeout(() => {
-      setIsStartingTransition(true);
-      playGameStart();
-      setTimeout(() => {
-        startSetup();
-      }, 2000);
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [activeRoom, startSetup, playGameStart, isStartingTransition]);
-
   if (!activeRoom) return null;
 
-  const { state, maxPlayers, code } = activeRoom;
+  const { state, code } = activeRoom;
+  const maxPlayers = state.maxPlayers ?? 15;
   const isHost = myPlayerId === state.hostId;
   const playerIds = Object.keys(state.players);
   const playerCount = playerIds.length;
