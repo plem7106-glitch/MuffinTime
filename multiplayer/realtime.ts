@@ -4,7 +4,8 @@ import type { RoomState } from '../game/types';
 export function subscribeToRoom(
   client: SupabaseClient,
   code: string,
-  onStateChange: (state: RoomState) => void
+  onStateChange: (state: RoomState) => void,
+  onStatusChange?: (status: string, err?: Error) => void
 ): RealtimeChannel {
   return client
     .channel(`room:${code}`)
@@ -15,7 +16,9 @@ export function subscribeToRoom(
         onStateChange(payload.new.state);
       }
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      onStatusChange?.(status, err);
+    });
 }
 
 export function unsubscribeFromRoom(channel: RealtimeChannel): Promise<'ok' | 'timed out' | 'error'> {

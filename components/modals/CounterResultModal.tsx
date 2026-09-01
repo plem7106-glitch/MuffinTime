@@ -1,7 +1,7 @@
 import { BottomSheet } from '../ui/BottomSheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { getDemoCard } from '../../lib/demoCards';
-import type { LastResult } from '../../lib/session';
+import type { LastResult } from '../../game/types';
 
 export function CounterResultModal({
   result,

@@ -18,6 +18,8 @@ export default function CreateRoomPage() {
   const { user, loading } = useAuth();
   const { createRoom } = useGameSession();
   const [maxPlayers, setMaxPlayers] = useState(3);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -25,11 +27,18 @@ export default function CreateRoomPage() {
     }
   }, [loading, user, router, pathname]);
 
-  function handleSubmit(e?: React.FormEvent) {
+  async function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (!user) return;
-    const code = createRoom(maxPlayers);
-    router.push(`/room/${code}`);
+    if (!user || isCreating) return;
+    setIsCreating(true);
+    setCreateError('');
+    try {
+      const code = await createRoom(maxPlayers);
+      router.push(`/room/${code}`);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'สร้างห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
+      setIsCreating(false);
+    }
   }
 
   if (loading || !user) return null;
@@ -147,12 +156,19 @@ export default function CreateRoomPage() {
           </div>
         </div>
 
+        {createError && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-bold text-red-600">
+            {createError}
+          </div>
+        )}
+
         <button
           type="submit"
-          className="mt-auto flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-base font-black text-white shadow-[0_6px_18px_rgba(237,31,79,0.3)] transition-all hover:bg-primary/90 active:scale-[0.98]"
+          disabled={isCreating}
+          className="mt-auto flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-base font-black text-white shadow-[0_6px_18px_rgba(237,31,79,0.3)] transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
-          <span>สร้างห้อง</span>
+          <span>{isCreating ? 'กำลังสร้างห้อง...' : 'สร้างห้อง'}</span>
         </button>
       </form>
     </main>

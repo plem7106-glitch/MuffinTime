@@ -3,6 +3,25 @@ export type CardCode = string;
 export type Rng = () => number;
 export type PlayDirection = 'clockwise' | 'counterclockwise';
 
+export interface PendingResponse {
+  responseId: string;
+  kind: 'action' | 'trap';
+  code: CardCode;
+  actorId: PlayerId;
+  targetId?: PlayerId;
+}
+
+export interface LastResult {
+  responseId?: string;
+  kind: 'action' | 'trap';
+  code: CardCode;
+  actorId: PlayerId;
+  targetId?: PlayerId;
+  countered: boolean;
+  counteredBy?: PlayerId;
+  counterCode?: CardCode;
+}
+
 export interface PlayerState {
   name: string;
   hand: CardCode[];
@@ -33,6 +52,8 @@ export interface RoomState {
   isShufflingDrawPile?: boolean;
   shuffleSequence?: number;
   roundNumber?: number;
+  pendingResponse?: PendingResponse | null;
+  lastResult?: LastResult | null;
 }
 
 

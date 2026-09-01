@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchRoom, writeRoomState, updateRoomWithRetry } from './room';
+import { fetchRoom, writeRoomState, updateRoomWithRetry, makeRoomCode, insertRoom, createRoomWithRetry } from './room';
 import type { RoomState } from '../game/types';
 
 function fakeClient({
@@ -103,5 +103,77 @@ describe('updateRoomWithRetry', () => {
     await expect(
       updateRoomWithRetry(client, 'ABCD', (s) => s, 3)
     ).rejects.toThrow(/failed to write after 3 attempts/);
+  });
+});
+
+function fakeInsertClient({
+  insertResults,
+}: {
+  insertResults: Array<{ error: { code?: string; message: string } | null }>;
+}): SupabaseClient {
+  let insertCall = 0;
+  return {
+    from: () => ({
+      insert: async () => insertResults[insertCall++],
+    }),
+  } as unknown as SupabaseClient;
+}
+
+describe('makeRoomCode', () => {
+  it('generates a 4-character code from the confusable-free charset', () => {
+    const code = makeRoomCode(() => 0);
+    expect(code).toHaveLength(4);
+    expect(code).not.toMatch(/[01OI]/);
+  });
+
+  it('is deterministic for a fixed rng', () => {
+    const code = makeRoomCode(() => 0.5);
+    expect(makeRoomCode(() => 0.5)).toBe(code);
+  });
+});
+
+describe('insertRoom', () => {
+  it('returns true when the insert succeeds', async () => {
+    const client = fakeInsertClient({ insertResults: [{ error: null }] });
+    const ok = await insertRoom(client, 'ABCD', { status: 'lobby' } as unknown as RoomState);
+    expect(ok).toBe(true);
+  });
+
+  it('returns false on a unique-violation (code already taken)', async () => {
+    const client = fakeInsertClient({ insertResults: [{ error: { code: '23505', message: 'duplicate key' } }] });
+    const ok = await insertRoom(client, 'ABCD', { status: 'lobby' } as unknown as RoomState);
+    expect(ok).toBe(false);
+  });
+
+  it('throws on any other error', async () => {
+    const client = fakeInsertClient({ insertResults: [{ error: { message: 'network down' } }] });
+    await expect(insertRoom(client, 'ABCD', { status: 'lobby' } as unknown as RoomState)).rejects.toThrow(/network down/);
+  });
+});
+
+describe('createRoomWithRetry', () => {
+  it('returns the code and state on the first successful insert', async () => {
+    const client = fakeInsertClient({ insertResults: [{ error: null }] });
+    const { code, state } = await createRoomWithRetry(client, 'host-1', 'Bank', 4, 5, () => 0);
+    expect(code).toHaveLength(4);
+    expect(state.hostId).toBe('host-1');
+    expect(state.players['host-1'].name).toBe('Bank');
+  });
+
+  it('retries with a new code after a collision', async () => {
+    const client = fakeInsertClient({
+      insertResults: [{ error: { code: '23505', message: 'duplicate key' } }, { error: null }],
+    });
+    const { state } = await createRoomWithRetry(client, 'host-1', 'Bank', 4, 5, () => 0);
+    expect(state.hostId).toBe('host-1');
+  });
+
+  it('throws after exhausting maxAttempts', async () => {
+    const client = fakeInsertClient({
+      insertResults: Array(3).fill({ error: { code: '23505', message: 'duplicate key' } }),
+    });
+    await expect(createRoomWithRetry(client, 'host-1', 'Bank', 4, 3, () => 0)).rejects.toThrow(
+      /failed to find an unused room code/
+    );
   });
 });
