@@ -141,3 +141,163 @@ describe('Family B/C batch (via resolveActionEffect)', () => {
     expect(next.discardPile).toEqual(['H1']);
   });
 });
+
+describe('Family D batch (via resolveActionEffect)', () => {
+  it.each([
+    ['A077', 1],
+    ['A112', 2],
+    ['A141', 1],
+    ['A144', 2],
+    ['A051', 1],
+    ['A120', 1],
+  ])('%s steals %i card(s) from the target to the actor', (code, n) => {
+    const next = resolveActionEffect(threePlayerState(), code, 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(1 + n);
+    expect(next.players.p2.hand.length).toBe(3 - n);
+  });
+
+  it('A029 steals 4 (clamped to what the target actually has) to the actor', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e'];
+    const next = resolveActionEffect(state, 'A029', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(5);
+    expect(next.players.p2.hand.length).toBe(1);
+  });
+
+  it('A052 draws the actor 3 and the target 3', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A052', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(4);
+    expect(next.players.p2.hand.length).toBe(6);
+  });
+
+  it('A124 draws only the target 5', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A124', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(1);
+    expect(next.players.p2.hand.length).toBe(8);
+  });
+
+  it('A140 draws both the actor and target 2', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A140', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(5);
+  });
+
+  it.each([
+    ['A038', 3],
+    ['A039', 5],
+  ])('%s discards %i from the target only', (code, n) => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const next = resolveActionEffect(state, code, 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(6 - n);
+    expect(next.players.me.hand.length).toBe(1);
+  });
+
+  it('A041 discards 3 from both the actor and target', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b', 'c', 'd'];
+    state.players.p2.hand = ['e', 'f', 'g', 'h'];
+    const next = resolveActionEffect(state, 'A041', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(1);
+    expect(next.players.p2.hand.length).toBe(1);
+  });
+
+  it('A045 discards the target\'s whole hand then draws them 3 new', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A045', 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.discardPile).toEqual(expect.arrayContaining(['H2', 'H3', 'H4']));
+  });
+
+  it('A093 discards only Action-type cards from the target', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['A001', 'T01', 'A002'];
+    const next = resolveActionEffect(state, 'A093', 'me', 'p2');
+    expect(next.players.p2.hand).toEqual(['T01']);
+  });
+
+  it('A123 discards only Counter-type cards from the target', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['C09', 'T01', 'A002'];
+    const next = resolveActionEffect(state, 'A123', 'me', 'p2');
+    expect(next.players.p2.hand).toEqual(expect.arrayContaining(['T01', 'A002']));
+    expect(next.players.p2.hand).not.toContain('C09');
+  });
+
+  it.each(['A018', 'A047'])('%s flags the target to skip their next turn', (code) => {
+    const next = resolveActionEffect(threePlayerState(), code, 'me', 'p2');
+    expect(next.players.p2.skipNextTurn).toBe(true);
+    expect(next.players.me.skipNextTurn).toBe(false);
+  });
+
+  it('A060 transfers the actor\'s whole hand to the target', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b'];
+    const next = resolveActionEffect(state, 'A060', 'me', 'p2');
+    expect(next.players.me.hand).toEqual([]);
+    expect(next.players.p2.hand).toEqual(expect.arrayContaining(['a', 'b', 'H2', 'H3', 'H4']));
+  });
+
+  it('A079 gives 1 random card from the actor to the target', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A079', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(0);
+    expect(next.players.p2.hand.length).toBe(4);
+  });
+
+  it('A082 draws the actor 2 then gives 1 to the target', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A082', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(2);
+    expect(next.players.p2.hand.length).toBe(4);
+  });
+
+  it('A107 gives 2 cards from the actor to the target', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A107', 'me', 'p2');
+    expect(next.players.me.hand.length).toBe(0);
+    expect(next.players.p2.hand.length).toBe(4);
+  });
+
+  it('A049 hands this card off to the next player in turn order (no target)', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A049'];
+    const next = resolveActionEffect(state, 'A049', 'me');
+    expect(next.discardPile).toEqual([]);
+    expect(next.players.p2.hand).toEqual(expect.arrayContaining(['A049']));
+  });
+
+  it('A078 hands this card off to the chosen target', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A078'];
+    const next = resolveActionEffect(state, 'A078', 'me', 'p3');
+    expect(next.discardPile).toEqual([]);
+    expect(next.players.p3.hand).toEqual(expect.arrayContaining(['A078']));
+  });
+
+  it('A125 hands this card off to the target, then steals 1 back', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A125'];
+    const next = resolveActionEffect(state, 'A125', 'me', 'p2');
+    expect(next.players.p2.hand).toContain('A125');
+    expect(next.players.p2.hand.length).toBe(3); // gained A125, lost 1 stolen
+    expect(next.players.me.hand.length).toBe(2);
+  });
+
+  it('A164 hands this card off to the next player (no target)', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A164'];
+    const next = resolveActionEffect(state, 'A164', 'me');
+    expect(next.players.p2.hand).toEqual(expect.arrayContaining(['A164']));
+  });
+
+  it('is a no-op for target-only Family D cards when no target is given', () => {
+    // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
+    // have an unconditional self-effect even without a target).
+    const targeted = [
+      'A029', 'A077', 'A112', 'A141', 'A144', 'A051', 'A120', 'A124',
+      'A038', 'A039', 'A045', 'A093', 'A123', 'A018', 'A047', 'A060', 'A079',
+      'A107', 'A078', 'A125',
+    ];
+    for (const code of targeted) {
+      const state = threePlayerState();
+      expect(resolveActionEffect(state, code, 'me')).toEqual(state);
+    }
+  });
+});
