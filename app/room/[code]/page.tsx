@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useGameSession } from '../../../lib/session';
 import { useAuth } from '../../../lib/auth';
