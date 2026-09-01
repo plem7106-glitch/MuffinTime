@@ -15,6 +15,7 @@ import { draw, discard, balancedShuffleDrawPile } from '../game/pile';
 import { placeTrap as enginePlaceTrap, removeTrap } from '../game/trap';
 import { advanceTurn, checkWinnerAtTurnStart, declareMuffinTime as engineDeclareMuffinTime } from '../game/turn';
 import type { RoomState, PlayerId, CardCode, PlayDirection } from '../game/types';
+import { useAuth } from './auth';
 
 import { buildDemoDeck, demoCardsOfType, resolveActionCard, resolveTrapCard, resolveCounterCard, getValidCounterCards } from './demoCards';
 
@@ -62,8 +63,8 @@ interface SessionState {
 }
 
 type Action =
-  | { type: 'CREATE_ROOM'; code: string; hostName: string; maxPlayers: number }
-  | { type: 'JOIN_ROOM'; code: string; name: string }
+  | { type: 'CREATE_ROOM'; code: string; hostId: PlayerId; hostName: string; maxPlayers: number }
+  | { type: 'JOIN_ROOM'; code: string; playerId: PlayerId; name: string }
   | { type: 'JOIN_BOT' }
   | { type: 'LEAVE_ROOM' }
   | { type: 'START_SETUP' }
@@ -131,10 +132,10 @@ function advanceAndCheckWin(room: RoomState): RoomState {
 function reducer(state: SessionState, action: Action): SessionState {
   switch (action.type) {
     case 'CREATE_ROOM': {
-      const roomState = engineCreateRoom('me', action.hostName, action.maxPlayers);
+      const roomState = engineCreateRoom(action.hostId, action.hostName, action.maxPlayers);
       return {
         ...state,
-        myPlayerId: 'me',
+        myPlayerId: action.hostId,
         activeRoom: { code: action.code, state: roomState, maxPlayers: roomState.maxPlayers ?? action.maxPlayers },
         pendingResponse: null,
       };
@@ -149,10 +150,10 @@ function reducer(state: SessionState, action: Action): SessionState {
         for (let i = 1; i <= existingOthers; i++) {
           roomState = addPlayer(roomState, `bot-${i}`, BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length]);
         }
-        roomState = addPlayer(roomState, 'me', action.name);
+        roomState = addPlayer(roomState, action.playerId, action.name);
         return {
           ...state,
-          myPlayerId: 'me',
+          myPlayerId: action.playerId,
           activeRoom: { code: action.code, state: roomState, maxPlayers },
           pendingResponse: null,
         };
@@ -382,8 +383,8 @@ export interface GameSessionValue {
   pendingResponse: PendingResponse | null;
   lastResult: LastResult | null;
   clearLastResult: () => void;
-  createRoom: (hostName: string, maxPlayers: number) => string;
-  joinRoom: (code: string, name: string) => void;
+  createRoom: (maxPlayers: number) => string;
+  joinRoom: (code: string) => void;
   joinNextBot: () => void;
   leaveRoom: () => void;
   startSetup: () => void;
@@ -415,15 +416,24 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     pendingResponse: null,
     lastResult: null,
   });
+  const { user } = useAuth();
 
-  const createRoomFn = useCallback((hostName: string, maxPlayers: number) => {
-    const code = makeRoomCode();
-    dispatch({ type: 'CREATE_ROOM', code, hostName, maxPlayers });
-    return code;
-  }, []);
-  const joinRoomFn = useCallback((code: string, name: string) => {
-    dispatch({ type: 'JOIN_ROOM', code, name });
-  }, []);
+  const createRoomFn = useCallback(
+    (maxPlayers: number) => {
+      if (!user) throw new Error('ต้องเข้าสู่ระบบก่อนสร้างห้อง');
+      const code = makeRoomCode();
+      dispatch({ type: 'CREATE_ROOM', code, hostId: user.id, hostName: user.name, maxPlayers });
+      return code;
+    },
+    [user]
+  );
+  const joinRoomFn = useCallback(
+    (code: string) => {
+      if (!user) throw new Error('ต้องเข้าสู่ระบบก่อนเข้าร่วมห้อง');
+      dispatch({ type: 'JOIN_ROOM', code, playerId: user.id, name: user.name });
+    },
+    [user]
+  );
   const joinNextBot = useCallback(() => dispatch({ type: 'JOIN_BOT' }), []);
   const leaveRoom = useCallback(() => dispatch({ type: 'LEAVE_ROOM' }), []);
   const startSetupFn = useCallback(() => dispatch({ type: 'START_SETUP' }), []);

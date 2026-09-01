@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import { useGameSession } from '../../../lib/session';
+import { useAuth } from '../../../lib/auth';
 import {
   ChevronLeftIcon,
-  UserIcon,
   InfoIcon,
   EnterDoorIcon,
   UsersIcon,
@@ -14,25 +14,31 @@ import {
 
 export default function JoinRoomPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams<{ code: string }>();
   const roomCode = params.code || '';
+  const { user, loading } = useAuth();
   const { rooms, joinRoom } = useGameSession();
-  const [name, setName] = useState('');
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    }
+  }, [loading, user, router, pathname]);
 
   const summary = rooms.find((r) => r.code === roomCode);
   const isFull = summary ? summary.currentPlayers >= summary.maxPlayers : false;
 
-  function handleSubmit(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName || !summary || isFull) return;
-    joinRoom(roomCode, trimmedName);
+  function handleJoin() {
+    if (!user || !summary || isFull) return;
+    joinRoom(roomCode);
     router.push(`/room/${roomCode}`);
   }
 
+  if (loading || !user) return null;
+
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3.5 p-4 pb-8 bg-white">
-      {/* 1. Header */}
       <header className="flex items-center justify-between py-0.5">
         <Link
           href="/"
@@ -45,9 +51,7 @@ export default function JoinRoomPage() {
         <div className="w-10" aria-hidden="true" />
       </header>
 
-      {/* 2. Hero Section */}
       <section className="flex items-center justify-between gap-3 py-1">
-        {/* Left: Headline */}
         <div className="flex flex-col text-left flex-1 min-w-0">
           <h2 className="text-2xl font-black text-ink leading-tight">
             <span className="text-primary font-black">เข้าห้อง</span>เพื่อน
@@ -55,11 +59,10 @@ export default function JoinRoomPage() {
             เริ่มความป่วนกันเลย!
           </h2>
           <p className="text-xs font-medium text-ink-secondary leading-snug mt-1.5">
-            กรอกชื่อของคุณเพื่อเข้าร่วมห้อง
+            สวัสดี {user.name} — กดเข้าร่วมได้เลย
           </p>
         </div>
 
-        {/* Right: Mascot holding smartphone */}
         <div className="flex w-32 shrink-0 items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -70,7 +73,6 @@ export default function JoinRoomPage() {
         </div>
       </section>
 
-      {/* 3. Room Information Card */}
       {summary ? (
         <section className="flex flex-col gap-1.5">
           <span className="text-xs font-bold text-ink-secondary px-0.5">
@@ -89,17 +91,11 @@ export default function JoinRoomPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {/* Room Code */}
               <div className="flex flex-col gap-0.5 rounded-xl bg-primary/5 p-2.5 border border-primary/10">
-                <span className="text-[10px] font-bold text-ink-secondary">
-                  รหัสห้อง
-                </span>
-                <span className="font-mono text-base font-black text-primary">
-                  {roomCode}
-                </span>
+                <span className="text-[10px] font-bold text-ink-secondary">รหัสห้อง</span>
+                <span className="font-mono text-base font-black text-primary">{roomCode}</span>
               </div>
 
-              {/* Player Count */}
               <div className="flex flex-col gap-0.5 rounded-xl bg-gray-50 p-2.5 border border-gray-100">
                 <span className="text-[10px] font-bold text-ink-secondary flex items-center gap-1">
                   <UsersIcon className="h-3 w-3 text-ink-secondary" />
@@ -128,76 +124,48 @@ export default function JoinRoomPage() {
         </div>
       )}
 
-      {/* Form Area */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 flex-1">
-        {/* 4. Player Name Field */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1.5 text-primary">
-            <UserIcon className="h-4 w-4" />
-            <label htmlFor="playerName" className="text-sm font-bold text-ink">
-              ชื่อของคุณ
-            </label>
+      <div className="rounded-2xl border border-[#FFE4E8] bg-[#FFF5F7] p-3.5 flex items-center justify-between gap-2 mt-auto">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 text-primary mb-0.5">
+            <InfoIcon className="h-4 w-4 shrink-0" />
+            <span className="text-xs font-bold text-ink">เคล็ดลับ</span>
           </div>
-          <input
-            id="playerName"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="กรอกชื่อของคุณ"
-            maxLength={20}
-            disabled={!summary || isFull}
-            className="w-full min-h-[50px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 placeholder:font-normal shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+
+          <ul className="flex flex-col gap-1 text-[11px] text-ink-secondary leading-snug">
+            <li className="flex items-start gap-1">
+              <span className="text-primary font-bold">•</span>
+              <span>ตรวจสอบรหัสห้องให้ถูกต้อง</span>
+            </li>
+            <li className="flex items-start gap-1">
+              <span className="text-primary font-bold">•</span>
+              <span>หากเข้าห้องไม่ได้ ลองให้เจ้าของห้องสร้างใหม่</span>
+            </li>
+            <li className="flex items-start gap-1">
+              <span className="text-primary font-bold">•</span>
+              <span>เชื่อมต่ออินเทอร์เน็ตที่เสถียรเพื่อประสบการณ์ที่ดีที่สุด</span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/join-room/tips-muffin.jpg"
+            alt="Muffin tips mascot"
+            className="h-16 w-16 object-contain drop-shadow-xs"
           />
-          <p className="text-[11px] text-ink-secondary px-0.5">
-            ชื่อที่แสดงให้เพื่อนในห้องเห็น
-          </p>
         </div>
+      </div>
 
-        {/* 5. Tips Panel */}
-        <div className="rounded-2xl border border-[#FFE4E8] bg-[#FFF5F7] p-3.5 flex items-center justify-between gap-2">
-          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 text-primary mb-0.5">
-              <InfoIcon className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-bold text-ink">เคล็ดลับ</span>
-            </div>
-
-            <ul className="flex flex-col gap-1 text-[11px] text-ink-secondary leading-snug">
-              <li className="flex items-start gap-1">
-                <span className="text-primary font-bold">•</span>
-                <span>ตรวจสอบรหัสห้องให้ถูกต้อง</span>
-              </li>
-              <li className="flex items-start gap-1">
-                <span className="text-primary font-bold">•</span>
-                <span>หากเข้าห้องไม่ได้ ลองให้เจ้าของห้องสร้างใหม่</span>
-              </li>
-              <li className="flex items-start gap-1">
-                <span className="text-primary font-bold">•</span>
-                <span>เชื่อมต่ออินเทอร์เน็ตที่เสถียรเพื่อประสบการณ์ที่ดีที่สุด</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Decorative Muffin Mascot */}
-          <div className="flex shrink-0 items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/join-room/tips-muffin.jpg"
-              alt="Muffin tips mascot"
-              className="h-16 w-16 object-contain drop-shadow-xs"
-            />
-          </div>
-        </div>
-
-        {/* 6. Bottom CTA: เข้าร่วมห้อง */}
-        <button
-          type="submit"
-          disabled={!name.trim() || !summary || isFull}
-          className="mt-auto flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-base font-black text-white shadow-[0_6px_18px_rgba(237,31,79,0.3)] transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-        >
-          <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
-          <span>เข้าร่วมห้อง</span>
-        </button>
-      </form>
+      <button
+        type="button"
+        onClick={handleJoin}
+        disabled={!summary || isFull}
+        className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-2xl bg-primary text-base font-black text-white shadow-[0_6px_18px_rgba(237,31,79,0.3)] transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+      >
+        <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
+        <span>เข้าร่วมห้อง</span>
+      </button>
     </main>
   );
 }
