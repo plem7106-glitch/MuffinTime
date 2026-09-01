@@ -68,6 +68,12 @@ export function advanceTurn(state: RoomState): RoomState {
   } while (attempts <= count);
 
   next.currentTurnIndex = index;
+  const activePlayerId = order[index];
+  if (next.players[activePlayerId]) {
+    next.players[activePlayerId].placedTrapThisTurn = false;
+  }
+  next.turnPhase = 'trap_placement';
+
   if (wrapped) {
     next.roundNumber = (next.roundNumber ?? 1) + 1;
   } else if (!next.roundNumber) {
@@ -101,5 +107,32 @@ export function clearMuffinTimeDeclaration(state: RoomState, playerId: PlayerId)
     next.players[playerId].hasCalledMuffinTime = false;
   }
   return next;
+}
+
+/**
+ * Emergency Force Skip Turn:
+ * Reliably recovers a stuck game in both Bot Mode and real multiplayer.
+ * - Safely clears active reaction stack frames and pending states without executing effects
+ * - Cancels pending target selection & interactions
+ * - Increments sequenceNumber to invalidate stale scheduled timers/callbacks
+ * - Does NOT execute unresolved card effects
+ * - Advances turn exactly once
+ * - Next player starts at 'trap_placement'
+ * - Preserves hands, deck, discard pile, active traps
+ */
+export function emergencyForceSkipTurn(state: RoomState): RoomState {
+  const next = cloneState(state);
+
+  // Safely clear any active reaction stack frames and pending states without executing effects
+  next.reactionStack = [];
+  next.pendingResponse = null;
+  next.pendingInteraction = null;
+  next.lastResult = null;
+
+  // Increment sequence number to invalidate any stale scheduled bot timers/callbacks
+  next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
+
+  // Advance turn exactly once
+  return advanceTurn(next);
 }
 

@@ -1,17 +1,65 @@
-import type { RoomState, PlayerId, CardCode, Rng } from '../game/types';
-import { demoCardsOfType } from './demoCards';
+import type { RoomState, PlayerId, CardCode, Rng, PendingResponse, PendingInteraction } from '../game/types';
+import { demoCardsOfType, getValidCounterCards } from './demoCards';
+import { getTrapRule } from '../game/trapRules/registry';
 
-export type BotDecision = { action: 'draw' } | { action: 'play'; code: CardCode; targetId?: PlayerId };
+export type BotDecision =
+  | { action: 'draw' }
+  | { action: 'play'; code: CardCode; targetId?: PlayerId };
 
-const PLAY_PROBABILITY = 0.4;
+export type BotTrapPlacementDecision =
+  | { action: 'place'; code: CardCode }
+  | { action: 'skip' };
 
-export function decideBotTurn(state: RoomState, botId: PlayerId, rng: Rng = Math.random): BotDecision {
+export type BotCounterDecision =
+  | { action: 'counter'; code: CardCode }
+  | { action: 'skip' };
+
+const ACTION_PLAY_PROBABILITY = 0.5;
+const TRAP_PLACE_PROBABILITY = 0.7;
+const COUNTER_PLAY_PROBABILITY = 0.8;
+
+/**
+ * Decides whether a bot places a Trap card from hand during its trap_placement phase.
+ */
+export function decideBotTrapPlacement(
+  state: RoomState,
+  botId: PlayerId,
+  rng: Rng = Math.random
+): BotTrapPlacementDecision {
+  const player = state.players[botId];
+  if (!player) return { action: 'skip' };
+
+  const currentTraps = player.traps ?? [];
+  if (currentTraps.length >= 3) {
+    return { action: 'skip' };
+  }
+
+  const trapCards = demoCardsOfType('trap');
+  const trapCodes = new Set(trapCards.map((c) => c.code));
+  const handTraps = player.hand.filter((code) => trapCodes.has(code));
+
+  if (handTraps.length === 0 || rng() > TRAP_PLACE_PROBABILITY) {
+    return { action: 'skip' };
+  }
+
+  const chosenCode = handTraps[Math.floor(rng() * handTraps.length)];
+  return { action: 'place', code: chosenCode };
+}
+
+/**
+ * Decides a bot's main phase action (draw vs play action card).
+ */
+export function decideBotTurn(
+  state: RoomState,
+  botId: PlayerId,
+  rng: Rng = Math.random
+): BotDecision {
   const hand = state.players[botId]?.hand ?? [];
   const actionCards = demoCardsOfType('action');
   const actionCodes = new Set(actionCards.map((c) => c.code));
   const playableActions = hand.filter((code) => actionCodes.has(code));
 
-  if (playableActions.length === 0 || rng() >= PLAY_PROBABILITY) {
+  if (playableActions.length === 0 || rng() >= ACTION_PLAY_PROBABILITY) {
     return { action: 'draw' };
   }
 
@@ -29,4 +77,66 @@ export function decideBotTurn(state: RoomState, botId: PlayerId, rng: Rng = Math
   }
   const targetId = candidates[Math.floor(rng() * candidates.length)];
   return { action: 'play', code, targetId };
+}
+
+/**
+ * Decides whether a bot plays a valid Counter card or skips when responding to a frame.
+ */
+export function decideBotCounter(
+  state: RoomState,
+  botId: PlayerId,
+  pendingResponse: PendingResponse,
+  rng: Rng = Math.random
+): BotCounterDecision {
+  const player = state.players[botId];
+  if (!player) return { action: 'skip' };
+
+  const validCounters = getValidCounterCards(player.hand, pendingResponse);
+  if (validCounters.length === 0 || rng() > COUNTER_PLAY_PROBABILITY) {
+    return { action: 'skip' };
+  }
+
+  const chosenCode = validCounters[Math.floor(rng() * validCounters.length)];
+  return { action: 'counter', code: chosenCode };
+}
+
+/**
+ * Decides a bot's response to an interactive invitation (e.g. T10 date invite).
+ */
+export function decideBotInteraction(
+  _interaction: PendingInteraction,
+  rng: Rng = Math.random
+): 'accept' | 'refuse' {
+  // Bots refuse date invitations 70% of the time to allow the T10 steal effect to trigger
+  return rng() < 0.7 ? 'refuse' : 'accept';
+}
+
+/**
+ * Evaluates whether a bot activates one of its active manual/honor traps.
+ */
+export function decideBotManualTrapActivation(
+  state: RoomState,
+  botId: PlayerId,
+  rng: Rng = Math.random
+): { code: CardCode; targetId?: PlayerId } | null {
+  const player = state.players[botId];
+  if (!player || !player.traps || player.traps.length === 0) return null;
+
+  // Small simulated chance per check so bot doesn't spam all traps at once
+  if (rng() > 0.25) return null;
+
+  const manualTraps = player.traps.filter((code) => {
+    const rule = getTrapRule(code);
+    return rule && (rule.mode === 'manual_honor' || rule.mode === 'interactive');
+  });
+
+  if (manualTraps.length === 0) return null;
+
+  const chosenTrap = manualTraps[Math.floor(rng() * manualTraps.length)];
+  const otherIds = Object.keys(state.players).filter((id) => id !== botId);
+  const humanIds = otherIds.filter((id) => !id.startsWith('bot-'));
+  const candidates = humanIds.length > 0 ? humanIds : otherIds;
+  const targetId = candidates.length > 0 ? candidates[Math.floor(rng() * candidates.length)] : undefined;
+
+  return { code: chosenTrap, targetId };
 }

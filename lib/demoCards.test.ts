@@ -40,20 +40,20 @@ describe('demoCardsOfType', () => {
   it('filters by type and returns the expected counts', () => {
     expect(demoCardsOfType('action').length).toBe(5);
     expect(demoCardsOfType('counter').length).toBe(3);
-    expect(demoCardsOfType('trap').length).toBe(5);
+    expect(demoCardsOfType('trap').length).toBe(15);
     expect(demoCardsOfType('trap').every((c) => c.type === 'trap')).toBe(true);
   });
 });
 
 describe('buildDemoDeck', () => {
-  it('repeats each of the 13 codes the given number of times', () => {
+  it('repeats each of the 23 codes the given number of times', () => {
     const deck = buildDemoDeck(2);
-    expect(deck.length).toBe(26);
+    expect(deck.length).toBe(46);
     expect(deck.filter((c) => c === 'A001').length).toBe(2);
   });
 
   it('defaults to 10 copies per card', () => {
-    expect(buildDemoDeck().length).toBe(130);
+    expect(buildDemoDeck().length).toBe(230);
   });
 });
 

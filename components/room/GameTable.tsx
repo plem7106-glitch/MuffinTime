@@ -20,6 +20,8 @@ import { ShuffleConfirmModal } from './ShuffleConfirmModal';
 import { ShuffleDrawPileOverlay } from './ShuffleDrawPileOverlay';
 import { RoundTransitionOverlay } from './RoundTransitionOverlay';
 import { TargetSelector } from '../modals/TargetSelector';
+import { DateInviteModal } from '../modals/DateInviteModal';
+import { getTrapRule } from '../../game/trapRules/registry';
 
 import { TrapModal } from '../modals/TrapModal';
 import { TrapAlertModal } from '../modals/TrapAlertModal';
@@ -44,6 +46,8 @@ export function GameTable() {
     playAction,
     placeTrapCard,
     openTrapCard,
+    initiateTrapInteraction,
+    respondToTrapInteraction,
     pendingResponse,
     playCounter,
     skipCounter,
@@ -65,26 +69,26 @@ export function GameTable() {
   const [isShuffleConfirmOpen, setIsShuffleConfirmOpen] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
 
-
-
-
   // Action Target Flow State
   const [pendingTargetCard, setPendingTargetCard] = useState<DemoCard | null>(null);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
 
   // Trap Open Flow State
+  const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
+  const [trapTargetPrompt, setTrapTargetPrompt] = useState<string>('เลือกผู้เล่นเป้าหมาย');
   const [pendingTrapOpen, setPendingTrapOpen] = useState<DemoCard | null>(null);
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
 
   // Auto-close trap open flow if a counter response window opens
   useEffect(() => {
-    if (pendingResponse && (pendingTrapOpen !== null || awaitingTrapTarget)) {
+    if (pendingResponse && (pendingTrapOpen !== null || pendingTrapCode !== null || awaitingTrapTarget)) {
       setPendingTrapOpen(null);
+      setPendingTrapCode(null);
       setAwaitingTrapTarget(false);
       setChosenTrapTarget(null);
     }
-  }, [pendingResponse, pendingTrapOpen, awaitingTrapTarget]);
+  }, [pendingResponse, pendingTrapOpen, pendingTrapCode, awaitingTrapTarget]);
 
   if (!activeRoom || !myPlayerId) return null;
 
@@ -177,28 +181,41 @@ export function GameTable() {
   // Handlers for Opening Active Traps
   const handleOpenTrapTap = (trapCode: CardCode) => {
     if (pendingResponse) return;
+    const rule = getTrapRule(trapCode);
+    if (rule && rule.needsTargetSelection) {
+      setPendingTrapCode(trapCode);
+      setTrapTargetPrompt(rule.targetPrompt ?? 'เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
+      setAwaitingTrapTarget(true);
+      return;
+    }
     try {
       const demo = getDemoCard(trapCode);
-      setPendingTrapOpen(demo);
+      if (demo.needsTarget) {
+        setPendingTrapCode(trapCode);
+        setTrapTargetPrompt('เลือกผู้เล่นเป้าหมายสำหรับกับดัก');
+        setAwaitingTrapTarget(true);
+        return;
+      }
     } catch {
-      openTrapCard(trapCode);
+      // not in demo cards
     }
+    openTrapCard(trapCode);
   };
 
   const handleConfirmOpenTrap = () => {
     if (!pendingTrapOpen) return;
-    if (pendingTrapOpen.needsTarget) {
-      setAwaitingTrapTarget(true);
-      return;
-    }
     openTrapCard(pendingTrapOpen.code);
     setPendingTrapOpen(null);
   };
 
   const handleConfirmTrapTarget = () => {
-    if (!pendingTrapOpen || !chosenTrapTarget) return;
-    openTrapCard(pendingTrapOpen.code, chosenTrapTarget);
-    setPendingTrapOpen(null);
+    if (!pendingTrapCode || !chosenTrapTarget) return;
+    if (pendingTrapCode === 'T10') {
+      initiateTrapInteraction('T10', chosenTrapTarget);
+    } else {
+      openTrapCard(pendingTrapCode, chosenTrapTarget);
+    }
+    setPendingTrapCode(null);
     setAwaitingTrapTarget(false);
     setChosenTrapTarget(null);
   };
@@ -369,11 +386,33 @@ export function GameTable() {
         onSelect={setChosenTrapTarget}
         onConfirm={handleConfirmTrapTarget}
         onCancel={() => {
+          setPendingTrapCode(null);
           setPendingTrapOpen(null);
           setAwaitingTrapTarget(false);
           setChosenTrapTarget(null);
         }}
-        prompt={pendingTrapOpen?.effect ?? 'เลือกผู้เล่นเป้าหมายสำหรับกับดัก'}
+        prompt={trapTargetPrompt}
+      />
+
+      {/* 12.5 Interactive Trap Modal (e.g. T10 Date Invite) */}
+      <DateInviteModal
+        interaction={
+          state.pendingInteraction?.type === 'date_invite' &&
+          state.pendingInteraction.targetPlayerId === myPlayerId
+            ? state.pendingInteraction
+            : null
+        }
+        state={state}
+        onAccept={() => {
+          if (state.pendingInteraction) {
+            respondToTrapInteraction(state.pendingInteraction.interactionId, 'accept');
+          }
+        }}
+        onRefuse={() => {
+          if (state.pendingInteraction) {
+            respondToTrapInteraction(state.pendingInteraction.interactionId, 'refuse');
+          }
+        }}
       />
 
       {/* 13. Trap Alert & Counter Decision Modal (When local player is hit by a Trap) */}
