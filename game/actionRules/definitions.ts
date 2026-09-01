@@ -1,6 +1,6 @@
 import { everyoneDraws, everyoneDiscards, passHands } from '../group';
 import { draw, discard } from '../pile';
-import { stealRandom } from '../transfer';
+import { stealRandom, swapHands } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
 import { skipTurn, reverseDirection } from '../turnFlow';
 import { getNextPlayerId } from '../turn';
@@ -1323,6 +1323,126 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'เลือกผู้เล่นอีก 1 คนให้ทุกคนตะโกนชื่อเขาพร้อมกัน 3 ครั้ง เขาต้องดื่ม 1 อึก',
     kind: 'no_op', executeEffect: (state) => state,
   },
+
+  // -- Unique/one-off cards, Phase 1 subset (classification doc §Section 3) --
+
+  A007: {
+    code: 'A007', name_en: 'Mystery Button', name_th: 'ปุ่มปริศนา',
+    description_th: 'Mini-Game: โยนเหรียญ ถ้าออกหัว จั่ว 3 ใบ ถ้าออกก้อย ทิ้ง 3 ใบ',
+    kind: 'auto',
+    executeEffect: (state, frame) => (Math.random() < 0.5 ? draw(state, frame.actorId, 3) : discard(state, frame.actorId, 3)),
+  },
+  A020: {
+    code: 'A020', name_en: 'New You', name_th: 'ตัวตนใหม่',
+    description_th: 'ทิ้งไพ่ทั้งหมดในมือ แล้วจั่วไพ่ใหม่ในจำนวนเท่ากัน',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      const count = state.players[frame.actorId].hand.length;
+      return draw(discard(state, frame.actorId, count), frame.actorId, count);
+    },
+  },
+  A022: {
+    code: 'A022', name_en: 'Single', name_th: 'ตัวคนเดียว',
+    description_th: 'หากไพ่ใบนี้เป็นไพ่เพียงใบเดียวในมือคุณ ให้จั่วไพ่ 10 ใบ',
+    kind: 'auto',
+    // By the time this runs, the played card is already discarded -- an
+    // empty hand here means this WAS the only card.
+    executeEffect: (state, frame) => (state.players[frame.actorId].hand.length === 0 ? draw(state, frame.actorId, 10) : state),
+  },
+  A036: {
+    code: 'A036', name_en: 'Confession', name_th: 'คำสารภาพ',
+    description_th: 'จั่วไพ่ 3 ใบ แต่ต้องเปิดให้ผู้เล่นคนอื่นทุกคนเห็น',
+    kind: 'auto',
+    // The "reveal your hand" half is a table-talk instruction, not tracked state.
+    executeEffect: (state, frame) => draw(state, frame.actorId, 3),
+  },
+  A043: {
+    code: 'A043', name_en: 'Got It Back In', name_th: 'เอากลับเข้าไปแล้ว',
+    description_th: 'ขโมยไพ่ทั้งหมดในมือของผู้เล่นอีก 1 คน แล้วนำไพ่เหล่านั้นไปใส่ไว้ตรงไหนก็ได้ในกองจั่ว',
+    kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะยึดมือแล้วฝังไพ่กลับเข้ากอง',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      if (!targetId) return state;
+      const next = cloneState(state);
+      const taken = next.players[targetId].hand;
+      next.players[targetId].hand = [];
+      for (const code of taken) {
+        const pos = Math.floor(Math.random() * (next.drawPile.length + 1));
+        next.drawPile.splice(pos, 0, code);
+      }
+      return next;
+    },
+  },
+  A055: {
+    code: 'A055', name_en: 'Killed Us All', name_th: 'ฆ่าพวกเราหมดเลย',
+    description_th: 'คุณทิ้งไพ่ 2 ใบ ผู้เล่นคนอื่นทั้งหมดทิ้งคนละ 1 ใบ',
+    kind: 'auto',
+    executeEffect: (state, frame) => everyoneDiscards(discard(state, frame.actorId, 2), 1, [frame.actorId]),
+  },
+  A063: {
+    code: 'A063', name_en: 'Baby With A Gun', name_th: 'เด็กถือปืน',
+    description_th: 'ขโมยไพ่กี่ใบก็ได้จากผู้เล่นคนอื่นกี่คนก็ได้',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่จะขโมยไพ่ (1 ใบต่อคน)',
+    // ponytail: real card lets the actor pick both how many players AND how
+    // many cards from each, fully free-form; no numeric-input UI exists yet,
+    // so this steals a fixed 1 card from each player in the roster instead.
+    executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
+  },
+  A071: {
+    code: 'A071', name_en: 'Do The Flop', name_th: 'ล้มตัวลง!',
+    description_th: 'ผู้เล่นทุกคนวางไพ่ในมือหงายหน้าไว้จนถึงเทิร์นถัดไปของคุณ',
+    kind: 'no_op',
+    // Same architecture gap as A025/A030/A086: a temporary visibility change,
+    // not a state mutation -- no per-viewer "what's revealed" channel exists.
+    executeEffect: (state) => state,
+  },
+  A075: {
+    code: 'A075', name_en: 'Evil Tie', name_th: 'เนกไทปีศาจ',
+    description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่มีจำนวนไพ่ในมือเท่ากับคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      const myCount = state.players[frame.actorId].hand.length;
+      const matching = Object.keys(state.players).filter(
+        (id) => id !== frame.actorId && state.players[id].hand.length === myCount
+      );
+      return rosterStolenBy(state, frame.actorId, matching, 1);
+    },
+  },
+  A084: {
+    code: 'A084', name_en: 'Hold This!', name_th: 'ถือไว้นะ!',
+    description_th: 'สลับไพ่ทั้งหมดในมือกับผู้เล่นอีก 1 คนที่คุณเลือก',
+    kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะสลับไพ่ทั้งมือด้วยกัน',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? swapHands(state, frame.actorId, targetId) : state;
+    },
+  },
+  A090: {
+    code: 'A090', name_en: 'I Wanna Die', name_th: 'ฉันอยากตาย',
+    description_th: 'ทิ้งไพ่ทั้งหมดในมือ (จะหยุดเล่นด้วยก็ได้)',
+    kind: 'auto',
+    // "...or stop playing entirely" is a product decision (a permanent,
+    // room-wide consequence unlike any other card's effect), not a technical
+    // gap -- deliberately not wired to leaveRoom() without asking first.
+    // Only the deterministic discard-whole-hand half is implemented.
+    executeEffect: (state, frame) => discard(state, frame.actorId, state.players[frame.actorId].hand.length),
+  },
+  A109: {
+    code: 'A109', name_en: 'Pointless', name_th: 'ไม่มีประโยชน์',
+    description_th: 'ไม่มีอะไรเกิดขึ้น',
+    kind: 'no_op',
+    executeEffect: (state) => state,
+  },
+
+  // A115 ("Tall Midget" -- tallest gives 3 to shortest) intentionally NOT
+  // included: needs identifying TWO different subjective roles (tallest AND
+  // shortest) in one play; neither the single-target picker nor the
+  // multi-select roster (unordered) can express a 2-role pick. Needs a real
+  // paired-selection UI.
+
+  // A166 ("Speed Chug Bonus") intentionally NOT included: the classification
+  // doc flags this as genuinely ambiguous in both languages -- "draw 3" never
+  // states who draws (the chooser or the chosen). Needs a rulebook check.
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so

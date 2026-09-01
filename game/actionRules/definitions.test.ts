@@ -761,6 +761,102 @@ describe('Family E9 batch (no_op)', () => {
   });
 });
 
+describe('Unique cards, Phase 1 subset (via resolveActionEffect)', () => {
+  it('A007 draws 3 or discards 3 (coin flip)', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A007', 'me');
+    const handLen = next.players.me.hand.length;
+    expect([4, 0]).toContain(handLen);
+  });
+
+  it('A020 discards the whole hand then redraws the same count', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b', 'c'];
+    const next = resolveActionEffect(state, 'A020', 'me');
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.discardPile).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+  });
+
+  it('A022 draws 10 when it was the actor\'s only card', () => {
+    const state = threePlayerState();
+    state.players.me.hand = []; // already discarded -- was the only card
+    const next = resolveActionEffect(state, 'A022', 'me');
+    expect(next.players.me.hand.length).toBe(10);
+  });
+
+  it('A022 is a no-op when the actor had other cards', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b'];
+    const next = resolveActionEffect(state, 'A022', 'me');
+    expect(next.players.me.hand).toEqual(['a', 'b']);
+  });
+
+  it('A036 draws the actor 3', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A036', 'me');
+    expect(next.players.me.hand.length).toBe(4);
+  });
+
+  it('A043 takes the target\'s whole hand and buries it in the draw pile', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['x', 'y'];
+    const next = resolveActionEffect(state, 'A043', 'me', 'p2');
+    expect(next.players.p2.hand).toEqual([]);
+    expect(next.drawPile).toEqual(expect.arrayContaining(['x', 'y']));
+    expect(next.drawPile.length).toBe(state.drawPile.length + 2);
+  });
+
+  it('A055 discards the actor 2 and everyone else 1', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A055', 'me');
+    expect(next.players.me.hand.length).toBe(0);
+    expect(next.players.p2.hand.length).toBe(2);
+    expect(next.players.p3.hand.length).toBe(2);
+  });
+
+  it('A063 steals 1 from each player in the roster', () => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload('A063', 'me', { rosterIds: ['p2', 'p3'] }));
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(2);
+    expect(next.players.p3.hand.length).toBe(2);
+  });
+
+  it('A071 is a no-op (temporary visibility, not state)', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A071', 'me')).toEqual(state);
+  });
+
+  it('A075 steals 1 from every player whose hand size matches the actor\'s', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a']; // 1 card
+    state.players.p2.hand = ['b']; // matches (1 card)
+    state.players.p3.hand = ['c', 'd']; // doesn't match (2 cards)
+    const next = resolveActionEffect(state, 'A075', 'me');
+    expect(next.players.me.hand.length).toBe(2);
+    expect(next.players.p2.hand.length).toBe(0);
+    expect(next.players.p3.hand.length).toBe(2);
+  });
+
+  it('A084 swaps the actor\'s and target\'s whole hands', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a'];
+    state.players.p2.hand = ['x', 'y'];
+    const next = resolveActionEffect(state, 'A084', 'me', 'p2');
+    expect(next.players.me.hand).toEqual(['x', 'y']);
+    expect(next.players.p2.hand).toEqual(['a']);
+  });
+
+  it('A090 discards the actor\'s whole hand', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b', 'c'];
+    const next = resolveActionEffect(state, 'A090', 'me');
+    expect(next.players.me.hand).toEqual([]);
+  });
+
+  it('A109 is always a no-op', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A109', 'me')).toEqual(state);
+  });
+});
+
 describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
