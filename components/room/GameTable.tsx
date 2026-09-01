@@ -40,6 +40,7 @@ export function GameTable() {
     myPlayerId,
     error,
     drawCard,
+    hostSkipTurn,
     declareMuffinTime,
     playAction,
     placeTrapCard,
@@ -427,6 +428,10 @@ export function GameTable() {
         isShuffleDisabled={isShuffleDisabled}
         shuffleDisabledReason={shuffleDisabledReason}
         onOpenManualFinish={() => setIsManualFinishOpen(true)}
+        onHostUnstick={() =>
+          pendingResponse ? skipCounter(pendingResponse.responseId) : hostSkipTurn()
+        }
+        hostUnstickLabel={pendingResponse ? 'บังคับข้ามการตอบโต้ที่ค้าง' : 'บังคับข้ามเทิร์นที่ค้าง'}
       />
 
       {/* 16. In-Game Card Gallery Browser Modal */}

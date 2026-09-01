@@ -27,6 +27,8 @@ export function GameSettingsModal({
   isShuffleDisabled = false,
   shuffleDisabledReason,
   onOpenManualFinish,
+  onHostUnstick,
+  hostUnstickLabel,
 }: {
   isOpen: boolean;
   isHost?: boolean;
@@ -36,6 +38,8 @@ export function GameSettingsModal({
   isShuffleDisabled?: boolean;
   shuffleDisabledReason?: string;
   onOpenManualFinish?: () => void;
+  onHostUnstick?: () => void;
+  hostUnstickLabel?: string;
 }) {
 
   const router = useRouter();
@@ -201,6 +205,27 @@ export function GameSettingsModal({
                 <span className="rounded-md bg-amber-200/80 px-1.5 py-0.5 text-[9px] font-black text-amber-950 uppercase tracking-wide">
                   Host เท่านั้น
                 </span>
+              </button>
+            </>
+          )}
+
+          {/* 5.5. Host-only: Unstick a hung turn / response window (e.g. a player left mid-game) */}
+          {isHost && onHostUnstick && (
+            <>
+              <div className="my-1 border-t border-gray-100 pt-2" />
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onHostUnstick();
+                }}
+                className="flex min-h-[44px] w-full items-center justify-between rounded-2xl border border-gray-200 bg-gray-50/70 px-3.5 text-xs font-bold text-ink-secondary hover:bg-gray-100 transition-colors active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-gray-400" />
+                  <span>{hostUnstickLabel ?? 'บังคับข้ามที่ค้าง'}</span>
+                </div>
+                <span className="text-[9px] text-gray-400">ใช้เมื่อเกมค้าง</span>
               </button>
             </>
           )}

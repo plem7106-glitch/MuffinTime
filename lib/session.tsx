@@ -42,6 +42,7 @@ export interface GameSessionValue {
   setPlayDirection: (direction: PlayDirection) => void;
   confirmTurnOrder: () => void;
   drawCard: () => void;
+  hostSkipTurn: () => void;
   playAction: (code: CardCode, targetId?: PlayerId) => void;
   placeTrapCard: (code: CardCode) => void;
   openTrapCard: (code: CardCode, targetId?: PlayerId) => void;
@@ -207,6 +208,20 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (state.pendingResponse) return state;
         if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
         return advanceAndCheckWin(draw(state, myPlayerId!, 1));
+      }),
+    [run, myPlayerId]
+  );
+
+  // Host-only escape hatch: advance past a player's turn with no card action, for when
+  // that player has left mid-game (leaveRoom doesn't remove anyone server-side yet, so a
+  // departed current player would otherwise stall the whole table indefinitely).
+  const hostSkipTurn = useCallback(
+    () =>
+      run((state) => {
+        if (myPlayerId !== state.hostId) return state;
+        if (state.status !== 'playing') return state;
+        if (state.pendingResponse) return state;
+        return advanceAndCheckWin(state);
       }),
     [run, myPlayerId]
   );
@@ -391,6 +406,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     setPlayDirection: setPlayDirectionFn,
     confirmTurnOrder: confirmTurnOrderFn,
     drawCard,
+    hostSkipTurn,
     playAction,
     placeTrapCard,
     openTrapCard,
