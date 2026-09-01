@@ -1434,6 +1434,41 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state) => state,
   },
 
+  // -- Family J1 + J2 (subjective): extreme-state, ties all included
+  // (classification doc §Family J) -- same roster_select mechanic as Family
+  // A, just for a subjective "who's the most X" instead of a yes/no condition.
+
+  A031: {
+    code: 'A031', name_en: 'Big Baby', name_th: 'เด็กยักษ์',
+    description_th: 'ผู้เล่นที่อายุมากที่สุดต้องทิ้งไพ่ 3 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อายุมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A058: {
+    code: 'A058', name_en: 'Little Baby', name_th: 'เด็กน้อย',
+    description_th: 'ผู้เล่นที่อายุน้อยที่สุดต้องทิ้งไพ่ 3 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อายุน้อยที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
+  },
+  A054: {
+    code: 'A054', name_en: 'Jewellery', name_th: 'เครื่องประดับ',
+    description_th: 'ผู้เล่นที่สวมเครื่องประดับมากที่สุดทิ้งไพ่ 2 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมเครื่องประดับมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
+  },
+  A095: {
+    code: 'A095', name_en: 'Johnny Big Feet', name_th: 'จอห์นนี่เท้าใหญ่',
+    description_th: 'ผู้เล่นที่มีเท้าใหญ่ที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เท้าใหญ่ที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
+  },
+  A070: {
+    code: 'A070', name_en: 'Desmond The Moon Bear', name_th: 'เดสมอนด์ หมีแห่งดวงจันทร์',
+    description_th: 'ผู้เล่นที่อยู่ไกลจากบ้านของตัวเองมากที่สุด จั่วไพ่ 3 ใบ',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อยู่ไกลจากบ้านมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
+  },
+
   // A115 ("Tall Midget" -- tallest gives 3 to shortest) intentionally NOT
   // included: needs identifying TWO different subjective roles (tallest AND
   // shortest) in one play; neither the single-target picker nor the

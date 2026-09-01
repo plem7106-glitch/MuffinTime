@@ -857,6 +857,32 @@ describe('Unique cards, Phase 1 subset (via resolveActionEffect)', () => {
   });
 });
 
+describe('Family J1/J2-subjective batch (roster = the extreme player(s), via executeActionFrameEffect)', () => {
+  it.each(['A031', 'A058', 'A054'])('%s discards from each roster member', (code) => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e'];
+    const next = executeActionFrameEffect(state, frameWithPayload(code, 'me', { rosterIds: ['p2'] }));
+    expect(next.players.p2.hand.length).toBeLessThan(5);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it.each(['A095', 'A070'])('%s draws each roster member 3', (code) => {
+    const next = executeActionFrameEffect(threePlayerState(), frameWithPayload(code, 'me', { rosterIds: ['p2', 'p3'] }));
+    expect(next.players.p2.hand.length).toBe(6);
+    expect(next.players.p3.hand.length).toBe(6);
+    expect(next.players.me.hand.length).toBe(1);
+  });
+
+  it('handles ties (multiple roster members) for A031', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c'];
+    state.players.p3.hand = ['d', 'e', 'f'];
+    const next = executeActionFrameEffect(state, frameWithPayload('A031', 'me', { rosterIds: ['p2', 'p3'] }));
+    expect(next.players.p2.hand.length).toBe(0);
+    expect(next.players.p3.hand.length).toBe(0);
+  });
+});
+
 describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
