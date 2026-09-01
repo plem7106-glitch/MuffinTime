@@ -19,6 +19,30 @@ const MASCOT_AVATARS = [
   { image: '/images/home/hero/hero-muffin.jpg', bg: 'bg-[#FFE4E6]', border: 'border-[#FECDD3]', text: 'text-[#E11D48]' },
 ];
 
+function CardBackFan({ count }: { count: number }) {
+  const maxShown = 5;
+  const shown = Math.min(count, maxShown);
+  const extra = count - shown;
+  if (shown === 0) return null;
+
+  return (
+    <div className="flex items-center h-3.5 shrink-0" aria-hidden="true">
+      <div className="relative h-3.5" style={{ width: `${10 + (shown - 1) * 5}px` }}>
+        {Array.from({ length: shown }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute top-0 h-3.5 w-2.5 rounded-[2px] border border-white bg-gradient-to-br from-primary/80 to-primary shadow-2xs"
+            style={{ left: `${i * 5}px`, zIndex: i }}
+          />
+        ))}
+      </div>
+      {extra > 0 && (
+        <span className="ml-1 text-[7px] font-black text-ink-secondary">+{extra}</span>
+      )}
+    </div>
+  );
+}
+
 export function PlayerDensityGrid({
   seatOrder,
   players,
@@ -155,6 +179,9 @@ export function PlayerDensityGrid({
                   </span>
                 )}
               </div>
+
+              {/* Face-down Card Back Fan (visual hand size, capped at 5 + "+N") */}
+              <CardBackFan count={cardCount} />
 
               {/* Hand & Trap Counters */}
               <div className="flex items-center justify-center gap-1 w-full shrink-0">
