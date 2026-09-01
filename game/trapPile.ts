@@ -70,3 +70,15 @@ export function stealTrap(state: RoomState, fromId: PlayerId, toId: PlayerId, ca
   next.players[toId].traps.push(cardCode);
   return next;
 }
+
+/** Like stealTrap, but the taken card lands in the receiver's hand instead of
+ * their traps (e.g. A059 "Mine Now" -- steal a placed trap back into your hand). */
+export function stealTrapToHand(state: RoomState, fromId: PlayerId, toId: PlayerId, cardCode: CardCode): RoomState {
+  const next = cloneState(state);
+  const fromTraps = next.players[fromId].traps;
+  const pos = fromTraps.indexOf(cardCode);
+  if (pos === -1) return next;
+  fromTraps.splice(pos, 1);
+  next.players[toId].hand.push(cardCode);
+  return next;
+}

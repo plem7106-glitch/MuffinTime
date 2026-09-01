@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrap } from './trapPile';
+import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrap, stealTrapToHand } from './trapPile';
 import type { RoomState } from './types';
 
 function baseState(): RoomState {
@@ -69,5 +69,19 @@ describe('stealTrap', () => {
   it('is a no-op if the card is not found', () => {
     const state = baseState();
     expect(stealTrap(state, 'p1', 'p2', 'T99')).toEqual(state);
+  });
+});
+
+describe('stealTrapToHand', () => {
+  it('moves a specific trap card from a player\'s traps into another player\'s hand', () => {
+    const next = stealTrapToHand(baseState(), 'p1', 'p2', 'T02');
+    expect(next.players.p1.traps).toEqual(['T01', 'T03']);
+    expect(next.players.p2.hand).toEqual(['T02']);
+    expect(next.players.p2.traps).toEqual(['T04']);
+  });
+
+  it('is a no-op if the card is not found', () => {
+    const state = baseState();
+    expect(stealTrapToHand(state, 'p1', 'p2', 'T99')).toEqual(state);
   });
 });

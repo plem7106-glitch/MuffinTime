@@ -7,8 +7,32 @@ import { getNextPlayerId } from '../turn';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
+import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand } from '../trapPile';
 import type { ActionRuleDefinition } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+
+/** A059 "Mine Now" steals a random one of the target's placed traps. */
+function stealRandomTrapToHand(state: RoomState, fromId: PlayerId, toId: PlayerId, rng: Rng = Math.random): RoomState {
+  const traps = state.players[fromId].traps;
+  if (traps.length === 0) return state;
+  const code = traps[Math.floor(rng() * traps.length)];
+  return stealTrapToHand(state, fromId, toId, code);
+}
+
+/** A009 "Quickfire" forces every trap-type card straight from hand onto the
+ * table, bypassing the normal one-at-a-time placement flow and its 3-slot UI
+ * cap (RoomState itself doesn't enforce a max, only GameTable's placement UI
+ * does) -- so a player holding 4+ traps can end up with more than 3 placed. */
+function placeAllTrapsFromHand(state: RoomState, playerId: PlayerId): RoomState {
+  const hand = state.players[playerId].hand;
+  const trapCodes = hand.filter((code) => getCardById(code)?.type === 'trap');
+  if (trapCodes.length === 0) return state;
+  const next = cloneState(state);
+  const player = next.players[playerId];
+  player.hand = player.hand.filter((code) => !trapCodes.includes(code));
+  player.traps.push(...trapCodes);
+  return next;
+}
 
 /** Seating order used for "left/right neighbor" cards, falling back the same
  * way GameTable.tsx's own seatOrder computation does. Convention chosen here
@@ -604,6 +628,100 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'นำไพ่ในมือของผู้เล่นทุกคนมารวมกัน สับ แล้วแจกกลับให้ทุกคนเท่า ๆ กัน',
     kind: 'auto',
     executeEffect: (state) => poolShuffleRedeal(state, Object.keys(state.players)),
+  },
+
+  // -- Family G1: Trap-card manipulation (classification doc §Family G) --
+
+  A003: {
+    code: 'A003', name_en: 'Shoot Your Problems', name_th: 'ยิงปัญหาทิ้งซะ',
+    description_th: 'ทิ้ง Trap ที่วางไว้ใบใดก็ได้รวม 3 ใบ',
+    kind: 'auto',
+    // ponytail: "any 3 you like" is the actor's free choice; no own-traps
+    // picker UI exists yet, so this discards 3 random placed traps.
+    executeEffect: (state, frame) => discardTraps(state, frame.actorId, 3),
+  },
+  A009: {
+    code: 'A009', name_en: 'Quickfire', name_th: 'ยิงรัว!',
+    description_th: 'ผู้เล่นคนอื่นทั้งหมดต้องนำ Trap ทุกใบที่อยู่ในมือออกมาวางเป็น Trap',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      let next = state;
+      for (const id of Object.keys(next.players)) {
+        if (id === frame.actorId) continue;
+        next = placeAllTrapsFromHand(next, id);
+      }
+      return next;
+    },
+  },
+  A015: {
+    code: 'A015', name_en: "Punch 'Em", name_th: 'ต่อยเลย!',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ทิ้ง Trap ที่วางไว้ทั้งหมด',
+    kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้ทิ้ง Trap ที่วางไว้ทั้งหมด',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? discardAllTraps(state, targetId) : state;
+    },
+  },
+  A025: {
+    code: 'A025', name_en: "Who's There?", name_th: 'ใครอยู่นั่น?',
+    description_th: 'พลิก Trap ที่วางไว้ของผู้เล่นคนอื่นทุกคน คนละ 1 ใบ โดยไม่ทำให้ Trap ทำงาน',
+    kind: 'no_op',
+    // Architecture gap, not a simplification: this is a pure information
+    // reveal (who sees what), not a state mutation -- RoomState has no
+    // per-viewer "revealed to me" channel to represent it. Same gap as A030/
+    // A086 below. Needs a real design (e.g. a revealedTo[] per trap) before
+    // this can do more than show the card text.
+    executeEffect: (state) => state,
+  },
+  A030: {
+    code: 'A030', name_en: 'Be Careful', name_th: 'ระวังหน่อย',
+    description_th: 'แอบดู Trap ที่วางไว้ของผู้เล่นคนอื่นทุกคน คนละ 1 ใบ',
+    kind: 'no_op',
+    executeEffect: (state) => state,
+  },
+  A034: {
+    code: 'A034', name_en: 'Cannonball', name_th: 'ลูกปืนใหญ่!',
+    description_th: 'ผู้เล่นทุกคนทิ้ง Trap ที่วางไว้คนละ 1 ใบ',
+    kind: 'auto',
+    executeEffect: (state) => {
+      let next = state;
+      for (const id of Object.keys(next.players)) next = discardTraps(next, id, 1);
+      return next;
+    },
+  },
+  A053: {
+    code: 'A053', name_en: 'Is This Yours?', name_th: 'นี่ของนายเหรอ?',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้นำ Trap ที่วางไว้ทั้งหมดกลับเข้ามือ',
+    kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้นำ Trap กลับเข้ามือ',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? returnTrapsToHand(state, targetId) : state;
+    },
+  },
+  A059: {
+    code: 'A059', name_en: 'Mine Now', name_th: 'ของฉันแล้ว',
+    description_th: 'ขโมย Trap ที่วางไว้ของผู้เล่นอีก 1 คน แล้วนำกลับเข้ามือคุณ',
+    kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะขโมย Trap',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandomTrapToHand(state, targetId, frame.actorId) : state;
+    },
+  },
+  A086: {
+    code: 'A086', name_en: 'I Can Explain', name_th: 'ฉันอธิบายได้นะ',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้หงาย Trap ที่วางไว้ทั้งหมด โดยไม่ทำให้ Trap ทำงาน',
+    kind: 'no_op',
+    executeEffect: (state) => state,
+  },
+  A113: {
+    code: 'A113', name_en: 'Suddenly Pineapples', name_th: 'จู่ ๆ ก็สับปะรด',
+    description_th: 'ทิ้ง Trap ที่วางอยู่ทั้งหมด',
+    kind: 'auto',
+    executeEffect: (state) => {
+      let next = state;
+      for (const id of Object.keys(next.players)) next = discardAllTraps(next, id);
+      return next;
+    },
   },
 
   // A172 "Seat Swap Chaos" (Family F1) intentionally NOT included here -- needs

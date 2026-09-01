@@ -375,6 +375,78 @@ describe('Family F batch (via resolveActionEffect)', () => {
   });
 });
 
+function trappedState(): RoomState {
+  return {
+    status: 'playing',
+    hostId: 'p1',
+    turnOrder: ['p1', 'p2', 'p3'],
+    currentTurnIndex: 0,
+    direction: 1,
+    muffinTimeTarget: 10,
+    drawPile: Array.from({ length: 10 }, (_, i) => `D${i + 1}`),
+    discardPile: [],
+    players: {
+      p1: { name: 'One', hand: ['T30', 'T31'], traps: ['T01', 'T02', 'T03'], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      p2: { name: 'Two', hand: ['T32'], traps: ['T04'], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      p3: { name: 'Three', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+    },
+  };
+}
+
+describe('Family G1 batch (via resolveActionEffect)', () => {
+  it('A003 discards 3 of the actor\'s own placed traps', () => {
+    const next = resolveActionEffect(trappedState(), 'A003', 'p1');
+    expect(next.players.p1.traps).toEqual([]);
+    expect(next.discardPile).toEqual(expect.arrayContaining(['T01', 'T02', 'T03']));
+  });
+
+  it('A009 forces every other player to place all trap-type hand cards on the table', () => {
+    const next = resolveActionEffect(trappedState(), 'A009', 'p1');
+    // actor (p1) is untouched
+    expect(next.players.p1.hand).toEqual(['T30', 'T31']);
+    // p2's T32 (a trap-type card) moves from hand to traps
+    expect(next.players.p2.hand).toEqual([]);
+    expect(next.players.p2.traps).toEqual(expect.arrayContaining(['T04', 'T32']));
+  });
+
+  it('A015 discards the target\'s entire placed-trap set', () => {
+    const next = resolveActionEffect(trappedState(), 'A015', 'p1', 'p1');
+    // (targeting self here just to exercise the primitive path)
+    expect(next.players.p1.traps).toEqual([]);
+  });
+
+  it.each(['A025', 'A030', 'A086'])('%s is a no-op (information reveal, not a state change)', (code) => {
+    const state = trappedState();
+    expect(resolveActionEffect(state, code, 'p1', 'p2')).toEqual(state);
+  });
+
+  it('A034 discards 1 placed trap from every player who has one', () => {
+    const next = resolveActionEffect(trappedState(), 'A034', 'p1');
+    expect(next.players.p1.traps.length).toBe(2);
+    expect(next.players.p2.traps.length).toBe(0);
+    expect(next.players.p3.traps.length).toBe(0);
+  });
+
+  it('A053 returns all of the target\'s placed traps to their hand', () => {
+    const next = resolveActionEffect(trappedState(), 'A053', 'p1', 'p2');
+    expect(next.players.p2.traps).toEqual([]);
+    expect(next.players.p2.hand).toEqual(expect.arrayContaining(['T32', 'T04']));
+  });
+
+  it('A059 steals 1 of the target\'s placed traps into the actor\'s hand', () => {
+    const next = resolveActionEffect(trappedState(), 'A059', 'p1', 'p2');
+    expect(next.players.p2.traps).toEqual([]);
+    expect(next.players.p1.hand).toEqual(expect.arrayContaining(['T30', 'T31', 'T04']));
+  });
+
+  it('A113 discards every player\'s entire placed-trap set', () => {
+    const next = resolveActionEffect(trappedState(), 'A113', 'p1');
+    expect(next.players.p1.traps).toEqual([]);
+    expect(next.players.p2.traps).toEqual([]);
+    expect(next.discardPile).toEqual(expect.arrayContaining(['T01', 'T02', 'T03', 'T04']));
+  });
+});
+
 describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
