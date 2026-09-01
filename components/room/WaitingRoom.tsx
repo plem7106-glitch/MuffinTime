@@ -224,7 +224,7 @@ export function WaitingRoom() {
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary mb-1">
             <CardsIcon className="h-4 w-4" />
           </div>
-          <span className="text-xs font-black text-ink leading-tight">231 ใบ</span>
+          <span className="text-xs font-black text-ink leading-tight">289 ใบ</span>
           <span className="text-[10px] text-ink-secondary mt-0.5">ไพ่ทั้งหมดในเกม</span>
         </div>
 

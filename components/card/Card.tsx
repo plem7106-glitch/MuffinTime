@@ -77,7 +77,7 @@ export function Card({
     if (image && !imageError) {
       return (
         <div
-          className={`w-full overflow-hidden rounded border border-ink/10 bg-ink/[0.02] ${
+          className={`w-full overflow-hidden rounded border border-ink/10 bg-white ${
             isCompact ? 'aspect-[4/3] shrink-0' : 'aspect-[4/3] shrink-0'
           }`}
         >
@@ -94,7 +94,7 @@ export function Card({
     return (
       <div
         aria-hidden="true"
-        className={`w-full rounded border border-dashed border-ink/10 bg-ink/[0.02] transition-colors ${
+        className={`w-full rounded border border-dashed border-ink/10 bg-white transition-colors ${
           isCompact ? 'aspect-[4/3] shrink-0' : 'aspect-[4/3] shrink-0'
         }`}
       />

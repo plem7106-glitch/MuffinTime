@@ -1,19 +1,28 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { useAuth } from '../../lib/auth';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth, sanitizeRedirectPath } from '../../lib/auth';
 import { ChevronLeftIcon, UserIcon, CheckIcon, InfoIcon } from '../../components/ui/Icons';
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/';
-  const { sendMagicLink } = useAuth();
+  const rawNext = searchParams.get('next');
+  const safeNext = sanitizeRedirectPath(rawNext);
+  const { user, loading, sendMagicLink } = useAuth();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Automatically redirect if user is already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace(safeNext);
+    }
+  }, [loading, user, router, safeNext]);
 
   async function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -22,12 +31,21 @@ function LoginForm() {
     if (!trimmedEmail || !trimmedName) return;
     setStatus('sending');
     try {
-      await sendMagicLink(trimmedEmail, trimmedName, next);
+      await sendMagicLink(trimmedEmail, trimmedName, safeNext);
       setStatus('sent');
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'ส่งลิงก์ไม่สำเร็จ ลองใหม่อีกครั้ง');
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('over_email_send_rate_limit')) {
+        setErrorMessage('ระบบจำกัดความถี่ในการส่งอีเมลชั่วคราว (Email rate limit exceeded) กรุณารอสักครู่แล้วลองใหม่อีกครั้ง');
+      } else {
+        setErrorMessage(msg || 'ส่งลิงก์ไม่สำเร็จ ลองใหม่อีกครั้ง');
+      }
       setStatus('error');
     }
+  }
+
+  if (!loading && user) {
+    return null;
   }
 
   if (status === 'sent') {

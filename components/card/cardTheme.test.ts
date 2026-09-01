@@ -34,9 +34,9 @@ describe('Card Component & Presentation Theme', () => {
     expect(counterSample?.type).toBe('counter');
     expect(counterSample?.name_th).toBe('เด็กกับปืนสองกระบอก');
 
-    expect(actionCards.length).toBe(138);
-    expect(trapCards.length).toBe(53);
-    expect(counterCards.length).toBe(40);
-    expect(allCards.length).toBe(231);
+    expect(actionCards.length).toBe(173);
+    expect(trapCards.length).toBe(66);
+    expect(counterCards.length).toBe(50);
+    expect(allCards.length).toBe(289);
   });
 });

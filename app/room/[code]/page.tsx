@@ -19,27 +19,33 @@ export default function RoomPage() {
   const { audioPhase, setAudioPhase } = useAudio();
   const resumeAttemptRef = useRef<string | null>(null);
 
+  const isBotRoom = roomCode.startsWith('bot-');
+
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!isBotRoom && !authLoading && !user) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
-  }, [authLoading, user, router, pathname]);
+  }, [authLoading, user, router, pathname, isBotRoom]);
 
-  // Direct navigation or a page refresh lands here with no activeRoom yet — fetch + subscribe.
+  // Direct navigation or a page refresh lands here with no activeRoom yet — fetch + subscribe (or load bot room).
   useEffect(() => {
-    if (!user) return;
+    if (!isBotRoom && !user) return;
     if (activeRoom?.code === roomCode) return;
     if (resumeAttemptRef.current === roomCode) return;
     resumeAttemptRef.current = roomCode;
     resumeRoom(roomCode).catch(() => {
-      router.replace(`/join/${roomCode}`);
+      if (!isBotRoom) {
+        router.replace(`/join/${roomCode}`);
+      }
     });
-  }, [user, roomCode, activeRoom, resumeRoom, router]);
+  }, [user, roomCode, activeRoom, resumeRoom, router, isBotRoom]);
 
   useEffect(() => {
     if (!activeRoom || activeRoom.code !== roomCode) return;
     if (myPlayerId && !activeRoom.state.players[myPlayerId]) {
-      router.replace(`/join/${roomCode}`);
+      if (!isBotRoom) {
+        router.replace(`/join/${roomCode}`);
+      }
       return;
     }
 
@@ -52,9 +58,9 @@ export default function RoomPage() {
     } else if (status === 'lobby' && audioPhase !== 'pre-game') {
       setAudioPhase('pre-game');
     }
-  }, [activeRoom, roomCode, myPlayerId, router, audioPhase, setAudioPhase]);
+  }, [activeRoom, roomCode, myPlayerId, router, audioPhase, setAudioPhase, isBotRoom]);
 
-  if (authLoading || !user) return null;
+  if (!isBotRoom && (authLoading || !user)) return null;
   if (!activeRoom || activeRoom.code !== roomCode) return null;
 
   let content: ReactNode = null;

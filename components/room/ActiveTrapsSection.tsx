@@ -91,7 +91,7 @@ export function ActiveTrapsSection({
                 </div>
 
                 {/* Card Artwork Image Slot (aspect 4:3) */}
-                <div className="w-full aspect-[4/3] overflow-hidden rounded-lg border border-trap/15 bg-trap/5 shrink-0 my-1 flex items-center justify-center">
+                <div className="w-full aspect-[4/3] overflow-hidden rounded-lg border border-trap/15 bg-white shrink-0 my-1 flex items-center justify-center">
                   {image && !hasImageError ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img

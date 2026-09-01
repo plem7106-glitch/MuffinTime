@@ -965,6 +965,251 @@
       "name_th": "นายมันเด็กเนิร์ด",
       "description_en": "All players wearing glasses draw 2 cards.",
       "description_th": "ผู้เล่นทุกคนที่สวมแว่น จั่วไพ่คนละ 2 ใบ"
+    },
+    {
+      "code": "A139",
+      "name_en": "Bottoms Up",
+      "name_th": "หมดแก้ว!",
+      "description_en": "All players who haven't finished their drink must finish it, then draw 1 card.",
+      "description_th": "ผู้เล่นทุกคนที่ยังดื่มไม่หมดแก้วในมือ ดื่มให้หมด แล้วจั่วไพ่คนละ 1 ใบ"
+    },
+    {
+      "code": "A140",
+      "name_en": "Cheers to That",
+      "name_th": "ชนแก้ว",
+      "description_en": "Choose another player to cheers with. You both draw 2 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนมาชนแก้วด้วยกัน ทั้งคู่จั่วไพ่คนละ 2 ใบ"
+    },
+    {
+      "code": "A141",
+      "name_en": "Drinking Buddy",
+      "name_th": "เพื่อนกินเหล้า",
+      "description_en": "Choose another player to take a sip with you, then steal 1 card from them.",
+      "description_th": "เลือกผู้เล่นอีก 1 คน ให้ดื่ม 1 อึกพร้อมกับคุณ แล้วขโมยไพ่จากเขา 1 ใบ"
+    },
+    {
+      "code": "A142",
+      "name_en": "Who's the Drunkest",
+      "name_th": "ใครเมาสุด",
+      "description_en": "Vote on who seems drunkest right now. That player discards 3 cards.",
+      "description_th": "โหวตกันว่าใครดูเมาที่สุดตอนนี้ คนนั้นทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "A143",
+      "name_en": "King's Toast",
+      "name_th": "ประกาศศักดา",
+      "description_en": "Declare yourself king. Everyone must drink before you or discard 2 cards.",
+      "description_th": "ประกาศตัวเองเป็นราชา ผู้เล่นทุกคนต้องดื่มก่อนคุณ ไม่งั้นทิ้งไพ่ 2 ใบ"
+    },
+    {
+      "code": "A144",
+      "name_en": "Chug It",
+      "name_th": "เอาให้จบแก้ว",
+      "description_en": "Choose another player to chug for a slow count of 5, then steal 2 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ดื่มรวดเดียวจนกว่าคุณจะนับ 5 แล้วขโมยไพ่ 2 ใบจากเขา"
+    },
+    {
+      "code": "A145",
+      "name_en": "Mercy Round",
+      "name_th": "เมตตารอบนี้",
+      "description_en": "Everyone takes one sip together, then everyone draws 1 card.",
+      "description_th": "ทุกคนดื่ม 1 อึกพร้อมกัน แล้วจั่วไพ่คนละ 1 ใบ"
+    },
+    {
+      "code": "A146",
+      "name_en": "Red Face Loses",
+      "name_th": "หน้าแดงก่อนแพ้",
+      "description_en": "Choose 2 players to compare who's more red-faced (others judge). Loser discards 3 cards.",
+      "description_th": "เลือกผู้เล่น 2 คนมาแข่งกันใครหน้าแดงกว่ากัน (ให้คนอื่นตัดสิน) คนแพ้ทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "A147",
+      "name_en": "Dance for Me",
+      "name_th": "เต้นให้ดู",
+      "description_en": "Choose another player to dance as you command for 10 seconds. If they fail, steal 3 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้เต้นท่าที่คุณสั่ง 10 วินาที ถ้าทำไม่ได้ ขโมยไพ่จากเขา 3 ใบ"
+    },
+    {
+      "code": "A148",
+      "name_en": "Dad Joke Roulette",
+      "name_th": "มุกแป้กหรือปัง",
+      "description_en": "Tell a joke. If nobody laughs, discard 2. If someone laughs, draw 2.",
+      "description_th": "เล่ามุกตลก ถ้าไม่มีใครหัวเราะ ทิ้งไพ่ 2 ใบ ถ้ามีคนหัวเราะ จั่ว 2 ใบ"
+    },
+    {
+      "code": "A149",
+      "name_en": "Whisper Dare",
+      "name_th": "กระซิบท้าทาย",
+      "description_en": "Whisper an embarrassing dare to another player. If they complete it, steal 2 cards from them.",
+      "description_th": "กระซิบคำสั่งอายๆ ให้ผู้เล่นอีกคนทำทันที ถ้าทำสำเร็จขโมยไพ่ 2 ใบจากเขา"
+    },
+    {
+      "code": "A150",
+      "name_en": "Drunk Impression",
+      "name_th": "เลียนแบบเสียงเมา",
+      "description_en": "Say a given sentence in your best drunk voice. If it makes others laugh, draw 3 cards.",
+      "description_th": "พูดประโยคที่กำหนดด้วยเสียงเหมือนคนเมา ถ้าทำให้คนอื่นหัวเราะได้ จั่วไพ่ 3 ใบ"
+    },
+    {
+      "code": "A151",
+      "name_en": "Butterfingers",
+      "name_th": "เก็บของตกไม่ทัน",
+      "description_en": "Choose another player to hold their drink with one hand until your next turn. If they set it down or spill, they discard 3 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ถือแก้วด้วยมือเดียวไปจนถึงเทิร์นถัดไปของคุณ ถ้าวางแก้วลงหรือทำหล่น ให้ทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "A152",
+      "name_en": "Forced Karaoke",
+      "name_th": "คาราโอเกะบังคับ",
+      "description_en": "Choose another player to sing one verse right now. If they refuse, discard 4 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ร้องเพลง 1 ท่อนตอนนี้เลย ถ้าปฏิเสธ ทิ้งไพ่ 4 ใบ"
+    },
+    {
+      "code": "A153",
+      "name_en": "Truth Booze",
+      "name_th": "จริงหรือดื่ม",
+      "description_en": "Choose another player: answer an embarrassing question truthfully, or drink. If they drink, steal 2 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ตอบคำถามลับๆ หรือดื่ม ถ้าเลือกดื่ม ขโมยไพ่ 2 ใบจากเขา"
+    },
+    {
+      "code": "A154",
+      "name_en": "The Puppet Master",
+      "name_th": "ผู้บงการ",
+      "description_en": "Choose 1 player to be your puppet. They must obey 1 command from you on their next turn.",
+      "description_th": "เลือกผู้เล่น 1 คนให้เป็นหุ่นเชิดของคุณ เขาต้องทำตามคำสั่งของคุณ 1 คำสั่งในเทิร์นถัดไปของเขา"
+    },
+    {
+      "code": "A155",
+      "name_en": "Order for Them",
+      "name_th": "สั่งดื่มแทน",
+      "description_en": "Choose another player to take a sip on your behalf. Draw 2 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คน สั่งให้เขาดื่มแทนคุณ 1 อึก แล้วจั่วไพ่ 2 ใบ"
+    },
+    {
+      "code": "A156",
+      "name_en": "Musical Chairs, Muffin Style",
+      "name_th": "เก้าอี้ดนตรีฉบับมัฟฟิน",
+      "description_en": "Everyone moves one seat to the left, bringing their drink.",
+      "description_th": "ทุกคนสลับที่นั่งไปทางซ้าย 1 ที่ พร้อมยกแก้วไปด้วย"
+    },
+    {
+      "code": "A157",
+      "name_en": "Stage Director",
+      "name_th": "จอมบงการเวที",
+      "description_en": "Choose 2 players to act out a short scene you invent. The worse performer discards 3 cards.",
+      "description_th": "เลือกผู้เล่น 2 คนให้แสดงบทสนทนาสั้นๆ ที่คุณกำหนด คนที่แสดงได้แย่กว่าทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "A158",
+      "name_en": "Sober Spy",
+      "name_th": "ตาสว่างยามเมา",
+      "description_en": "If you haven't drunk this round, steal 3 cards from whoever has drunk the most.",
+      "description_th": "ถ้าคุณยังไม่ได้ดื่มเลยในรอบนี้ ขโมยไพ่ 3 ใบจากผู้เล่นที่ดื่มมากที่สุด"
+    },
+    {
+      "code": "A159",
+      "name_en": "Round for the House",
+      "name_th": "รอบปาร์ตี้",
+      "description_en": "Everyone sips together. All other players draw 1 card; you draw 2.",
+      "description_th": "ทุกคนดื่มพร้อมกัน 1 อึก แล้วผู้เล่นคนอื่นทั้งหมดจั่วไพ่คนละ 1 ใบ คุณจั่ว 2 ใบ"
+    },
+    {
+      "code": "A160",
+      "name_en": "Duel of Sips",
+      "name_th": "คู่ดวลดื่ม",
+      "description_en": "Challenge another player to a drinking race. Whoever finishes first draws 3 cards.",
+      "description_th": "ท้าผู้เล่นอีกคนดื่มแข่งกัน คนที่ดื่มหมดก่อนจั่วไพ่ 3 ใบ"
+    },
+    {
+      "code": "A161",
+      "name_en": "Confess or Drink",
+      "name_th": "ยอมสารภาพ",
+      "description_en": "Choose another player to confess a small secret or take 2 sips.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้สารภาพความลับเล็กๆ หรือดื่ม 2 อึก"
+    },
+    {
+      "code": "A162",
+      "name_en": "Awkward Pose",
+      "name_th": "แต๊ะอิงแขนขา",
+      "description_en": "Choose another player to freeze in a silly pose until your next turn. If they move first, discard 3 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ค้างท่าทางแปลกๆ จนกว่าจะถึงเทิร์นถัดไปของคุณ ถ้าขยับก่อน ทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "A163",
+      "name_en": "Hands Up",
+      "name_th": "ยกมือขึ้น!",
+      "description_en": "Everyone must raise their drink above their head for the rest of the round. Whoever forgets discards 2 cards.",
+      "description_th": "ทุกคนต้องยกแก้วขึ้นเหนือหัวไปจนจบรอบนี้ คนที่ลืมทิ้งไพ่ 2 ใบ"
+    },
+    {
+      "code": "A164",
+      "name_en": "Pass the Shame",
+      "name_th": "ส่งต่อความอาย",
+      "description_en": "Give this card and an embarrassing task to the next player.",
+      "description_th": "มอบไพ่ใบนี้พร้อมภารกิจอายๆ ให้ผู้เล่นถัดไป"
+    },
+    {
+      "code": "A165",
+      "name_en": "Command Chain",
+      "name_th": "เจ้าพ่อคำสั่ง",
+      "description_en": "Command 3 players to do different actions simultaneously. Whoever messes up discards 2 cards.",
+      "description_th": "สั่งให้ผู้เล่น 3 คนทำท่าทางต่างกันพร้อมกัน คนที่ทำผิดจังหวะทิ้งไพ่ 2 ใบ"
+    },
+    {
+      "code": "A166",
+      "name_en": "Speed Chug Bonus",
+      "name_th": "หมดแก้วเร็วก็รวย",
+      "description_en": "Choose another player to drink fast. If they beat your slow count of 5, draw 3 cards.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ดื่มให้เร็วที่สุด ถ้าเร็วกว่าที่คุณนับ 5 จั่วไพ่ 3 ใบ"
+    },
+    {
+      "code": "A167",
+      "name_en": "Drunk Confession",
+      "name_th": "บอกความลับตอนเมา",
+      "description_en": "Ask another player a secret question. If they answer, steal 1 card. If not, they drink.",
+      "description_th": "ถามคำถามลับกับผู้เล่นอีก 1 คน ถ้าตอบ ขโมยไพ่ 1 ใบจากเขา ถ้าไม่ตอบ เขาดื่ม 1 อึก"
+    },
+    {
+      "code": "A168",
+      "name_en": "Don't Drink and Drive",
+      "name_th": "เมาไม่ขับ",
+      "description_en": "All players say \"don't drink and drive\" together, then everyone draws 1 card.",
+      "description_th": "ผู้เล่นทุกคนพูดพร้อมกันว่า \"เมาไม่ขับ\" แล้วจั่วไพ่คนละ 1 ใบ"
+    },
+    {
+      "code": "A169",
+      "name_en": "Crowd Chant",
+      "name_th": "เสียงเรียกร้อง",
+      "description_en": "Choose another player for everyone to chant their name 3 times. They must drink.",
+      "description_th": "เลือกผู้เล่นอีก 1 คนให้ทุกคนตะโกนชื่อเขาพร้อมกัน 3 ครั้ง เขาต้องดื่ม 1 อึก"
+    },
+    {
+      "code": "A170",
+      "name_en": "Guess the Buzz",
+      "name_th": "เกมทายใจ",
+      "description_en": "Guess how many drinks another player has had. If correct, steal 2 cards.",
+      "description_th": "ทายว่าผู้เล่นอีก 1 คนดื่มไปกี่แก้วแล้ว ถ้าทายถูก ขโมยไพ่ 2 ใบ"
+    },
+    {
+      "code": "A171",
+      "name_en": "Toast Master",
+      "name_th": "ยกแก้วให้สุด",
+      "description_en": "Lead a full-table toast. Everyone draws 1 card.",
+      "description_th": "นำการชนแก้วพร้อมกันทั้งวง ทุกคนจั่วไพ่คนละ 1 ใบ"
+    },
+    {
+      "code": "A172",
+      "name_en": "Seat Swap Chaos",
+      "name_th": "บังคับสลับที่",
+      "description_en": "Choose 2 players to swap seats along with their drinks.",
+      "description_th": "เลือกผู้เล่น 2 คนให้สลับที่นั่งกันพร้อมแก้วของตัวเอง"
+    },
+    {
+      "code": "A173",
+      "name_en": "Vote to Roast",
+      "name_th": "โหวตไล่ล่า",
+      "description_en": "Everyone votes on who's been most embarrassing this round. That player discards 4 cards.",
+      "description_th": "ทุกคนโหวตว่าใครทำตัวน่าอายที่สุดในรอบนี้ คนนั้นทิ้งไพ่ 4 ใบ"
     }
   ],
   "trap": [
@@ -1338,6 +1583,97 @@
       "name_th": "หน้าในหน้า",
       "description_en": "Stick this card to your forehead. If nobody mentions it by your next turn, all players draw 2 cards.",
       "description_th": "แปะไพ่ใบนี้ไว้ที่หน้าผากของคุณ หากไม่มีใครพูดถึงมันจนถึงเทิร์นถัดไปของคุณ ผู้เล่นทุกคนจั่วไพ่คนละ 2 ใบ"
+    },
+    {
+      "code": "T54",
+      "name_en": "Slurred Speech",
+      "name_th": "พูดเพี้ยน",
+      "description_en": "If another player slurs a word from being drunk, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดคำผิดเพราะเมา ขโมยไพ่จากเขา 3 ใบ"
+    },
+    {
+      "code": "T55",
+      "name_en": "Spill It",
+      "name_th": "หกน้ำ",
+      "description_en": "If another player spills any drink, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นทำเครื่องดื่มหกแม้แต่หยดเดียว ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "T56",
+      "name_en": "Drunk Texting",
+      "name_th": "โทรหาแฟนเก่า",
+      "description_en": "If another player picks up their phone during the game, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นหยิบโทรศัพท์ขึ้นมาระหว่างเกม ขโมยไพ่จากเขา 3 ใบ"
+    },
+    {
+      "code": "T57",
+      "name_en": "Forgot My Turn",
+      "name_th": "ลืมเทิร์นตัวเอง",
+      "description_en": "If another player gets confused about whose turn it is, steal 2 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นสับสนว่าถึงตาใคร ขโมยไพ่จากเขา 2 ใบ"
+    },
+    {
+      "code": "T58",
+      "name_en": "Leaning Tower",
+      "name_th": "เอนหลังพิง",
+      "description_en": "If another player leans or slumps in their seat, they discard 4 cards.",
+      "description_th": "หากผู้เล่นคนอื่นเอนตัวหรือล้มลงกับที่นั่ง ผู้เล่นคนนั้นทิ้งไพ่ 4 ใบ"
+    },
+    {
+      "code": "T59",
+      "name_en": "Say That Again?",
+      "name_th": "ถามซ้ำ",
+      "description_en": "If another player repeats the same question within a few minutes, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นถามคำถามเดิมซ้ำภายในไม่กี่นาที ขโมยไพ่จากเขา 3 ใบ"
+    },
+    {
+      "code": "T60",
+      "name_en": "Giggle Fit",
+      "name_th": "หัวเราะไม่หยุด",
+      "description_en": "If another player laughs for no clear reason, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นหัวเราะโดยไม่มีเหตุผลชัดเจน ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "T61",
+      "name_en": "Sloppy Hugs",
+      "name_th": "เมาแล้วกอด",
+      "description_en": "If another player hugs someone during the game, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นกอดใครก็ตามระหว่างเกม ขโมยไพ่จากเขา 3 ใบ"
+    },
+    {
+      "code": "T62",
+      "name_en": "Wrong Glass",
+      "name_th": "ดื่มผิดแก้ว",
+      "description_en": "If another player accidentally drinks from someone else's glass, steal 4 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นหยิบแก้วของคนอื่นมาดื่มโดยไม่ตั้งใจ ขโมยไพ่จากเขา 4 ใบ"
+    },
+    {
+      "code": "T63",
+      "name_en": "Solo Dance",
+      "name_th": "เต้นคนเดียว",
+      "description_en": "If another player starts dancing unprompted, they discard 3 cards.",
+      "description_th": "หากผู้เล่นคนอื่นเริ่มเต้นโดยไม่มีใครขอ ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ"
+    },
+    {
+      "code": "T64",
+      "name_en": "Too Loud",
+      "name_th": "เสียงดังเกินไป",
+      "description_en": "If another player suddenly talks too loudly, they discard 2 cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดเสียงดังผิดปกติ ผู้เล่นคนนั้นทิ้งไพ่ 2 ใบ"
+    },
+    {
+      "code": "T65",
+      "name_en": "Wobbly Legs",
+      "name_th": "ยืนไม่มั่นคง",
+      "description_en": "If another player stands up and wobbles, they discard 4 cards.",
+      "description_th": "หากผู้เล่นคนอื่นลุกขึ้นยืนแล้วเซ ผู้เล่นคนนั้นทิ้งไพ่ 4 ใบ"
+    },
+    {
+      "code": "T66",
+      "name_en": "Sorry Spam",
+      "name_th": "ขอโทษพร่ำเพรื่อ",
+      "description_en": "If another player says \"sorry\" more than once in one round, steal 3 of their cards.",
+      "description_th": "หากผู้เล่นคนอื่นพูดคำว่า \"ขอโทษ\" เกิน 1 ครั้งในรอบเดียว ขโมยไพ่จากเขา 3 ใบ"
     }
   ],
   "counter": [
@@ -1620,6 +1956,76 @@
       "name_th": "วันตรงข้าม",
       "description_en": "The effects of an action card played specifically against you now affect whoever played it instead.",
       "description_th": "ผลของไพ่ Action ที่ถูกใช้เจาะจงใส่คุณ จะเปลี่ยนไปมีผลกับผู้เล่นที่ใช้ไพ่ใบนั้นแทน"
+    },
+    {
+      "code": "C41",
+      "name_en": "Skip My Round",
+      "name_th": "ขอผ่านรอบนี้",
+      "description_en": "Stop an action card that forces you to drink.",
+      "description_th": "หยุดไพ่ Action ที่บังคับให้คุณดื่ม"
+    },
+    {
+      "code": "C42",
+      "name_en": "Sneaky Swap",
+      "name_th": "เทน้ำแทนเหล้า",
+      "description_en": "Stop a card forcing you to drink, then choose another player to drink instead.",
+      "description_th": "หยุดไพ่ที่บังคับให้คุณดื่ม แล้วเลือกผู้เล่นอีกคนให้ดื่มแทน"
+    },
+    {
+      "code": "C43",
+      "name_en": "Not My Cup",
+      "name_th": "มือใครมือมัน",
+      "description_en": "Stop another player from ordering you to do an embarrassing task.",
+      "description_th": "หยุดไม่ให้ผู้เล่นคนอื่นสั่งให้คุณทำภารกิจอายๆ"
+    },
+    {
+      "code": "C44",
+      "name_en": "Still Sober",
+      "name_th": "คนนี้ไม่เมา",
+      "description_en": "You are not affected by the current drunk-behavior trap card.",
+      "description_th": "คุณไม่ได้รับผลจากไพ่ Trap ที่เกี่ยวกับอาการเมาที่กำลังทำงานอยู่"
+    },
+    {
+      "code": "C45",
+      "name_en": "Pass the Blush",
+      "name_th": "ส่งต่อความอาย",
+      "description_en": "Stop the current action card and choose another player to take the effect instead.",
+      "description_th": "หยุดไพ่ Action ที่กำลังทำงานอยู่ แล้วเลือกผู้เล่นอีกคนให้รับผลแทน"
+    },
+    {
+      "code": "C46",
+      "name_en": "Split the Shot",
+      "name_th": "ดื่มคนละครึ่ง",
+      "description_en": "If forced to drink, split it with another player of your choice.",
+      "description_th": "หากถูกบังคับให้ดื่ม ให้แบ่งครึ่งกับผู้เล่นอีก 1 คนที่คุณเลือก"
+    },
+    {
+      "code": "C47",
+      "name_en": "Party Pooper",
+      "name_th": "หยุดวงเหล้า",
+      "description_en": "Stop an action card that affects everyone so only its player is affected.",
+      "description_th": "หยุดไพ่ Action ที่มีผลกับผู้เล่นทุกคน ให้เหลือแค่คนที่เล่นไพ่ใบนั้น"
+    },
+    {
+      "code": "C48",
+      "name_en": "Water Please",
+      "name_th": "ขอน้ำเปล่า",
+      "description_en": "Stop being forced to drink and draw 1 card instead.",
+      "description_th": "หยุดไม่ให้ถูกบังคับดื่ม แล้วจั่วไพ่ 1 ใบแทน"
+    },
+    {
+      "code": "C49",
+      "name_en": "Fake Drunk",
+      "name_th": "เมาไม่จริง",
+      "description_en": "Stop the current drunk-behavior trap card from triggering.",
+      "description_th": "หยุดไพ่ Trap ที่ใช้ตรวจจับพฤติกรรมเมาที่กำลังทำงานอยู่"
+    },
+    {
+      "code": "C50",
+      "name_en": "Cut Them Off",
+      "name_th": "บอกเลิกก่อน",
+      "description_en": "Stop another player from controlling you, then steal 1 card from them.",
+      "description_th": "หยุดผู้เล่นคนอื่นไม่ให้บงการคุณ แล้วขโมยไพ่ 1 ใบจากเขา"
     }
   ]
 }

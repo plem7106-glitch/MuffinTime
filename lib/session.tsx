@@ -7,6 +7,7 @@ import { fetchRoom, updateRoomWithRetry, createRoomWithRetry } from '../multipla
 import { subscribeToRoom, unsubscribeFromRoom } from '../multiplayer/realtime';
 import {
   addPlayer,
+  createRoom as engineCreateRoom,
   startSetup as engineStartSetup,
   updateSeatOrder as engineUpdateSeatOrder,
   updatePlayDirection as engineUpdatePlayDirection,
@@ -19,6 +20,27 @@ import { placeTrap as enginePlaceTrap, removeTrap } from '../game/trap';
 import { advanceTurn, checkWinnerAtTurnStart, declareMuffinTime as engineDeclareMuffinTime } from '../game/turn';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
 import { buildDemoDeck, resolveActionCard, resolveTrapCard, resolveCounterCard, getValidCounterCards } from './demoCards';
+import { decideBotTurn } from './botTurn';
+
+export const BOT_NAME_POOL = [
+  'Tee (Bot)',
+  'Bank (Bot)',
+  'Joe (Bot)',
+  'Guy (Bot)',
+  'Nam (Bot)',
+  'Ploy (Bot)',
+  'Golf (Bot)',
+  'Mint (Bot)',
+  'Fern (Bot)',
+  'Aom (Bot)',
+  'Art (Bot)',
+  'Ice (Bot)',
+  'Beam (Bot)',
+  'Oat (Bot)',
+  'Toey (Bot)',
+  'Nook (Bot)',
+  'Krit (Bot)',
+];
 
 export interface ActiveRoom {
   code: string;
@@ -33,6 +55,7 @@ export interface GameSessionValue {
   error: string | null;
   clearLastResult: () => void;
   createRoom: (maxPlayers: number) => Promise<string>;
+  createBotRoom: (maxPlayers: number, hostName?: string) => string;
   joinRoom: (code: string) => Promise<void>;
   previewRoom: (code: string) => Promise<RoomState | null>;
   resumeRoom: (code: string) => Promise<void>;
@@ -68,12 +91,15 @@ function advanceAndCheckWin(room: RoomState): RoomState {
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const myPlayerId = user?.id ?? null;
+  const [localHostId, setLocalHostId] = useState<string>('host-me');
 
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissedResponseId, setDismissedResponseId] = useState<string | null>(null);
+
+  const isBotRoom = roomCode?.startsWith('bot-') ?? false;
+  const myPlayerId = isBotRoom ? (localHostId || user?.id || 'host-me') : (user?.id ?? null);
 
   const channelRef = useRef<ReturnType<typeof subscribeToRoom> | null>(null);
   const isWritingRef = useRef(false);
@@ -102,6 +128,27 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const run = useCallback(
     async (updater: (state: RoomState) => RoomState) => {
       if (!roomCode || isWritingRef.current) return;
+
+      // Bot room: in-memory local state update
+      if (roomCode.startsWith('bot-')) {
+        setRoomState((prev) => {
+          if (!prev) return prev;
+          const next = updater(prev);
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem(
+                `muffin_bot_room_${roomCode}`,
+                JSON.stringify({ hostId: localHostId || user?.id || 'host-me', state: next })
+              );
+            } catch {
+              // ignore storage errors
+            }
+          }
+          return next;
+        });
+        return;
+      }
+
       isWritingRef.current = true;
       setError(null);
       try {
@@ -112,7 +159,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         isWritingRef.current = false;
       }
     },
-    [roomCode]
+    [roomCode, localHostId, user]
   );
 
   const createRoomFn = useCallback(
@@ -123,6 +170,44 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       return code;
     },
     [user, enterRoom]
+  );
+
+  const createBotRoomFn = useCallback(
+    (maxPlayers: number, hostName?: string) => {
+      if (channelRef.current) {
+        unsubscribeFromRoom(channelRef.current);
+        channelRef.current = null;
+      }
+      const hostId = user?.id || 'host-me';
+      const actualHostName = hostName?.trim() || user?.name || 'ผู้เล่น';
+      const boundedMax = Math.min(Math.max(maxPlayers, 3), 15);
+
+      let state = engineCreateRoom(hostId, actualHostName, boundedMax);
+      for (let i = 1; i <= boundedMax - 1; i++) {
+        const botId = `bot-${i}`;
+        const botName = BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length];
+        state = addPlayer(state, botId, botName);
+      }
+
+      const code = `bot-${Math.floor(1000 + Math.random() * 9000)}`;
+      setLocalHostId(hostId);
+      setRoomCode(code);
+      setRoomState(state);
+      setError(null);
+
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(
+            `muffin_bot_room_${code}`,
+            JSON.stringify({ hostId, state })
+          );
+        } catch {
+          // ignore storage errors
+        }
+      }
+      return code;
+    },
+    [user]
   );
 
   const joinRoomFn = useCallback(
@@ -148,9 +233,35 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
   const resumeRoom = useCallback(
     async (code: string) => {
+      if (code.startsWith('bot-')) {
+        if (roomCode === code && roomState) return;
+        if (typeof window !== 'undefined') {
+          const cached = sessionStorage.getItem(`muffin_bot_room_${code}`);
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              setLocalHostId(parsed.hostId || user?.id || 'host-me');
+              setRoomCode(code);
+              setRoomState(parsed.state);
+              return;
+            } catch {
+              // fallback to fresh bot room
+            }
+          }
+        }
+        const hostId = user?.id || 'host-me';
+        const hostName = user?.name || 'ผู้เล่น';
+        let state = engineCreateRoom(hostId, hostName, 3);
+        state = addPlayer(state, 'bot-1', BOT_NAME_POOL[0]);
+        state = addPlayer(state, 'bot-2', BOT_NAME_POOL[1]);
+        setLocalHostId(hostId);
+        setRoomCode(code);
+        setRoomState(state);
+        return;
+      }
       await enterRoom(code);
     },
-    [enterRoom]
+    [enterRoom, roomCode, roomState, user]
   );
 
   const leaveRoom = useCallback(() => {
@@ -158,10 +269,18 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       unsubscribeFromRoom(channelRef.current);
       channelRef.current = null;
     }
+    if (roomCode?.startsWith('bot-') && typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`muffin_bot_room_${roomCode}`);
+      } catch {
+        // ignore
+      }
+    }
+    executedBotTurnKeyRef.current = null;
     setRoomCode(null);
     setRoomState(null);
     setError(null);
-  }, []);
+  }, [roomCode]);
 
   const startSetupFn = useCallback(
     () =>
@@ -319,13 +438,15 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const playAgain = useCallback(
-    () =>
+    () => {
+      executedBotTurnKeyRef.current = null;
       run((state) => {
         const currentStatus = state.status;
         if (currentStatus !== 'finished' && (currentStatus as string) !== 'ended') return state;
         if (myPlayerId !== state.hostId) return state;
         return { ...engineResetForPlayAgain(state), pendingResponse: null, lastResult: null };
-      }),
+      });
+    },
     [run, myPlayerId]
   );
 
@@ -354,19 +475,41 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId]
   );
 
+  const executedBotTurnKeyRef = useRef<string | null>(null);
+
   // Auto-skip the counter window only when NO eligible responder holds a valid counter card.
-  // Runs on the host's client only (single source of truth) — checking "does my own hand have
-  // a counter" on every client independently would let the first bystander with an empty hand
-  // resolve the window for the whole table within 400ms, even if the actual target (or any other
-  // eligible player) does hold a valid counter and simply hasn't had a real chance to act yet.
-  // The responseId guard in skipCounter still stops this from double-applying an effect, but it
-  // can't stop the effect from being applied too early — so the eligibility check itself has to
-  // be correct, not just idempotent.
   useEffect(() => {
     const pendingResponse = roomState?.pendingResponse;
     if (!pendingResponse || !myPlayerId || !roomState) return;
     if (myPlayerId !== roomState.hostId) return;
 
+    const isBot = roomCode?.startsWith('bot-');
+
+    if (isBot) {
+      // In local bot mode, only the local human player interacts via counter modals.
+      // If the local human player is the actor of the card, or is not the target of a trap,
+      // or does not hold any valid counter card, auto-skip the counter response window.
+      const isHumanActor = pendingResponse.actorId === myPlayerId;
+      const isHumanTarget = !pendingResponse.targetId || pendingResponse.targetId === myPlayerId;
+      const humanHand = roomState.players[myPlayerId]?.hand ?? [];
+      const humanCanCounter = getValidCounterCards(humanHand, pendingResponse).length > 0;
+
+      // 1. If human was hit by a trap, human sees TrapAlertModal to decide counter/decline
+      if (!isHumanActor && isHumanTarget && pendingResponse.kind === 'trap') {
+        return;
+      }
+      // 2. If human can counter an action, human sees CounterModal to decide play/skip
+      if (!isHumanActor && humanCanCounter && pendingResponse.kind === 'action') {
+        return;
+      }
+
+      // Otherwise (bot-on-bot action/trap, human's own action/trap, or human has no valid counters), auto-skip after 400ms
+      const responseId = pendingResponse.responseId;
+      const timer = setTimeout(() => skipCounter(responseId), 400);
+      return () => clearTimeout(timer);
+    }
+
+    // Multiplayer room logic (all human players):
     const eligibleIds =
       pendingResponse.kind === 'trap' && pendingResponse.targetId
         ? [pendingResponse.targetId]
@@ -381,7 +524,48 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     const responseId = pendingResponse.responseId;
     const timer = setTimeout(() => skipCounter(responseId), 400);
     return () => clearTimeout(timer);
-  }, [roomState, myPlayerId, skipCounter]);
+  }, [roomState, myPlayerId, skipCounter, roomCode]);
+
+  // Auto-play bot turns in local bot rooms
+  useEffect(() => {
+    if (!roomCode?.startsWith('bot-') || !roomState || roomState.pendingResponse) return;
+    if (roomState.status !== 'playing') return;
+    if (roomState.isShufflingDrawPile) return;
+
+    const botId = roomState.turnOrder[roomState.currentTurnIndex];
+    if (!botId || !botId.startsWith('bot-')) return;
+
+    // Unique turn key per turn state to prevent duplicate scheduling
+    const turnKey = `${roomState.roundNumber ?? 1}-${roomState.currentTurnIndex}-${botId}-${roomState.players[botId]?.hand.length}-${roomState.drawPile.length}`;
+    if (executedBotTurnKeyRef.current === turnKey) return;
+
+    const timer = setTimeout(() => {
+      executedBotTurnKeyRef.current = turnKey;
+      run((state) => {
+        if (state.status !== 'playing' || state.pendingResponse || state.isShufflingDrawPile) return state;
+        const currentBotId = state.turnOrder[state.currentTurnIndex];
+        if (!currentBotId || !currentBotId.startsWith('bot-')) return state;
+
+        const decision = decideBotTurn(state, currentBotId);
+        if (decision.action === 'draw') {
+          return advanceAndCheckWin(draw(state, currentBotId, 1));
+        }
+        const afterDiscard = discard(state, currentBotId, 1, [decision.code]);
+        const responseId = `action-${decision.code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        return {
+          ...afterDiscard,
+          pendingResponse: {
+            responseId,
+            kind: 'action',
+            code: decision.code,
+            actorId: currentBotId,
+            targetId: decision.targetId,
+          },
+        };
+      });
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [roomCode, roomState, run]);
 
   const rawLastResult = roomState?.lastResult ?? null;
   const lastResult =
@@ -397,6 +581,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     error,
     clearLastResult,
     createRoom: createRoomFn,
+    createBotRoom: createBotRoomFn,
     joinRoom: joinRoomFn,
     previewRoom,
     resumeRoom,
@@ -427,3 +612,4 @@ export function useGameSession(): GameSessionValue {
   if (!ctx) throw new Error('useGameSession must be used within GameSessionProvider');
   return ctx;
 }
+

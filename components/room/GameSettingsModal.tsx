@@ -107,7 +107,7 @@ export function GameSettingsModal({
           >
             <div className="flex items-center gap-2.5">
               <CardsIcon className="h-4 w-4 text-primary" />
-              <span>ดูข้อมูลไพ่ (231 ใบ)</span>
+              <span>ดูข้อมูลไพ่ (289 ใบ)</span>
             </div>
             <span className="text-[10px] text-ink-secondary">ค้นหาการ์ด →</span>
           </button>

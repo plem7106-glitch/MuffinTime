@@ -75,7 +75,7 @@ export function InGameCardGalleryModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-black text-ink">คลังข้อมูลไพ่</h2>
-              <p className="text-[10px] text-ink-secondary">ไพ่ทั้งหมด 231 ใบ</p>
+              <p className="text-[10px] text-ink-secondary">ไพ่ทั้งหมด {totalCount} ใบ</p>
             </div>
           </div>
           <button

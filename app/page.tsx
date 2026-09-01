@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { GameBenefits } from '../components/lobby/GameBenefits';
 import { JoinRoomModal } from '../components/lobby/JoinRoomModal';
 import { useAudio } from '../lib/audio';
-import { useAuth } from '../lib/auth';
+import { useAuth, AUTH_CONFIG } from '../lib/auth';
 import {
   MenuIcon,
   PlusIcon,
@@ -29,12 +29,12 @@ export default function Home() {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (AUTH_CONFIG.requireAuthOnHome && !loading && !user) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [loading, user, router, pathname]);
 
-  if (loading || !user) return null;
+  if (AUTH_CONFIG.requireAuthOnHome && (loading || !user)) return null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3 p-4 pb-8 bg-white">
@@ -91,7 +91,7 @@ export default function Home() {
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-ink hover:bg-primary/10 hover:text-primary transition-colors"
               >
                 <CardsIcon className="h-4 w-4 text-primary" />
-                <span>คลังการ์ด 231 ใบ</span>
+                <span>คลังการ์ด 289 ใบ</span>
               </Link>
 
               <div className="my-1 border-t border-gray-100" />
