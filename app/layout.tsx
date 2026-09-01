@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Noto_Sans_Thai } from 'next/font/google';
 import './globals.css';
+import { AuthProvider } from '../lib/auth';
 import { GameSessionProvider } from '../lib/session';
 import { AudioProvider } from '../lib/audio';
 
@@ -23,9 +24,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="th">
       <body className={notoSansThai.className}>
-        <AudioProvider>
-          <GameSessionProvider>{children}</GameSessionProvider>
-        </AudioProvider>
+        <AuthProvider>
+          <AudioProvider>
+            <GameSessionProvider>{children}</GameSessionProvider>
+          </AudioProvider>
+        </AuthProvider>
       </body>
     </html>
   );
