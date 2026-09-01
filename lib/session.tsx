@@ -335,26 +335,33 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId]
   );
 
-  // Auto-skip the counter window when this player's hand has no valid counter to play.
-  // Runs per-client (each player checks only their own hand) — safe to race across
-  // clients because skipCounter/playCounter both check responseId before applying anything.
+  // Auto-skip the counter window only when NO eligible responder holds a valid counter card.
+  // Runs on the host's client only (single source of truth) — checking "does my own hand have
+  // a counter" on every client independently would let the first bystander with an empty hand
+  // resolve the window for the whole table within 400ms, even if the actual target (or any other
+  // eligible player) does hold a valid counter and simply hasn't had a real chance to act yet.
+  // The responseId guard in skipCounter still stops this from double-applying an effect, but it
+  // can't stop the effect from being applied too early — so the eligibility check itself has to
+  // be correct, not just idempotent.
   useEffect(() => {
     const pendingResponse = roomState?.pendingResponse;
     if (!pendingResponse || !myPlayerId || !roomState) return;
+    if (myPlayerId !== roomState.hostId) return;
 
-    const isTrapTarget =
-      pendingResponse.kind === 'trap' &&
-      pendingResponse.actorId !== myPlayerId &&
-      (!pendingResponse.targetId || pendingResponse.targetId === myPlayerId);
-    if (isTrapTarget) return;
+    const eligibleIds =
+      pendingResponse.kind === 'trap' && pendingResponse.targetId
+        ? [pendingResponse.targetId]
+        : Object.keys(roomState.players).filter((id) => id !== pendingResponse.actorId);
 
-    const myHand = roomState.players[myPlayerId]?.hand ?? [];
-    const validCounters = getValidCounterCards(myHand, pendingResponse);
-    if (validCounters.length === 0) {
-      const responseId = pendingResponse.responseId;
-      const timer = setTimeout(() => skipCounter(responseId), 400);
-      return () => clearTimeout(timer);
-    }
+    const anyoneCanRespond = eligibleIds.some((id) => {
+      const hand = roomState.players[id]?.hand ?? [];
+      return getValidCounterCards(hand, pendingResponse).length > 0;
+    });
+    if (anyoneCanRespond) return;
+
+    const responseId = pendingResponse.responseId;
+    const timer = setTimeout(() => skipCounter(responseId), 400);
+    return () => clearTimeout(timer);
   }, [roomState, myPlayerId, skipCounter]);
 
   const rawLastResult = roomState?.lastResult ?? null;
