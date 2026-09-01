@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from './supabase';
-import { useAuth } from './auth';
+import { usePlayer } from './player';
 import { fetchRoom, updateRoomWithRetry, createRoomWithRetry } from '../multiplayer/room';
 import { subscribeToRoom, unsubscribeFromRoom } from '../multiplayer/realtime';
 import {
@@ -54,9 +54,9 @@ export interface GameSessionValue {
   lastResult: LastResult | null;
   error: string | null;
   clearLastResult: () => void;
-  createRoom: (maxPlayers: number) => Promise<string>;
+  createRoom: (maxPlayers: number, hostName: string) => Promise<string>;
   createBotRoom: (maxPlayers: number, hostName?: string) => string;
-  joinRoom: (code: string) => Promise<void>;
+  joinRoom: (code: string, playerName: string) => Promise<void>;
   previewRoom: (code: string) => Promise<RoomState | null>;
   resumeRoom: (code: string) => Promise<void>;
   leaveRoom: () => void;
@@ -90,7 +90,7 @@ function advanceAndCheckWin(room: RoomState): RoomState {
 }
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { playerId, playerName } = usePlayer();
   const [localHostId, setLocalHostId] = useState<string>('host-me');
 
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -99,7 +99,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const [dismissedResponseId, setDismissedResponseId] = useState<string | null>(null);
 
   const isBotRoom = roomCode?.startsWith('bot-') ?? false;
-  const myPlayerId = isBotRoom ? (localHostId || user?.id || 'host-me') : (user?.id ?? null);
+  const myPlayerId = isBotRoom ? (localHostId || playerId || 'host-me') : playerId;
 
   const channelRef = useRef<ReturnType<typeof subscribeToRoom> | null>(null);
   const isWritingRef = useRef(false);
@@ -138,7 +138,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
             try {
               sessionStorage.setItem(
                 `muffin_bot_room_${roomCode}`,
-                JSON.stringify({ hostId: localHostId || user?.id || 'host-me', state: next })
+                JSON.stringify({ hostId: localHostId || playerId || 'host-me', state: next })
               );
             } catch {
               // ignore storage errors
@@ -159,17 +159,18 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         isWritingRef.current = false;
       }
     },
-    [roomCode, localHostId, user]
+    [roomCode, localHostId, playerId]
   );
 
   const createRoomFn = useCallback(
-    async (maxPlayers: number) => {
-      if (!user) throw new Error('ต้องเข้าสู่ระบบก่อนสร้างห้อง');
-      const { code } = await createRoomWithRetry(supabase, user.id, user.name, maxPlayers);
+    async (maxPlayers: number, hostName: string) => {
+      if (!playerId) throw new Error('ระบบยังไม่พร้อม ลองใหม่อีกครั้ง');
+      const finalName = hostName.trim() || 'ผู้เล่น';
+      const { code } = await createRoomWithRetry(supabase, playerId, finalName, maxPlayers);
       await enterRoom(code);
       return code;
     },
-    [user, enterRoom]
+    [playerId, enterRoom]
   );
 
   const createBotRoomFn = useCallback(
@@ -178,8 +179,8 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         unsubscribeFromRoom(channelRef.current);
         channelRef.current = null;
       }
-      const hostId = user?.id || 'host-me';
-      const actualHostName = hostName?.trim() || user?.name || 'ผู้เล่น';
+      const hostId = playerId || 'host-me';
+      const actualHostName = hostName?.trim() || playerName || 'ผู้เล่น';
       const boundedMax = Math.min(Math.max(maxPlayers, 3), 15);
 
       let state = engineCreateRoom(hostId, actualHostName, boundedMax);
@@ -207,19 +208,20 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       }
       return code;
     },
-    [user]
+    [playerId, playerName]
   );
 
   const joinRoomFn = useCallback(
-    async (code: string) => {
-      if (!user) throw new Error('ต้องเข้าสู่ระบบก่อนเข้าร่วมห้อง');
+    async (code: string, name: string) => {
+      if (!playerId) throw new Error('ระบบยังไม่พร้อม ลองใหม่อีกครั้ง');
+      const finalName = name.trim() || 'ผู้เล่น';
       await updateRoomWithRetry(supabase, code, (state) => {
-        if (state.players[user.id]) return state; // already a member — resume, don't re-add
-        return addPlayer(state, user.id, user.name);
+        if (state.players[playerId]) return state; // already a member — resume, don't re-add
+        return addPlayer(state, playerId, finalName);
       });
       await enterRoom(code);
     },
-    [user, enterRoom]
+    [playerId, enterRoom]
   );
 
   const previewRoom = useCallback(async (code: string): Promise<RoomState | null> => {
@@ -240,7 +242,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           if (cached) {
             try {
               const parsed = JSON.parse(cached);
-              setLocalHostId(parsed.hostId || user?.id || 'host-me');
+              setLocalHostId(parsed.hostId || playerId || 'host-me');
               setRoomCode(code);
               setRoomState(parsed.state);
               return;
@@ -249,8 +251,8 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-        const hostId = user?.id || 'host-me';
-        const hostName = user?.name || 'ผู้เล่น';
+        const hostId = playerId || 'host-me';
+        const hostName = playerName || 'ผู้เล่น';
         let state = engineCreateRoom(hostId, hostName, 3);
         state = addPlayer(state, 'bot-1', BOT_NAME_POOL[0]);
         state = addPlayer(state, 'bot-2', BOT_NAME_POOL[1]);
@@ -261,7 +263,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       }
       await enterRoom(code);
     },
-    [enterRoom, roomCode, roomState, user]
+    [enterRoom, roomCode, roomState, playerId, playerName]
   );
 
   const leaveRoom = useCallback(() => {
