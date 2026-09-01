@@ -111,13 +111,14 @@ export function Card({
           selected ? '-translate-y-2 shadow-md ring-2 ring-primary' : ''
         } ${className}`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
           <span className={`text-xs font-bold ${theme.text}`}>{theme.label}</span>
           {id && <span className="text-[10px] font-mono text-ink-secondary">{id}</span>}
         </div>
-        <div className="flex flex-col gap-0.5 my-auto">
-          <span className="text-sm font-bold text-ink line-clamp-2">{displayTitle}</span>
-          <span className="line-clamp-3 text-xs text-ink-secondary">{displayDesc}</span>
+        {renderImageSlot(true)}
+        <div className="flex flex-col gap-0.5 min-h-0">
+          <span className="text-xs font-bold text-ink line-clamp-1">{displayTitle}</span>
+          <span className="line-clamp-2 text-[10px] text-ink-secondary">{displayDesc}</span>
         </div>
       </button>
     );
