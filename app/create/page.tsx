@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
-import { useAuth } from '../../lib/auth';
+import { usePlayer } from '../../lib/player';
 import {
   ChevronLeftIcon,
   UsersIcon,
@@ -21,8 +21,13 @@ function CreateRoomContent() {
   const initialMode = searchParams.get('mode') === 'bots' ? 'bots' : 'friends';
   const [mode, setMode] = useState<CreateMode>(initialMode);
 
-  const { user, loading: authLoading } = useAuth();
+  const { playerName, setPlayerName } = usePlayer();
   const { createRoom, createBotRoom } = useGameSession();
+
+  const [nameInput, setNameInput] = useState('');
+  useEffect(() => {
+    setNameInput(playerName);
+  }, [playerName]);
 
   // Friends room state
   const [friendsMaxPlayers, setFriendsMaxPlayers] = useState(3);
@@ -31,17 +36,18 @@ function CreateRoomContent() {
 
   // Bot room state
   const [botMaxPlayers, setBotMaxPlayers] = useState(3);
-  const [botPlayerName, setBotPlayerName] = useState(user?.name || 'ผู้เล่น');
   const [isCreatingBots, setIsCreatingBots] = useState(false);
 
   // Submit Friends Room
   async function handleFriendsSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (!user || isCreatingFriends) return;
+    if (isCreatingFriends) return;
+    const finalName = nameInput.trim() || 'ผู้เล่น';
+    setPlayerName(finalName);
     setIsCreatingFriends(true);
     setFriendsError('');
     try {
-      const code = await createRoom(friendsMaxPlayers);
+      const code = await createRoom(friendsMaxPlayers, finalName);
       router.push(`/room/${code}`);
     } catch (err) {
       setFriendsError(err instanceof Error ? err.message : 'สร้างห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
@@ -53,9 +59,11 @@ function CreateRoomContent() {
   function handleBotSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (isCreatingBots) return;
+    const finalName = nameInput.trim() || 'ผู้เล่น';
+    setPlayerName(finalName);
     setIsCreatingBots(true);
     try {
-      const code = createBotRoom(botMaxPlayers, botPlayerName.trim() || 'ผู้เล่น');
+      const code = createBotRoom(botMaxPlayers, finalName);
       router.push(`/room/${code}`);
     } catch {
       setIsCreatingBots(false);
@@ -138,45 +146,25 @@ function CreateRoomContent() {
       {/* 1. PLAY WITH FRIENDS (ONLINE MULTIPLAYER — REQUIRES SUPABASE AUTH)         */}
       {/* ========================================================================= */}
       {mode === 'friends' && (
-        <>
-          {/* If NOT logged in: Show Login Requirement Card */}
-          {!authLoading && !user ? (
-            <div className="flex flex-1 flex-col justify-between gap-4 py-2">
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 flex flex-col gap-2.5 text-left">
-                <div className="flex items-center gap-2 text-amber-800 font-black text-sm">
+        <form onSubmit={handleFriendsSubmit} className="flex flex-col gap-3.5 flex-1">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 text-primary">
                   <UserIcon className="h-4 w-4" />
-                  <span>ต้องเข้าสู่ระบบเพื่อเล่นกับเพื่อน</span>
+                  <label htmlFor="friendsPlayerName" className="text-sm font-bold text-ink">
+                    ชื่อของคุณในเกม
+                  </label>
                 </div>
-                <p className="text-xs text-amber-900 leading-relaxed">
-                  การสร้างห้องออนไลน์และเล่นแบบเรียลไทม์จำเป็นต้องระบุตัวตนผ่าน Supabase เพื่อซิงค์สถานะเกมระหว่างเครื่อง
-                </p>
-                <div className="mt-1 flex flex-col gap-1.5 text-xs text-amber-800 font-semibold">
-                  <span>💡 หากต้องการทดสอบ UI ทันที สามารถกด <strong>เล่นกับบอท</strong> ได้โดยไม่ต้องล็อกอิน</span>
-                </div>
+                <input
+                  id="friendsPlayerName"
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="กรอกชื่อของคุณ"
+                  maxLength={20}
+                  className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
+                />
               </div>
 
-              <div className="flex flex-col gap-2 mt-auto">
-                <button
-                  type="button"
-                  onClick={() => router.push('/login?next=%2Fcreate%3Fmode%3Dfriends')}
-                  className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-black text-white shadow-[0_6px_18px_rgba(237,31,79,0.3)] transition-all hover:bg-primary/90 active:scale-[0.98]"
-                >
-                  <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
-                  <span>เข้าสู่ระบบด้วยอีเมล</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMode('bots')}
-                  className="flex min-h-[46px] w-full items-center justify-center rounded-2xl border border-gray-200 bg-white text-xs font-bold text-ink hover:bg-gray-50 transition-colors"
-                >
-                  สลับไปเล่นกับบอท (ไม่ต้องล็อกอิน)
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* If Logged in: Show Normal Multiplayer Creation Form */
-            <form onSubmit={handleFriendsSubmit} className="flex flex-col gap-3.5 flex-1">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1.5 text-primary">
                   <UsersIcon className="h-4 w-4" />
@@ -262,9 +250,7 @@ function CreateRoomContent() {
                 <EnterDoorIcon className="h-5 w-5 stroke-[2.5]" />
                 <span>{isCreatingFriends ? 'กำลังสร้างห้อง...' : 'สร้างห้องออนไลน์'}</span>
               </button>
-            </form>
-          )}
-        </>
+        </form>
       )}
 
       {/* ========================================================================= */}
@@ -283,8 +269,8 @@ function CreateRoomContent() {
             <input
               id="botPlayerName"
               type="text"
-              value={botPlayerName}
-              onChange={(e) => setBotPlayerName(e.target.value)}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
               placeholder="กรอกชื่อของคุณ"
               maxLength={20}
               className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"

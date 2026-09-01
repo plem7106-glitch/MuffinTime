@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRoom, addPlayer, startGame, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
+import { createRoom, addPlayer, removePlayer, startGame, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
 
 describe('createRoom', () => {
   it('creates a lobby room with the host as the first player', () => {
@@ -146,5 +146,32 @@ describe('startGame', () => {
     const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
     const started = startGame(room, allCodes, () => 0);
     expect(() => startGame(started, allCodes, () => 0)).toThrow('game already started');
+  });
+});
+
+describe('removePlayer', () => {
+  it('removes a non-host player and leaves the host unchanged', () => {
+    let room = createRoom('host1', 'Ploy', 4);
+    room = addPlayer(room, 'p2', 'Nut');
+    const next = removePlayer(room, 'p2');
+    expect(next.players.p2).toBeUndefined();
+    expect(Object.keys(next.players)).toEqual(['host1']);
+    expect(next.hostId).toBe('host1');
+  });
+
+  it('reassigns the host to a remaining player when the host leaves', () => {
+    let room = createRoom('host1', 'Ploy', 4);
+    room = addPlayer(room, 'p2', 'Nut');
+    room = addPlayer(room, 'p3', 'Bank');
+    const next = removePlayer(room, 'host1');
+    expect(next.players.host1).toBeUndefined();
+    expect(next.hostId).not.toBe('host1');
+    expect(['p2', 'p3']).toContain(next.hostId);
+  });
+
+  it('is a no-op when the player is not in the room', () => {
+    const room = createRoom('host1', 'Ploy', 4);
+    const next = removePlayer(room, 'nobody');
+    expect(next).toEqual(room);
   });
 });

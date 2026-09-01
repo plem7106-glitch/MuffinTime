@@ -1,12 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { GameBenefits } from '../components/lobby/GameBenefits';
 import { JoinRoomModal } from '../components/lobby/JoinRoomModal';
 import { useAudio } from '../lib/audio';
-import { useAuth, AUTH_CONFIG } from '../lib/auth';
 import {
   MenuIcon,
   PlusIcon,
@@ -21,20 +19,9 @@ import {
 } from '../components/ui/Icons';
 
 export default function Home() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { user, loading } = useAuth();
   const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx } = useAudio();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (AUTH_CONFIG.requireAuthOnHome && !loading && !user) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-    }
-  }, [loading, user, router, pathname]);
-
-  if (AUTH_CONFIG.requireAuthOnHome && (loading || !user)) return null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3 p-4 pb-8 bg-white">

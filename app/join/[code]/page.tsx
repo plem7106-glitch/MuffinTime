@@ -1,39 +1,37 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useGameSession } from '../../../lib/session';
-import { useAuth } from '../../../lib/auth';
+import { usePlayer } from '../../../lib/player';
 import type { RoomState } from '../../../game/types';
 import {
   ChevronLeftIcon,
   InfoIcon,
   EnterDoorIcon,
   UsersIcon,
+  UserIcon,
 } from '../../../components/ui/Icons';
 
 export default function JoinRoomPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useParams<{ code: string }>();
   const roomCode = params.code || '';
-  const { user, loading: authLoading } = useAuth();
+  const { playerId, playerName, setPlayerName } = usePlayer();
   const { previewRoom, joinRoom } = useGameSession();
 
   const [previewLoading, setPreviewLoading] = useState(true);
   const [preview, setPreview] = useState<RoomState | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [nameInput, setNameInput] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-    }
-  }, [authLoading, user, router, pathname]);
+    setNameInput(playerName);
+  }, [playerName]);
 
   useEffect(() => {
-    if (!user) return;
     let cancelled = false;
     setPreviewLoading(true);
     previewRoom(roomCode).then((state) => {
@@ -44,11 +42,11 @@ export default function JoinRoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, roomCode, previewRoom]);
+  }, [roomCode, previewRoom]);
 
   const currentPlayers = preview ? Object.keys(preview.players).length : 0;
   const maxPlayers = preview?.maxPlayers ?? 15;
-  const alreadyMember = !!preview && !!user && !!preview.players[user.id];
+  const alreadyMember = !!preview && !!playerId && !!preview.players[playerId];
   const isLobbyStatus = preview?.status === 'lobby';
   const isFull = !!preview && !alreadyMember && currentPlayers >= maxPlayers;
   const canJoin = !!preview && (alreadyMember || (isLobbyStatus && !isFull));
@@ -56,18 +54,18 @@ export default function JoinRoomPage() {
 
   async function handleJoin() {
     if (!canJoin || joining) return;
+    const finalName = nameInput.trim() || 'ผู้เล่น';
+    setPlayerName(finalName);
     setJoining(true);
     setJoinError('');
     try {
-      await joinRoom(roomCode);
+      await joinRoom(roomCode, finalName);
       router.push(`/room/${roomCode}`);
     } catch (err) {
       setJoinError(err instanceof Error ? err.message : 'เข้าร่วมห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
       setJoining(false);
     }
   }
-
-  if (authLoading || !user) return null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-3.5 p-4 pb-8 bg-white">
@@ -91,7 +89,7 @@ export default function JoinRoomPage() {
             เริ่มความป่วนกันเลย!
           </h2>
           <p className="text-xs font-medium text-ink-secondary leading-snug mt-1.5">
-            สวัสดี {user.name} — กดเข้าร่วมได้เลย
+            กรอกชื่อแล้วกดเข้าร่วมได้เลย
           </p>
         </div>
 
@@ -104,6 +102,24 @@ export default function JoinRoomPage() {
           />
         </div>
       </section>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-primary">
+          <UserIcon className="h-4 w-4" />
+          <label htmlFor="joinPlayerName" className="text-sm font-bold text-ink">
+            ชื่อของคุณในเกม
+          </label>
+        </div>
+        <input
+          id="joinPlayerName"
+          type="text"
+          value={nameInput}
+          onChange={(e) => setNameInput(e.target.value)}
+          placeholder="กรอกชื่อของคุณ"
+          maxLength={20}
+          className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
+        />
+      </div>
 
       {previewLoading ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 p-6 text-center">
