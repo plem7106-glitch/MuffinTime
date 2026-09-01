@@ -1,4 +1,5 @@
 import { getCardByCode } from './index';
+import { getActionRule } from '../../game/actionRules/registry';
 import type { CardCode } from '../../game/types';
 
 export interface CardDisplay {
@@ -23,6 +24,8 @@ export function getCardDisplay(code: CardCode): CardDisplay {
     effect: card.description_th,
     titleEn: card.name_en,
     image: card.image,
-    needsTarget: card.id === 'A014' || card.id === 'A016',
+    // Single-select target flow only -- roster_select/outcome_entry Action kinds
+    // need their own UI wiring (added alongside the first card that uses them).
+    needsTarget: getActionRule(card.id)?.needsTargetSelection === true,
   };
 }

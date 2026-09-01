@@ -38,7 +38,7 @@ export function TargetSelector({
                 (multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'border-primary bg-primary/10' : 'border-ink/20'
               }`}
             >
-              <span className={selectedId === id ? 'text-primary' : 'text-ink-secondary'}>
+              <span className={(multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'text-primary' : 'text-ink-secondary'}>
                 {(multiSelect ? selectedIds?.includes(id) : selectedId === id) ? '●' : '○'}
               </span>
               <span className="font-semibold text-ink">{player.name}</span>
