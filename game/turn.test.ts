@@ -68,6 +68,30 @@ describe('advanceTurn', () => {
     expect(next.players.p2.skipNextTurn).toBe(false);
     expect(next.players.p3.skipNextTurn).toBe(false);
   });
+
+  it('clears a globalRestriction once play returns to its source player', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: { p1: { skipNextTurn: false }, p2: { skipNextTurn: false }, p3: { skipNextTurn: false } },
+      globalRestrictions: [{ type: 'no_actions', sourcePlayerId: 'p2' }],
+    } as unknown as RoomState;
+    const stillActive = advanceTurn(state); // -> p2's turn starts: restriction lifts now
+    expect(stillActive.globalRestrictions).toEqual([]);
+  });
+
+  it('leaves a globalRestriction in place until its source player\'s turn arrives', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: { p1: { skipNextTurn: false }, p2: { skipNextTurn: false }, p3: { skipNextTurn: false } },
+      globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p3' }],
+    } as unknown as RoomState;
+    const next = advanceTurn(state); // -> p2's turn, not p3's yet
+    expect(next.globalRestrictions).toEqual([{ type: 'no_win', sourcePlayerId: 'p3' }]);
+  });
 });
 
 describe('emergencyForceSkipTurn', () => {
@@ -92,6 +116,29 @@ describe('emergencyForceSkipTurn', () => {
     expect(next.currentTurnIndex).toBe(2);
     expect(next.turnPhase).toBe('trap_placement');
     expect(next.players.p3.skipNextTurn).toBe(true);
+  });
+
+  it('also clears a globalRestriction once play returns to its source player', () => {
+    const state = {
+      status: 'playing',
+      turnOrder: ['p1', 'p2', 'p3'],
+      seatOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { hand: [], traps: [], skipNextTurn: false },
+        p2: { hand: [], traps: [], skipNextTurn: false },
+        p3: { hand: [], traps: [], skipNextTurn: false },
+      },
+      drawPile: [],
+      discardPile: [],
+      reactionStack: [],
+      globalRestrictions: [{ type: 'no_actions', sourcePlayerId: 'p2' }],
+    } as unknown as RoomState;
+
+    const next = emergencyForceSkipTurn(state);
+    expect(next.currentTurnIndex).toBe(1); // p2's turn
+    expect(next.globalRestrictions).toEqual([]);
   });
 });
 
@@ -133,6 +180,15 @@ describe('checkWinnerAtTurnStart', () => {
 
   it('is false if the hand count changed since declaring', () => {
     const state = { muffinTimeTarget: 10, players: { p1: { hand: Array(9).fill('A01'), hasCalledMuffinTime: true } } } as unknown as RoomState;
+    expect(checkWinnerAtTurnStart(state, 'p1')).toBe(false);
+  });
+
+  it('is false while a no_win globalRestriction is active, even if otherwise eligible', () => {
+    const state = {
+      muffinTimeTarget: 10,
+      players: { p1: { hand: Array(10).fill('A01'), hasCalledMuffinTime: true } },
+      globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p2' }],
+    } as unknown as RoomState;
     expect(checkWinnerAtTurnStart(state, 'p1')).toBe(false);
   });
 });

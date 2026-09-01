@@ -74,6 +74,12 @@ export function advanceTurn(state: RoomState): RoomState {
   }
   next.turnPhase = 'trap_placement';
 
+  // "...until your next turn" restrictions (A019/A072/A085) lift the moment
+  // play returns to whoever created them.
+  if (next.globalRestrictions && next.globalRestrictions.length > 0) {
+    next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);
+  }
+
   if (wrapped) {
     next.roundNumber = (next.roundNumber ?? 1) + 1;
   } else if (!next.roundNumber) {
@@ -97,6 +103,7 @@ export function declareMuffinTime(state: RoomState, playerId: PlayerId): RoomSta
 }
 
 export function checkWinnerAtTurnStart(state: RoomState, playerId: PlayerId): boolean {
+  if (state.globalRestrictions?.some((r) => r.type === 'no_win')) return false;
   const player = state.players[playerId];
   return Boolean(player?.hasCalledMuffinTime && player.hand.length === state.muffinTimeTarget);
 }
@@ -142,6 +149,9 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
   next.turnPhase = 'trap_placement';
   const activePlayerId = order[next.currentTurnIndex];
   if (next.players[activePlayerId]) next.players[activePlayerId].placedTrapThisTurn = false;
+  if (next.globalRestrictions && next.globalRestrictions.length > 0) {
+    next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);
+  }
   return next;
 }
 

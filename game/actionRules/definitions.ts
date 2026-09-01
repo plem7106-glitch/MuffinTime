@@ -1469,6 +1469,40 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
   },
 
+  // -- Family I1: temporary global rule suspension (classification doc §Family I1) --
+  // Pushes a GlobalRestriction, cleared by game/turn.ts's advanceTurn the
+  // moment play returns to the actor (see game/types.ts's GlobalRestriction
+  // doc comment). Enforced in lib/session.tsx's playAction/playCounter and
+  // here in checkWinnerAtTurnStart for no_win.
+
+  A019: {
+    code: 'A019', name_en: "We're All Gonna Die", name_th: 'เราจะตายกันหมด!',
+    description_th: 'ไพ่ Counter ไม่สามารถใช้งานได้จนถึงเทิร์นถัดไปของคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => ({
+      ...state,
+      globalRestrictions: [...(state.globalRestrictions ?? []), { type: 'no_counters', sourcePlayerId: frame.actorId }],
+    }),
+  },
+  A072: {
+    code: 'A072', name_en: "Don't Even", name_th: 'อย่าแม้แต่จะคิด',
+    description_th: 'ไม่มีผู้เล่นคนใดสามารถเล่น Action ได้จนถึงเทิร์นถัดไปของคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => ({
+      ...state,
+      globalRestrictions: [...(state.globalRestrictions ?? []), { type: 'no_actions', sourcePlayerId: frame.actorId }],
+    }),
+  },
+  A085: {
+    code: 'A085', name_en: 'Hold Your Horses', name_th: 'ใจเย็นก่อน!',
+    description_th: 'ไม่มีผู้เล่นคนใดสามารถชนะเกมได้จนถึงเทิร์นถัดไปของคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => ({
+      ...state,
+      globalRestrictions: [...(state.globalRestrictions ?? []), { type: 'no_win', sourcePlayerId: frame.actorId }],
+    }),
+  },
+
   // A115 ("Tall Midget" -- tallest gives 3 to shortest) intentionally NOT
   // included: needs identifying TWO different subjective roles (tallest AND
   // shortest) in one play; neither the single-target picker nor the

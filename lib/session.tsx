@@ -400,6 +400,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (state.reactionStack && state.reactionStack.length > 0) return state;
         if (state.pendingResponse) return state;
         if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
+        if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
         const actorId = myPlayerId!;
         if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
         if ((code === 'A014' || code === 'A016') && !targetId) return state;
@@ -476,6 +477,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       run((state) => {
         const top = getTopFrame(state);
         if (!top || top.frameId !== responseId) return state;
+        if (state.globalRestrictions?.some((r) => r.type === 'no_counters')) return state;
         const counterActorId = myPlayerId!;
         if (!state.pendingResponse || !getPlayableCounters(state.players[counterActorId]?.hand ?? [], state.pendingResponse).includes(code)) return state;
         const afterDiscard = discard(state, counterActorId, 1, [code]);
@@ -657,8 +659,9 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       // In local bot mode, check if human has an active interaction to decide
       const isHumanActor = pendingResponse.actorId === myPlayerId;
       const isHumanTarget = !pendingResponse.targetId || pendingResponse.targetId === myPlayerId;
+      const noCounters = roomState.globalRestrictions?.some((r) => r.type === 'no_counters') ?? false;
       const humanHand = roomState.players[myPlayerId]?.hand ?? [];
-      const humanCanCounter = getPlayableCounters(humanHand, pendingResponse).length > 0;
+      const humanCanCounter = !noCounters && getPlayableCounters(humanHand, pendingResponse).length > 0;
 
       // 1. If human was hit by a trap, human sees TrapAlertModal to decide counter/decline
       if (!isHumanActor && isHumanTarget && pendingResponse.kind === 'trap') {
@@ -679,12 +682,14 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         // Evaluate bot counter decisions
         let botCounterActorId: string | null = null;
         let botCounterCode: string | null = null;
-        for (const botId of eligibleBotIds) {
-          const decision = decideBotCounter(roomState, botId, pendingResponse);
-          if (decision.action === 'counter') {
-            botCounterActorId = botId;
-            botCounterCode = decision.code;
-            break;
+        if (!noCounters) {
+          for (const botId of eligibleBotIds) {
+            const decision = decideBotCounter(roomState, botId, pendingResponse);
+            if (decision.action === 'counter') {
+              botCounterActorId = botId;
+              botCounterCode = decision.code;
+              break;
+            }
           }
         }
 

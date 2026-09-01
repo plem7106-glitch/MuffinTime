@@ -883,6 +883,27 @@ describe('Family J1/J2-subjective batch (roster = the extreme player(s), via exe
   });
 });
 
+describe('Family I1 batch (via resolveActionEffect)', () => {
+  it.each([
+    ['A019', 'no_counters'],
+    ['A072', 'no_actions'],
+    ['A085', 'no_win'],
+  ])('%s pushes a %s globalRestriction sourced from the actor', (code, type) => {
+    const next = resolveActionEffect(threePlayerState(), code, 'me');
+    expect(next.globalRestrictions).toEqual([{ type, sourcePlayerId: 'me' }]);
+  });
+
+  it('appends to existing restrictions rather than replacing them', () => {
+    const state = threePlayerState();
+    state.globalRestrictions = [{ type: 'no_win', sourcePlayerId: 'p2' }];
+    const next = resolveActionEffect(state, 'A019', 'me');
+    expect(next.globalRestrictions).toEqual([
+      { type: 'no_win', sourcePlayerId: 'p2' },
+      { type: 'no_counters', sourcePlayerId: 'me' },
+    ]);
+  });
+});
+
 describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
