@@ -122,8 +122,8 @@ export function HandTrayModal({
           <span className="text-[10px] text-ink-secondary/70">← เลื่อนซ้าย-ขวา →</span>
         </div>
 
-        {/* 1. Horizontal Scrollable Hand Cards Track */}
-        <div className="flex gap-2.5 overflow-x-auto py-2 px-1 pb-3 scrollbar-none shrink-0">
+        {/* 1. Overlapping Hand Cards Track (fanned like real cards in hand) */}
+        <div className="flex overflow-x-auto py-2 pl-1 pr-8 pb-3 scrollbar-none shrink-0">
           {hand.length === 0 ? (
             <div className="flex h-36 w-full items-center justify-center rounded-2xl border border-dashed border-gray-200 text-xs font-bold text-gray-400">
               ไม่มีไพ่ในมือ
@@ -149,7 +149,9 @@ export function HandTrayModal({
                   key={`${code}-${idx}`}
                   className="shrink-0 transition-transform duration-150"
                   style={{
-                    transform: isSelected ? 'translateY(-6px)' : undefined,
+                    marginLeft: idx === 0 ? 0 : -44,
+                    zIndex: isSelected ? 100 : idx,
+                    transform: isSelected ? 'translateY(-14px)' : undefined,
                   }}
                 >
                   <Card
