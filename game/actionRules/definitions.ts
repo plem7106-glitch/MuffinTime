@@ -1,12 +1,65 @@
-import { everyoneDraws, everyoneDiscards } from '../group';
+import { everyoneDraws, everyoneDiscards, passHands } from '../group';
 import { draw, discard } from '../pile';
 import { stealRandom } from '../transfer';
-import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer } from '../primitives';
+import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
 import { skipTurn } from '../turnFlow';
 import { getNextPlayerId } from '../turn';
+import { drawUntilCount } from '../misc';
+import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
 import type { ActionRuleDefinition } from './types';
-import type { CardCode, PlayerId, RoomState } from '../types';
+import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+
+/** Seating order used for "left/right neighbor" cards, falling back the same
+ * way GameTable.tsx's own seatOrder computation does. Convention chosen here
+ * (not verified against the seating UI's visual layout): index+1 = "right
+ * neighbor", index-1 = "left neighbor". Flip the sign below if it turns out
+ * backwards once seen on screen. */
+function getSeatOrder(state: RoomState): PlayerId[] {
+  const ids = Object.keys(state.players);
+  if (state.seatOrder && state.seatOrder.length === ids.length && state.seatOrder.every((id) => state.players[id])) {
+    return state.seatOrder;
+  }
+  return state.turnOrder && state.turnOrder.length === ids.length ? state.turnOrder : ids;
+}
+
+function rotateSeatOrder(state: RoomState, steps: number): RoomState {
+  const order = getSeatOrder(state);
+  const count = order.length;
+  if (count === 0) return state;
+  const rotated = order.map((_, i) => order[((i - steps) % count + count) % count]);
+  return { ...state, seatOrder: rotated };
+}
+
+/** Everyone simultaneously steals 1 card from their right-seat neighbor,
+ * pairing computed from the seat order before any of the steals happen. */
+function stealFromRightNeighbor(state: RoomState, rng: Rng = Math.random): RoomState {
+  const order = getSeatOrder(state);
+  const count = order.length;
+  let next = state;
+  for (let i = 0; i < count; i++) {
+    const thief = order[i];
+    const victim = order[(i + 1) % count];
+    if (thief === victim) continue;
+    next = stealRandom(next, victim, thief, 1, rng);
+  }
+  return next;
+}
+
+/** Pools every listed player's hand, shuffles, and deals it back out evenly
+ * (round-robin, so any remainder is spread one-at-a-time in playerIds order).
+ * Generalizes executeHandSwapAndDeal (2-player only) to N players, for A074. */
+function poolShuffleRedeal(state: RoomState, playerIds: PlayerId[], rng: Rng = Math.random): RoomState {
+  const next = cloneState(state);
+  const pool = shuffle(playerIds.flatMap((id) => next.players[id].hand), rng);
+  for (const id of playerIds) next.players[id].hand = [];
+  playerIds.forEach((id, i) => {
+    for (let j = i; j < pool.length; j += playerIds.length) {
+      next.players[id].hand.push(pool[j]);
+    }
+  });
+  return next;
+}
 
 /** Moves the specific card instance just played (frame.sourceCode, already in
  * discardPile by the time executeEffect runs) into another player's hand
@@ -481,6 +534,82 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       return nextId ? handOffPlayedCard(state, frame.sourceCode, nextId) : state;
     },
   },
+
+  // -- Family F: structural / seating & hand-redistribution (classification doc §Family F) --
+
+  A010: {
+    code: 'A010', name_en: "You're A Chair", name_th: 'นายคือเก้าอี้',
+    description_th: 'ผู้เล่นทุกคนย้ายที่นั่งไปทางขวา โดยทิ้ง Trap ที่วางไว้ให้อยู่ที่เดิม',
+    kind: 'auto',
+    // ponytail: real card leaves placed Traps pinned to the seat rather than
+    // following the player -- that reassignment isn't implemented, traps just
+    // move with their owner like normal.
+    executeEffect: (state) => rotateSeatOrder(state, 1),
+  },
+  A080: {
+    code: 'A080', name_en: 'Here It Comes!', name_th: 'มาแล้ว!',
+    description_th: 'ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่นั่งทางขวาของตัวเอง',
+    kind: 'auto',
+    executeEffect: (state) => stealFromRightNeighbor(state),
+  },
+  A087: {
+    code: 'A087', name_en: 'I Like Trains', name_th: 'ฉันชอบรถไฟ',
+    description_th: 'ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางซ้าย',
+    kind: 'auto',
+    executeEffect: (state) => passHands(state, -1),
+  },
+  A110: {
+    code: 'A110', name_en: 'Skateboards', name_th: 'สเกตบอร์ด',
+    description_th: 'ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางขวา',
+    kind: 'auto',
+    executeEffect: (state) => passHands(state, 1),
+  },
+  A156: {
+    code: 'A156', name_en: 'Musical Chairs, Muffin Style', name_th: 'เก้าอี้ดนตรีฉบับมัฟฟิน',
+    description_th: 'ทุกคนสลับที่นั่งไปทางซ้าย 1 ที่ พร้อมยกแก้วไปด้วย',
+    kind: 'auto',
+    executeEffect: (state) => rotateSeatOrder(state, -1),
+  },
+  A044: {
+    code: 'A044', name_en: 'Grow Up Fast', name_th: 'โตไว ๆ',
+    description_th: 'ผู้เล่นทุกคนปรับจำนวนไพ่ในมือให้เหลือ 7 ใบ โดยถ้ามีน้อยกว่าให้จั่วเพิ่ม และถ้ามากกว่าให้ทิ้ง',
+    kind: 'auto',
+    executeEffect: (state) => {
+      let next = state;
+      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 7);
+      return next;
+    },
+  },
+  A129: {
+    code: 'A129', name_en: 'Only One', name_th: 'เหลือแค่หนึ่ง',
+    description_th: 'ผู้เล่นทุกคนทิ้งไพ่จนเหลือไพ่ในมือเพียงคนละ 1 ใบ',
+    kind: 'auto',
+    executeEffect: (state) => {
+      let next = state;
+      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 1);
+      return next;
+    },
+  },
+  A032: {
+    code: 'A032', name_en: 'Bound Together', name_th: 'ผูกติดกัน',
+    description_th: 'ขโมยไพ่ทั้งหมดในมือของผู้เล่นอีก 1 คน นำมาสับรวมกับไพ่ในมือคุณ แล้วแจกกลับให้คุณทั้งสองคนเท่า ๆ กัน',
+    kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะนำไพ่มารวมและแจกใหม่',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? executeHandSwapAndDeal(state, frame.actorId, targetId) : state;
+    },
+  },
+  A074: {
+    code: 'A074', name_en: 'Drunk Science', name_th: 'วิทยาศาสตร์เมา ๆ',
+    description_th: 'นำไพ่ในมือของผู้เล่นทุกคนมารวมกัน สับ แล้วแจกกลับให้ทุกคนเท่า ๆ กัน',
+    kind: 'auto',
+    executeEffect: (state) => poolShuffleRedeal(state, Object.keys(state.players)),
+  },
+
+  // A172 "Seat Swap Chaos" (Family F1) intentionally NOT included here -- needs
+  // a "pick exactly 2 players" UI. GameTable's TargetSelector supports
+  // multiSelect but nothing enforces an exact count yet; add alongside the
+  // first real multi-select roster_select card.
 
   // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs a
   // "cards lost since your last turn" counter that requires touching

@@ -287,6 +287,95 @@ describe('Family D batch (via resolveActionEffect)', () => {
     expect(next.players.p2.hand).toEqual(expect.arrayContaining(['A164']));
   });
 
+});
+
+function seatedState(): RoomState {
+  return {
+    status: 'playing',
+    hostId: 'p1',
+    seatOrder: ['p1', 'p2', 'p3'],
+    turnOrder: ['p1', 'p2', 'p3'],
+    currentTurnIndex: 0,
+    direction: 1,
+    muffinTimeTarget: 10,
+    drawPile: Array.from({ length: 30 }, (_, i) => `D${i + 1}`),
+    discardPile: [],
+    players: {
+      p1: { name: 'One', hand: ['a1'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      p2: { name: 'Two', hand: ['b1', 'b2'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      p3: { name: 'Three', hand: ['c1', 'c2', 'c3'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+    },
+  };
+}
+
+describe('Family F batch (via resolveActionEffect)', () => {
+  it('A010 rotates the seat order one step right and leaves hands alone', () => {
+    const next = resolveActionEffect(seatedState(), 'A010', 'p1');
+    expect(next.seatOrder).toEqual(['p3', 'p1', 'p2']);
+    expect(next.players.p1.hand).toEqual(['a1']);
+  });
+
+  it('A156 rotates the seat order one step left', () => {
+    const next = resolveActionEffect(seatedState(), 'A156', 'p1');
+    expect(next.seatOrder).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('A080 makes every player steal 1 card from their right-seat neighbor', () => {
+    const next = resolveActionEffect(seatedState(), 'A080', 'p1');
+    // p1 steals from p2, p2 steals from p3, p3 steals from p1 -- everyone
+    // still ends up with exactly the same hand size they started with.
+    expect(next.players.p1.hand.length).toBe(1);
+    expect(next.players.p2.hand.length).toBe(2);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it('A087 sends every hand one seat over (consistently opposite of A110)', () => {
+    const next = resolveActionEffect(seatedState(), 'A087', 'p1');
+    expect(next.players.p3.hand).toEqual(['a1']);
+    expect(next.players.p1.hand).toEqual(['b1', 'b2']);
+    expect(next.players.p2.hand).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('A110 sends every hand the opposite way around from A087', () => {
+    const next = resolveActionEffect(seatedState(), 'A110', 'p1');
+    expect(next.players.p2.hand).toEqual(['a1']);
+    expect(next.players.p3.hand).toEqual(['b1', 'b2']);
+    expect(next.players.p1.hand).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('A044 draws hands up to 7 and discards hands down to 7', () => {
+    const state = seatedState();
+    state.players.p3.hand = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'];
+    const next = resolveActionEffect(state, 'A044', 'p1');
+    expect(next.players.p1.hand.length).toBe(7);
+    expect(next.players.p2.hand.length).toBe(7);
+    expect(next.players.p3.hand.length).toBe(7);
+  });
+
+  it('A129 discards every hand down to exactly 1 card', () => {
+    const next = resolveActionEffect(seatedState(), 'A129', 'p1');
+    expect(next.players.p1.hand.length).toBe(1);
+    expect(next.players.p2.hand.length).toBe(1);
+    expect(next.players.p3.hand.length).toBe(1);
+  });
+
+  it('A032 pools the actor + target hands and deals them back evenly', () => {
+    const next = resolveActionEffect(seatedState(), 'A032', 'p1', 'p2');
+    expect(next.players.p1.hand.length + next.players.p2.hand.length).toBe(3);
+    expect(Math.abs(next.players.p1.hand.length - next.players.p2.hand.length)).toBeLessThanOrEqual(1);
+    expect(next.players.p3.hand).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('A074 pools every hand and deals them back evenly among all players', () => {
+    const next = resolveActionEffect(seatedState(), 'A074', 'p1');
+    const total = next.players.p1.hand.length + next.players.p2.hand.length + next.players.p3.hand.length;
+    expect(total).toBe(6);
+    const sizes = [next.players.p1.hand.length, next.players.p2.hand.length, next.players.p3.hand.length];
+    expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('Family D no-target no-op', () => {
   it('is a no-op for target-only Family D cards when no target is given', () => {
     // Excludes A049/A164 (no target needed at all) and A052/A140/A082/A041 (they
     // have an unconditional self-effect even without a target).
