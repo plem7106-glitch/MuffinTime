@@ -35,7 +35,7 @@ export default function RoomPage() {
     }
   }, [authLoading, user, pathname, router, activeRoom, audioPhase, setAudioPhase]);
 
-  if (authLoading || !user || !activeRoom) return null;
+  if (authLoading || !activeRoom) return null;
 
   switch (activeRoom.state.status) {
     case 'lobby':
