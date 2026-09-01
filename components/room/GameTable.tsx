@@ -38,6 +38,7 @@ export function GameTable() {
   const {
     activeRoom,
     myPlayerId,
+    error,
     drawCard,
     declareMuffinTime,
     playAction,
@@ -215,6 +216,11 @@ export function GameTable() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-start p-3 pb-24 bg-gradient-to-b from-gray-50/70 via-white to-gray-50/70 overflow-x-hidden">
+      {error && (
+        <div className="fixed inset-x-3 top-3 z-[60] mx-auto max-w-md rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-lg">
+          {error}
+        </div>
+      )}
       {/* =================================================== */}
       {/* A. UPPER GAMEPLAY CONTENT (Tightly Stacked at Top)  */}
       {/* =================================================== */}
