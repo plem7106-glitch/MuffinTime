@@ -323,8 +323,11 @@ grouped-pattern cards, + 26 unique (15 Phase 1 + 11 Phase 2) = **173**, matching
 grouped patterns (C3's A091, H1's A064) turned out to need the same class of core-engine
 change as the Phase 2 batch once actually implemented, and moved there. One originally-listed
 Phase 1 unique card (A115) shipped after adding a small dual-target-selection primitive; one
-(A166) stays deferred as a genuine rules-ambiguity, not an engine gap. Current status: **150
-of 173 implemented**, 11 Phase 2 (unchanged, all still need core turn/engine work), 2 moved
-into Phase 2 (A064, A091), 1 blocked on a rules-ambiguity call (A166). See
+(A166) stays deferred as a genuine rules-ambiguity, not an engine gap. Current status: **153
+of 173 implemented** (A037/A066/A137 birthday cards shipped 2026-09-02, see §I4/§J4), 13
+Phase 2 (unchanged, all still need core turn/engine work — includes A064/A091 moved in from
+Family groups), 1 blocked on a rules-ambiguity call (A166), 6 remaining "Group 2" cards
+(A023/A024/A027/A118/A135/A158 — see the handoff note
+`docs/superpowers/specs/2026-09-02-remaining-work-handoff.md` for next-session priority). See
 `game/actionRules/definitions.ts`'s trailing comments for the up-to-date per-card reasoning —
 this doc is the historical classification pass, that file is the live source of truth.
