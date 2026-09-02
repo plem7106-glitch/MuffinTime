@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 160/173 Action cards implemented -- Group 2 and Group 3 are fully done
+## Status: 163/173 Action cards implemented -- Group 2, Group 3, and Group 1 Cluster A are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -32,9 +32,11 @@ independently).
 - `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
   `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
   `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
-  `ActionRuleDefinition.needsDrinkCheck`), and A166 (`ActionRuleDefinition.needsTargetThenOutcome`).
-  **Branch your next work off `feature/birthday-cards`, not `main`**, or you'll be missing
-  that infrastructure and these 10 extra cards.
+  `ActionRuleDefinition.needsDrinkCheck`), A166 (`ActionRuleDefinition.needsTargetThenOutcome`),
+  and A100/A035/A040 (`PlayerState.bonusActionPlaysRemaining`/`mustPlayActionThisTurn`,
+  `RoomState.pendingActionObligations`/`actionRedirect`). **Branch your next work off
+  `feature/birthday-cards`, not `main`**, or you'll be missing that infrastructure and these
+  13 extra cards.
 - When your work is done and tests pass: push to this same branch if PR #3 is still open
   (it'll pick up the new commits automatically), or open a fresh PR **into `main`** if #3
   already merged. Use `git push` and `gh pr create`/`gh pr view` — `gh` is authenticated in
@@ -43,8 +45,15 @@ independently).
   status` yourself rather than assuming either way.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (at the 160/173 checkpoint): `npx vitest run` → 533
+- Last known-good check on this branch (at the 163/173 checkpoint): `npx vitest run` → 556
   passed, `npx tsc --noEmit` → clean. Run both again before you start — confirm your baseline.
+- **If you add a new per-turn or per-game `PlayerState`/`RoomState` field, reset it in ALL
+  FOUR places**, not just the ones that seem obvious: `game/turn.ts`'s `advanceTurn` and
+  `emergencyForceSkipTurn` (per-turn resets), and `game/room.ts`'s `startGame` and
+  `resetForPlayAgain` (per-game resets). Cluster A's implementation (below) hit this exact
+  gap **four separate times** — once per new field — each caught only by code review, not
+  by the original implementation. Treat this as a checklist, not a one-off pattern to
+  rediscover per card.
 
 ## How to implement a card (the pattern)
 
@@ -88,7 +97,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 13 cards left, 1 group (Group 2 and Group 3 are done)
+## What's next — 10 cards left, all in Group 1 (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -129,17 +138,60 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 (13 cards, needs core turn/engine changes — untouched, all that's left)
+### Group 1 — Cluster A DONE (163/173 checkpoint), 6 clusters / 10 cards remain
 
-`A017, A028, A035, A040, A064, A091, A092, A094, A100, A108, A119, A126, A130`. Each needs
-something beyond a single `executeEffect`: recursive resolution, turn-economy exceptions,
-an action-history log, multi-hop delegated targeting, a full game reset, or a hook inside
-`draw()` (`game/pile.ts`), the most-called primitive in the game. Full per-card reasoning
-in the classification doc's "Phase 2" table. This is its own planning effort — don't start
-it casually inside a small-batch PR like the ones above; it likely wants a
-`superpowers:brainstorming` + `superpowers:writing-plans` pass of its own given the
-engine-level surface area. This is the entire remaining scope — once it's done, all 173
-Action cards are implemented.
+Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
+decomposed into 7 clusters by shared mechanism during brainstorming — see
+`docs/superpowers/specs/2026-09-02-group1-cluster-a-design.md` for the full decomposition
+table and rationale. **Cluster A (A100, A035, A040 — persistent per-player/table flags,
+the lowest-risk cluster) is done.** Its own plan/spec docs are
+`docs/superpowers/specs/2026-09-02-group1-cluster-a-design.md` and
+`docs/superpowers/plans/2026-09-02-group1-cluster-a.md`.
+
+- **A100** "โรงงานมัฟฟิน" — `PlayerState.bonusActionPlaysRemaining`, consumed by extending
+  `lib/session.tsx`'s `playAction` gate to allow 2 extra plays past the normal 1-per-turn
+  limit.
+- **A035** "ออกมาเล่นกันเถอะ" — `RoomState.pendingActionObligations` (a sibling of
+  `pendingWinChecks`) + `PlayerState.mustPlayActionThisTurn`. Ruling confirmed with the
+  user: hard-enforced (blocks `endTurn`), not honor-system, applies to every player at the
+  table on their own next turn, exempts a player under an active table-wide `no_actions`
+  restriction (avoids a soft-lock).
+- **A040** "ฉันชอบมัน!" — `RoomState.actionRedirect` + a new pure `applyActionRedirect`
+  helper (`game/turnFlow.ts`) intercepting the one call site where a played Action card is
+  discarded. Ruling confirmed with the user: applies to *any* player's Action play, not
+  just the actor who set it up.
+- Implemented via `superpowers:subagent-driven-development` — 3 implementer runs + spec
+  review + code review per task, plus a final holistic review across all three cards
+  together. That process caught 4 real bugs, all the same shape: a new field left out of
+  `startGame`/`resetForPlayAgain`'s reset logic, letting stale state leak into a "Play
+  Again" match (see the "reset it in ALL FOUR places" note above — this is exactly what
+  bit this cluster, repeatedly). All 4 are fixed and verified.
+- Known, accepted (not fixed) gaps from the final review, low priority: `emergencyForceSkipTurn`
+  (the host's "unstick" button) doesn't consume a landed-on player's `pendingActionObligations`
+  entry — consistent with that function's existing documented contract of skipping
+  turn-start side effects (it also already skips `resolvePendingWinChecks`), not a new gap.
+  Bot-driven (`bot-*`) rooms bypass all three cards' new mechanics entirely (bots already
+  bypassed the 1-action-per-turn limit before this cluster; this wasn't specifically
+  addressed). Neither blocks merge; flagged for whoever picks up bot-room support later.
+
+**Remaining: 6 clusters, 10 cards** — `A017, A028, A064, A091, A092, A094, A108, A119,
+A126, A130`. Each needs its own spec (and likely its own plan) before implementation,
+following the same brainstorming → writing-plans → subagent-driven-development flow used
+for Cluster A. Per the original decomposition:
+
+- **Cluster B** (turn-order mutation): `A119`
+- **Cluster C** (2-hop delegated targeting): `A126`, `A130`
+- **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
+  system directly): `A017`, `A028`, `A094`, `A108`
+- **Cluster E** (draw-pile hook): `A064`
+- **Cluster F** (forced-vs-voluntary loss tracking): `A091`
+- **Cluster G** (mid-game full reset, standalone): `A092`
+
+Full per-card reasoning for all of these is in the classification doc's "Phase 2" table
+(`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
+these casually inside a small-batch PR — each wants its own
+`superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
+surface area, the same way Cluster A got one.
 
 ## Known gap, not yet built (unrelated to the above)
 
