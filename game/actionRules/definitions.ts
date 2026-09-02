@@ -2,7 +2,7 @@ import { everyoneDraws, everyoneDiscards, passHands } from '../group';
 import { draw, discard } from '../pile';
 import { stealRandom, swapHands } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
-import { skipTurn, reverseDirection } from '../turnFlow';
+import { skipTurn, reverseDirection, changeMuffinTarget } from '../turnFlow';
 import { getNextPlayerId } from '../turn';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
@@ -13,7 +13,7 @@ import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
 import { rosterDraws, rosterDiscards, rosterStolenBy, rosterSkipTurn } from '../roster';
 import type { ActionRuleDefinition } from './types';
-import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame, todayFromFrame } from './types';
+import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame, todayFromFrame, numberInputFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
@@ -979,14 +979,57 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   // The following are deliberately NOT included in this batch -- each needs
   // real new infrastructure this codebase doesn't have yet, not just a UI
   // picker like the earlier "ponytail" simplifications:
-  //  - A135 (choose the new Muffin Time target number): needs a numeric-input UI.
-  //  - A024, A027, A023 (win/lose evaluated at the ACTOR's next turn, not now):
-  //    needs a scheduled/delayed check consulted by game/turn.ts's
-  //    checkWinnerAtTurnStart -- there's no "pending effect for a future
-  //    turn" mechanism to hook into.
   //  - A118 (whoever suggested playing this game): no such one-time
   //    room-setup fact is collected or stored anywhere.
   //  - A158 (a live per-player drink-count tally): no such counter exists.
+
+  // A135: change the Muffin Time win target -- needs a free-form number from
+  // the actor (see needsNumberInput's doc comment in ./types.ts).
+  A135: {
+    code: 'A135', name_en: 'Time of Death', name_th: 'เวลาแห่งความตาย', kind: 'auto',
+    needsNumberInput: true,
+    numberInputPrompt: 'เลือกจำนวนไพ่เป้าหมายใหม่สำหรับ Muffin Time',
+    numberInputMin: 1, numberInputMax: 20,
+    description_th: 'เปลี่ยนเงื่อนไขชนะของ Muffin Time จาก 10 ใบ เป็นจำนวนไพ่ที่คุณเลือก และใช้จำนวนใหม่นี้ไปจนจบเกม',
+    executeEffect: (state, frame) => {
+      const n = numberInputFromFrame(frame);
+      if (n === undefined || n <= 0) return state;
+      return changeMuffinTarget(state, n);
+    },
+  },
+
+  // A023/A024/A027: win/lose evaluated at the ACTOR's own next turn, not
+  // immediately -- each pushes a RoomState.pendingWinChecks entry (see its
+  // doc comment in ../types.ts) consumed by game/turn.ts's
+  // resolvePendingWinChecks, which lib/session.tsx's advanceAndCheckWin
+  // calls on every turn transition.
+  A023: {
+    code: 'A023', name_en: 'Shoot Me', name_th: 'ยิงฉันสิ', kind: 'auto',
+    description_th: 'หากถึงเทิร์นถัดไปของคุณแล้วยังมีไพ่เหลืออยู่ในมือ คุณชนะเกม',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.pendingWinChecks = [...(next.pendingWinChecks ?? []), { sourcePlayerId: frame.actorId, type: 'hand_nonempty' }];
+      return next;
+    },
+  },
+  A024: {
+    code: 'A024', name_en: 'The End', name_th: 'จุดจบ', kind: 'auto',
+    description_th: 'เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือน้อยที่สุดชนะ หากเสมอกัน ให้ลองใหม่',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.pendingWinChecks = [...(next.pendingWinChecks ?? []), { sourcePlayerId: frame.actorId, type: 'fewest_hand' }];
+      return next;
+    },
+  },
+  A027: {
+    code: 'A027', name_en: '1 Year to Live', name_th: 'เหลือเวลาอีก 1 ปี', kind: 'auto',
+    description_th: 'เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือมากที่สุดชนะ หากเสมอกัน ให้ลองใหม่',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.pendingWinChecks = [...(next.pendingWinChecks ?? []), { sourcePlayerId: frame.actorId, type: 'most_hand' }];
+      return next;
+    },
+  },
 
   // -- Birthday cards (classification doc §I4/§J4) -- PlayerState.birthdayMMDD
   // is optional and self-reported (game/types.ts); GameTable stamps "today"

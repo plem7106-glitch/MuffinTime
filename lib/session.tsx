@@ -22,6 +22,7 @@ import {
   advanceTurn,
   emergencyForceSkipTurn,
   checkWinnerAtTurnStart,
+  resolvePendingWinChecks,
   declareMuffinTime as engineDeclareMuffinTime,
   finishByDeckExhaustion,
 } from '../game/turn';
@@ -120,10 +121,12 @@ const GameSessionContext = createContext<GameSessionValue | null>(null);
 function advanceAndCheckWin(room: RoomState): RoomState {
   const advanced = advanceTurn(room);
   const currentId = advanced.turnOrder[advanced.currentTurnIndex];
-  if (checkWinnerAtTurnStart(advanced, currentId)) {
-    return { ...advanced, status: 'finished', winnerId: currentId, finishReason: 'normal' };
+  const afterPendingChecks = resolvePendingWinChecks(advanced, currentId);
+  if (afterPendingChecks.status === 'finished') return afterPendingChecks;
+  if (checkWinnerAtTurnStart(afterPendingChecks, currentId)) {
+    return { ...afterPendingChecks, status: 'finished', winnerId: currentId, finishReason: 'normal' };
   }
-  return advanced;
+  return afterPendingChecks;
 }
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {

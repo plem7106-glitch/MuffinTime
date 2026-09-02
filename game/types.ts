@@ -143,6 +143,24 @@ export interface GlobalRestriction {
   sourcePlayerId: PlayerId;
 }
 
+/**
+ * A win/lose evaluation deferred to sourcePlayerId's own next turn
+ * (A023/A024/A027's "by your next turn..." Action cards) -- there is no
+ * mechanism for arbitrary future-turn effects, so this is scoped narrowly to
+ * "declare a winner (or not) the moment play returns to sourcePlayerId".
+ * Pushed by the card's executeEffect, consumed exactly once (removed
+ * regardless of outcome) by game/turn.ts's resolvePendingWinChecks, which
+ * lib/session.tsx's advanceAndCheckWin calls on every turn transition --
+ * mirrors GlobalRestriction's "until your next turn" lifecycle above.
+ */
+export interface PendingWinCheck {
+  sourcePlayerId: PlayerId;
+  /** hand_nonempty: A023 (actor still holds cards) -- fewest_hand: A024
+   * (least cards wins, tie = no winner) -- most_hand: A027 (most cards
+   * wins, tie = no winner). */
+  type: 'hand_nonempty' | 'fewest_hand' | 'most_hand';
+}
+
 export interface RoomState {
   status: 'lobby' | 'setup' | 'playing' | 'ended' | 'finished';
   hostId: PlayerId;
@@ -179,6 +197,9 @@ export interface RoomState {
 
   // Temporary table-wide rule suspensions (e.g. A019/A072/A085)
   globalRestrictions?: GlobalRestriction[];
+
+  // Win/lose checks deferred to a specific player's own next turn (A023/A024/A027)
+  pendingWinChecks?: PendingWinCheck[];
 
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;

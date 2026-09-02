@@ -1079,3 +1079,52 @@ describe('Birthday cards (A037/A066/A137, via executeActionFrameEffect)', () => 
     expect(next.players.p2.hand.length).toBe(4); // stealer -- gained 1
   });
 });
+
+describe('A135 (needs a free-form number input)', () => {
+  it('changes muffinTimeTarget to the chosen number', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A135', 'me', { numberInput: 7 }));
+    expect(next.muffinTimeTarget).toBe(7);
+  });
+
+  it('is a no-op when no number was provided', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A135', 'me', {}))).toEqual(state);
+  });
+
+  it('is a no-op when the provided number is zero or negative', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A135', 'me', { numberInput: 0 }))).toEqual(state);
+    expect(executeActionFrameEffect(state, frameWithPayload('A135', 'me', { numberInput: -3 }))).toEqual(state);
+  });
+});
+
+describe('A023/A024/A027 (deferred win checks at the actor\'s own next turn)', () => {
+  it('A023 pushes a hand_nonempty pendingWinCheck for the actor', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A023', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'me', type: 'hand_nonempty' }]);
+  });
+
+  it('A024 pushes a fewest_hand pendingWinCheck for the actor', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A024', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'me', type: 'fewest_hand' }]);
+  });
+
+  it('A027 pushes a most_hand pendingWinCheck for the actor', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A027', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'me', type: 'most_hand' }]);
+  });
+
+  it('appends to any pre-existing pendingWinChecks instead of clobbering them', () => {
+    const state = threePlayerState();
+    state.pendingWinChecks = [{ sourcePlayerId: 'p2', type: 'most_hand' }];
+    const next = executeActionFrameEffect(state, frameWithPayload('A023', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([
+      { sourcePlayerId: 'p2', type: 'most_hand' },
+      { sourcePlayerId: 'me', type: 'hand_nonempty' },
+    ]);
+  });
+});

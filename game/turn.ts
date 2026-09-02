@@ -1,5 +1,5 @@
 import { cloneState } from './util';
-import type { RoomState, PlayerId, PlayDirection } from './types';
+import type { RoomState, PlayerId, PlayDirection, PendingWinCheck } from './types';
 
 export function getNextPlayerIndex(
   count: number,
@@ -146,6 +146,58 @@ export function checkWinnerAtTurnStart(state: RoomState, playerId: PlayerId): bo
   if (state.globalRestrictions?.some((r) => r.type === 'no_win')) return false;
   const player = state.players[playerId];
   return Boolean(player?.hasCalledMuffinTime && player.hand.length === state.muffinTimeTarget);
+}
+
+/** The single player at the min/max hand size, or undefined on a tie
+ * (A024/A027's "if tied, try again" -> no winner declared this time). */
+function extremeHandSizeWinner(state: RoomState, direction: 'min' | 'max'): PlayerId | undefined {
+  const ids = Object.keys(state.players);
+  if (ids.length === 0) return undefined;
+  const sizes = ids.map((id) => state.players[id].hand.length);
+  const extreme = direction === 'min' ? Math.min(...sizes) : Math.max(...sizes);
+  const tied = ids.filter((id) => state.players[id].hand.length === extreme);
+  return tied.length === 1 ? tied[0] : undefined;
+}
+
+function evaluatePendingWinCheck(state: RoomState, check: PendingWinCheck): PlayerId | undefined {
+  switch (check.type) {
+    case 'hand_nonempty':
+      return (state.players[check.sourcePlayerId]?.hand.length ?? 0) > 0 ? check.sourcePlayerId : undefined;
+    case 'fewest_hand':
+      return extremeHandSizeWinner(state, 'min');
+    case 'most_hand':
+      return extremeHandSizeWinner(state, 'max');
+  }
+}
+
+/**
+ * Evaluates and consumes every RoomState.pendingWinChecks entry scheduled
+ * for `currentId` (A023/A024/A027 -- see PendingWinCheck's doc comment in
+ * ./types.ts). Called on every turn transition, right alongside
+ * checkWinnerAtTurnStart. Matching entries are always removed (consume-once),
+ * regardless of whether they produce a winner -- a no_win restriction or a
+ * tie means "no winner this time", not "check again next time it's your turn".
+ */
+export function resolvePendingWinChecks(state: RoomState, currentId: PlayerId): RoomState {
+  const pending = state.pendingWinChecks;
+  if (!pending || pending.length === 0) return state;
+  const matching = pending.filter((c) => c.sourcePlayerId === currentId);
+  if (matching.length === 0) return state;
+
+  const next = cloneState(state);
+  next.pendingWinChecks = pending.filter((c) => c.sourcePlayerId !== currentId);
+
+  const noWin = next.globalRestrictions?.some((r) => r.type === 'no_win');
+  for (const check of matching) {
+    if (next.status !== 'playing' || noWin) break;
+    const winnerId = evaluatePendingWinCheck(next, check);
+    if (winnerId) {
+      next.status = 'finished';
+      next.winnerId = winnerId;
+      next.finishReason = 'normal';
+    }
+  }
+  return next;
 }
 
 export function clearMuffinTimeDeclaration(state: RoomState, playerId: PlayerId): RoomState {

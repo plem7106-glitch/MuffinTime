@@ -31,7 +31,8 @@ export function getCardDisplay(code: CardCode): CardDisplay {
       getActionRule(card.id)?.needsTargetSelection ||
         getActionRule(card.id)?.needsRosterSelection ||
         getActionRule(card.id)?.needsOutcomeEntry ||
-        getActionRule(card.id)?.needsDualTargetSelection
+        getActionRule(card.id)?.needsDualTargetSelection ||
+        getActionRule(card.id)?.needsNumberInput
     ),
   };
 }

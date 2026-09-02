@@ -34,6 +34,14 @@ export interface ActionRuleDefinition {
    * resolve the frame. The caller (GameTable) stamps the date in before
    * pushing the frame, the same way a picker stamps rosterIds/outcome/etc. */
   needsTodayDate?: boolean;
+  /** Needs a free-form number chosen by the actor before this resolves
+   * (A135's "pick a new Muffin Time target"). Bounds are advisory for the UI
+   * picker only -- executeEffect trusts whatever numberInputFromFrame
+   * returns and simply no-ops on a missing/non-positive value. */
+  needsNumberInput?: boolean;
+  numberInputPrompt?: string;
+  numberInputMin?: number;
+  numberInputMax?: number;
   executeEffect: (state: RoomState, frame: StackFrame) => RoomState;
 }
 
@@ -60,4 +68,10 @@ export function dualTargetIdsFromFrame(frame: StackFrame): { firstId?: PlayerId;
  * needsTodayDate. */
 export function todayFromFrame(frame: StackFrame): string | undefined {
   return frame.customPayload?.today as string | undefined;
+}
+
+/** The number the actor chose, as stamped by the caller before pushing the
+ * frame -- see needsNumberInput. */
+export function numberInputFromFrame(frame: StackFrame): number | undefined {
+  return frame.customPayload?.numberInput as number | undefined;
 }

@@ -7,6 +7,7 @@ import {
   clearMuffinTimeDeclaration,
   emergencyForceSkipTurn,
   finishByDeckExhaustion,
+  resolvePendingWinChecks,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -242,6 +243,133 @@ describe('checkWinnerAtTurnStart', () => {
       globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p2' }],
     } as unknown as RoomState;
     expect(checkWinnerAtTurnStart(state, 'p1')).toBe(false);
+  });
+});
+
+describe('resolvePendingWinChecks', () => {
+  it('is a no-op when there are no pending checks', () => {
+    const state = { status: 'playing', players: { p1: { hand: [] } } } as unknown as RoomState;
+    expect(resolvePendingWinChecks(state, 'p1')).toEqual(state);
+  });
+
+  it('is a no-op when the current player has no matching pending check', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: [] }, p2: { hand: [] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p2', type: 'hand_nonempty' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('playing');
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'p2', type: 'hand_nonempty' }]);
+  });
+
+  it('hand_nonempty: declares the source player winner when they still hold cards', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001'] }, p2: { hand: [] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'hand_nonempty' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('p1');
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('hand_nonempty: no winner and the check is still consumed when the hand is empty', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: [] }, p2: { hand: [] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'hand_nonempty' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('playing');
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('fewest_hand: declares the single player with the fewest cards winner', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001', 'A002'] }, p2: { hand: ['A003'] }, p3: { hand: ['A004', 'A005', 'A006'] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'fewest_hand' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('p2');
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('fewest_hand: a tie declares no winner but still consumes the check', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001'] }, p2: { hand: ['A002'] }, p3: { hand: ['A003', 'A004'] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'fewest_hand' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('playing');
+    expect(next.winnerId).toBeUndefined();
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('most_hand: declares the single player with the most cards winner', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001'] }, p2: { hand: ['A002', 'A003', 'A004'] }, p3: { hand: ['A005'] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'most_hand' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('p2');
+  });
+
+  it('most_hand: a tie declares no winner but still consumes the check', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001', 'A002'] }, p2: { hand: ['A003', 'A004'] }, p3: { hand: [] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'most_hand' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('playing');
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('respects a no_win globalRestriction: no winner declared, but the check is still consumed', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001'] }, p2: { hand: [] } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'hand_nonempty' }],
+      globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p2' }],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('playing');
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('does not clobber a winner already declared by an earlier check in the same batch', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: ['A001'] }, p2: { hand: [] } },
+      pendingWinChecks: [
+        { sourcePlayerId: 'p1', type: 'hand_nonempty' },
+        { sourcePlayerId: 'p1', type: 'most_hand' },
+      ],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('p1'); // hand_nonempty's winner, not most_hand's
+    expect(next.pendingWinChecks).toEqual([]);
+  });
+
+  it('only consumes entries for the current player, leaving others queued', () => {
+    const state = {
+      status: 'playing',
+      players: { p1: { hand: [] }, p2: { hand: [] } },
+      pendingWinChecks: [
+        { sourcePlayerId: 'p1', type: 'hand_nonempty' },
+        { sourcePlayerId: 'p2', type: 'most_hand' },
+      ],
+    } as unknown as RoomState;
+    const next = resolvePendingWinChecks(state, 'p1');
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'p2', type: 'most_hand' }]);
   });
 });
 

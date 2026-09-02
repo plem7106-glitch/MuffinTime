@@ -22,6 +22,7 @@ import { ShuffleDrawPileOverlay } from './ShuffleDrawPileOverlay';
 import { RoundTransitionOverlay } from './RoundTransitionOverlay';
 import { TargetSelector } from '../modals/TargetSelector';
 import { OutcomeToggle } from '../modals/OutcomeToggle';
+import { NumberInputModal } from '../modals/NumberInputModal';
 import { DateInviteModal } from '../modals/DateInviteModal';
 import { getTrapRule } from '../../game/trapRules/registry';
 import { getActionRule } from '../../game/actionRules/registry';
@@ -248,6 +249,12 @@ export function GameTable() {
     setPendingTargetCard(null);
   };
 
+  const handleNumberInputConfirm = (numberInput: number) => {
+    if (!pendingTargetCard) return;
+    playAction(pendingTargetCard.code, undefined, { numberInput });
+    setPendingTargetCard(null);
+  };
+
   // Handlers for Opening Active Traps
   const handleOpenTrapTap = (trapCode: CardCode) => {
     if (pendingResponse) return;
@@ -450,7 +457,7 @@ export function GameTable() {
           when the card's rule needs a roster_select -- e.g. "who matches this
           condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
-        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry}
+        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput}
         candidates={opponentCandidates}
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
@@ -506,6 +513,17 @@ export function GameTable() {
         yesLabel={pendingActionRule?.outcomeYesLabel}
         noLabel={pendingActionRule?.outcomeNoLabel}
         onSelect={handleOutcomeSelect}
+        onCancel={() => setPendingTargetCard(null)}
+      />
+
+      {/* 10.6 Action Card Number Input (free-form number, e.g. A135's new
+          Muffin Time target) */}
+      <NumberInputModal
+        open={pendingTargetCard !== null && pendingActionRule?.needsNumberInput === true}
+        prompt={pendingActionRule?.numberInputPrompt ?? pendingTargetCard?.effect ?? ''}
+        min={pendingActionRule?.numberInputMin}
+        max={pendingActionRule?.numberInputMax}
+        onConfirm={handleNumberInputConfirm}
         onCancel={() => setPendingTargetCard(null)}
       />
 
