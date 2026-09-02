@@ -1794,15 +1794,23 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
-      // Explicit full no-op on self-targeting, independent of the UI's
-      // opponentCandidates filtering (bots/tests/future refactors could
-      // still call this with targetId === actorId). jumpToPlayerTurn's own
-      // self-target guard only skips the jump itself -- it still returns a
-      // state whose current player is the actor, so resolveTurnArrival
-      // would run (and re-evaluate checkWinnerAtTurnStart) for them
-      // mid-turn without this check, which can end the game prematurely if
-      // they'd already declared muffin time earlier in their own turn.
-      if (targetId === frame.actorId) return state;
+      // Explicit full no-op on self-targeting OR an invalid/nonexistent
+      // target, independent of the UI's opponentCandidates filtering
+      // (bots/tests/future refactors/a stale id from a race could still
+      // call this that way). jumpToPlayerTurn no-ops in both cases too, but
+      // only skips the jump itself (and, for an invalid target, skips
+      // beginTurn) -- it still returns a state whose current player is the
+      // actor, so resolveTurnArrival would run (and re-evaluate the live
+      // checkWinnerAtTurnStart check) for them mid-turn without this check,
+      // which can end the game prematurely if they'd already declared
+      // muffin time earlier in their own turn. Validated up front against
+      // the target, not the outcome after the jump -- checking currentId
+      // against frame.actorId afterward would also wrongly block the
+      // legitimate case where every other player is skip-flagged and the
+      // jump wraps all the way back around to the actor, which SHOULD run
+      // resolveTurnArrival since beginTurn genuinely fires for them then.
+      const order = state.turnOrder?.length ? state.turnOrder : (state.seatOrder ?? []);
+      if (targetId === frame.actorId || !order.includes(targetId)) return state;
       const jumped = jumpToPlayerTurn(state, targetId);
       const currentId = jumped.turnOrder[jumped.currentTurnIndex];
       return resolveTurnArrival(jumped, currentId);

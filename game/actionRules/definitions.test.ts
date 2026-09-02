@@ -1303,4 +1303,24 @@ describe('A119 (skip play forward to a chosen player\'s next turn)', () => {
     const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'me', {}));
     expect(next).toEqual(state);
   });
+
+  it('is a no-op when targetId does not exist in turnOrder (through the full A119 -> resolveTurnArrival chain)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'ghost-player', {}));
+    expect(next).toEqual(state);
+  });
+
+  it('does not trigger a premature win when the target is invalid while muffin time is already declared', () => {
+    // Sibling bug to the self-target premature win above, same failure
+    // mode: jumpToPlayerTurn also no-ops (skips beginTurn) when targetId
+    // isn't found in turnOrder/seatOrder at all, but still returns a state
+    // whose current player is the actor -- so without an up-front target
+    // validity check, resolveTurnArrival would run for the actor mid-turn
+    // and re-declare a win via the live checkWinnerAtTurnStart check.
+    const state = threePlayerState();
+    state.muffinTimeTarget = state.players.me.hand.length; // make 'me' currently eligible
+    state.players.me.hasCalledMuffinTime = true;
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'ghost-player', {}));
+    expect(next).toEqual(state);
+  });
 });

@@ -307,6 +307,15 @@ export function resolveTurnArrival(state: RoomState, currentId: PlayerId): RoomS
  *      until landing on someone who isn't flagged.
  * Lands via beginTurn (flag reset + restriction clearing), same as
  * advanceTurn/emergencyForceSkipTurn.
+ *
+ * Note for callers chaining resolveTurnArrival after this: both no-op paths
+ * below (self-target, invalid targetId) still return a state whose current
+ * player is the original actor -- resolveTurnArrival's live
+ * checkWinnerAtTurnStart check would then re-evaluate for them mid-turn.
+ * This function only guards its own jump/beginTurn; it does not guard
+ * against that. A119's executeEffect (game/actionRules/definitions.ts)
+ * validates the target itself before calling either function -- any future
+ * caller chaining resolveTurnArrival after this one needs the same check.
  */
 export function jumpToPlayerTurn(state: RoomState, targetId: PlayerId): RoomState {
   const next = cloneState(state);
