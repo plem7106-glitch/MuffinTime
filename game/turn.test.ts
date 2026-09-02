@@ -10,6 +10,7 @@ import {
   resolvePendingWinChecks,
   resolvePendingActionObligations,
   canEndTurn,
+  resolveTurnArrival,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -450,6 +451,68 @@ describe('resolvePendingActionObligations', () => {
     const next = resolvePendingActionObligations(state, 'p1');
     expect(next.players.p1.mustPlayActionThisTurn).toBeUndefined();
     expect(next.pendingActionObligations).toEqual([]);
+  });
+});
+
+describe('resolveTurnArrival', () => {
+  it('is a no-op when there is nothing pending and no muffin-time win', () => {
+    const state = {
+      status: 'playing',
+      muffinTimeTarget: 10,
+      players: { p1: { hand: [], hasCalledMuffinTime: false } },
+    } as unknown as RoomState;
+    expect(resolveTurnArrival(state, 'p1')).toEqual(state);
+  });
+
+  it('declares a winner from a pending win check', () => {
+    const state = {
+      status: 'playing',
+      muffinTimeTarget: 10,
+      players: { p1: { hand: ['A001'], hasCalledMuffinTime: false } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'hand_nonempty' }],
+    } as unknown as RoomState;
+    const next = resolveTurnArrival(state, 'p1');
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('p1');
+  });
+
+  it('declares a winner when the player already called muffin time and still qualifies', () => {
+    const state = {
+      status: 'playing',
+      muffinTimeTarget: 10,
+      players: { p1: { hand: Array(10).fill('A01'), hasCalledMuffinTime: true } },
+    } as unknown as RoomState;
+    const next = resolveTurnArrival(state, 'p1');
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('p1');
+  });
+
+  it('resolves a pending action obligation when there is no win', () => {
+    const state = {
+      status: 'playing',
+      muffinTimeTarget: 10,
+      players: { p1: { hand: ['A001'], hasCalledMuffinTime: false } },
+      pendingActionObligations: ['p1'],
+    } as unknown as RoomState;
+    const next = resolveTurnArrival(state, 'p1');
+    expect(next.status).toBe('playing');
+    expect(next.players.p1.mustPlayActionThisTurn).toBe(true);
+    expect(next.pendingActionObligations).toEqual([]);
+  });
+
+  it('does not resolve obligations once a pending win check already finished the game', () => {
+    const state = {
+      status: 'playing',
+      muffinTimeTarget: 10,
+      players: { p1: { hand: ['A001'], hasCalledMuffinTime: false } },
+      pendingWinChecks: [{ sourcePlayerId: 'p1', type: 'hand_nonempty' }],
+      pendingActionObligations: ['p1'],
+    } as unknown as RoomState;
+    const next = resolveTurnArrival(state, 'p1');
+    expect(next.status).toBe('finished');
+    // Untouched -- resolveTurnArrival returns immediately once a win check
+    // finishes the game, same short-circuit advanceAndCheckWin had inline.
+    expect(next.pendingActionObligations).toEqual(['p1']);
   });
 });
 

@@ -276,6 +276,24 @@ export function resolvePendingActionObligations(state: RoomState, currentId: Pla
   return next;
 }
 
+/**
+ * The full "a player's turn has just started" resolution chain: pending win
+ * checks (A023/A024/A027), then the standing muffin-time win check, then
+ * pending action obligations (A035). Shared by lib/session.tsx's
+ * advanceAndCheckWin (a normal turn-end) and A119's executeEffect (an
+ * immediate mid-turn jump via jumpToPlayerTurn) so both turn-arrival paths
+ * run the identical, single-tested chain instead of two copies drifting
+ * apart.
+ */
+export function resolveTurnArrival(state: RoomState, currentId: PlayerId): RoomState {
+  const afterPendingChecks = resolvePendingWinChecks(state, currentId);
+  if (afterPendingChecks.status === 'finished') return afterPendingChecks;
+  if (checkWinnerAtTurnStart(afterPendingChecks, currentId)) {
+    return { ...afterPendingChecks, status: 'finished', winnerId: currentId, finishReason: 'normal' };
+  }
+  return resolvePendingActionObligations(afterPendingChecks, currentId);
+}
+
 export function clearMuffinTimeDeclaration(state: RoomState, playerId: PlayerId): RoomState {
   const next = cloneState(state);
   if (next.players[playerId]) {
