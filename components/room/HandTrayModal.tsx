@@ -6,6 +6,7 @@ import { getCardById } from '../../data/cards/index';
 import { getCardDisplay, type CardDisplay } from '../../data/cards/display';
 import { Card, CARD_TYPE_THEMES } from '../card/Card';
 import { CloseIcon, CardsIcon, CheckIcon } from '../ui/Icons';
+import { soundManager } from '../../lib/presentation/soundManager';
 
 export function HandTrayModal({
   isOpen,
@@ -241,8 +242,12 @@ export function HandTrayModal({
               return (
                 <div
                   key={`${code}-${idx}`}
-                  className="shrink-0 transition-transform duration-150"
-                  style={{ scrollSnapAlign: 'start' }}
+                  className="shrink-0 transition-all duration-200 animate-in fade-in slide-in-from-bottom-3"
+                  style={{
+                    scrollSnapAlign: 'start',
+                    animationDelay: `${Math.min(idx * 35, 280)}ms`,
+                    animationFillMode: 'backwards',
+                  }}
                 >
                   <Card
                     id={code}
@@ -252,7 +257,10 @@ export function HandTrayModal({
                     image={image}
                     variant="hand"
                     selected={isSelected}
-                    onClick={() => handleHandCardPress(code)}
+                    onClick={() => {
+                      soundManager.playSfx('/sounds/Select.mp3', 0.35);
+                      handleHandCardPress(code);
+                    }}
                     className="cursor-pointer shadow-xs hover:shadow-md"
                   />
                 </div>

@@ -49,7 +49,7 @@ export function CenterTable({
       className="flex items-center justify-center gap-7 sm:gap-9 py-2 px-2 sm:px-3 rounded-2xl border border-gray-100/90 bg-white/90 backdrop-blur-xs shadow-2xs select-none w-full shrink-0"
     >
       {/* 1. Draw Pile (กองจั่ว - 120x180px Portrait 2:3 Main Pile - Interactive Center Deck) */}
-      <div className="flex flex-col items-center gap-4 shrink-0">
+      <div className="flex flex-col items-center gap-4 shrink-0" data-deck-anchor="true">
         <div className="relative w-[118px] sm:w-32 aspect-[2/3]">
           <div aria-hidden="true" className="absolute -right-1.5 top-2.5 bottom-[-8px] left-2 rotate-[1.4deg] rounded-2xl border border-pink-950/15 bg-pink-800 shadow-sm" />
           <div aria-hidden="true" className="absolute -right-1 top-2 bottom-[-5px] left-1 rotate-[-0.8deg] rounded-2xl border border-pink-950/15 bg-white shadow-[0_3px_7px_rgba(131,24,67,0.14)]" />
@@ -104,7 +104,7 @@ export function CenterTable({
       </div>
 
       {/* 2. Discard Pile (กองทิ้ง - Matching 120x180px Portrait 2:3 Main Pile - Tappable) */}
-      <div className="flex flex-col items-center gap-4 shrink-0">
+      <div className="flex flex-col items-center gap-4 shrink-0" data-discard-anchor="true" data-play-area-anchor="true">
         <div className="relative w-[118px] sm:w-32 aspect-[2/3]">
           <div aria-hidden="true" className="absolute -left-1.5 right-1 top-3 bottom-[-6px] rotate-[-1.8deg] rounded-2xl border border-ink/10 bg-white shadow-[0_4px_10px_rgba(17,24,39,0.10)]" />
           <div aria-hidden="true" className="absolute -right-1.5 left-2 top-2 bottom-[-5px] rotate-[1.3deg] rounded-2xl border border-ink/10 bg-rose-50 shadow-sm" />

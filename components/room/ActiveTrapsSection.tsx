@@ -22,6 +22,7 @@ export function ActiveTrapsSection({
   return (
     <section
       aria-label="กับดักที่คุณวางไว้"
+      data-trap-anchor="true"
       className="flex flex-col gap-1.5 w-full shrink-0 select-none"
     >
       {/* Header */}

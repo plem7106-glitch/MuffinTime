@@ -34,6 +34,11 @@ import { TrapResultModal } from '../modals/TrapResultModal';
 import { CounterResultModal } from '../modals/CounterResultModal';
 import { DiscardPileModal } from '../modals/DiscardPileModal';
 import { HostSkipConfirmModal } from './HostSkipConfirmModal';
+import { PresentationProvider } from '../../lib/presentation/presentationContext';
+import { PresentationOverlay } from './PresentationOverlay';
+import { ActivityFeed } from './ActivityFeed';
+import { PresentationBridge } from './PresentationBridge';
+import { LiveGameStatus } from './LiveGameStatus';
 
 
 import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon } from '../ui/Icons';
@@ -299,7 +304,11 @@ export function GameTable() {
 
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-start p-3 pb-24 bg-gradient-to-b from-gray-50/70 via-white to-gray-50/70 overflow-x-hidden">
+    <PresentationProvider>
+      <PresentationBridge state={state} viewerId={myPlayerId} />
+      <PresentationOverlay />
+      <ActivityFeed />
+      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-start p-3 pb-28 bg-gradient-to-b from-gray-50/70 via-white to-gray-50/70 overflow-x-hidden" data-player-anchor={myPlayerId}>
       {/* =================================================== */}
       {/* A. UPPER GAMEPLAY CONTENT (Tightly Stacked at Top)  */}
       {/* =================================================== */}
@@ -348,10 +357,10 @@ export function GameTable() {
       {/* =================================================== */}
       {/* B. FLEXIBLE SPACER (Only between CenterTable & Traps)*/}
       {/* =================================================== */}
-      <div className="flex-1 min-h-[16px]" />
+      <div className="flex-1 min-h-[12px]" />
 
       {/* =================================================== */}
-      {/* C. ACTIVE TRAPS (Anchored near bottom above Bar)    */}
+      {/* C. ACTIVE TRAPS & LIVE GAME STATUS                  */}
       {/* =================================================== */}
       <div className="flex flex-col gap-1.5 shrink-0 mt-auto mb-2">
         {/* 5. Section 4: My Active Traps (Always 3 portrait 2:3 slots) */}
@@ -361,6 +370,9 @@ export function GameTable() {
           onAddTrapSlotClick={() => setIsHandTrayOpen(true)}
           disabled={pendingResponse !== null || isShuffling || isRoundTransitionActive}
         />
+
+        {/* Live Gameplay Status Pill (Directly below Active Traps, above Bottom Action Bar) */}
+        <LiveGameStatus viewerId={myPlayerId} players={state.players} />
 
         {/* Declare Muffin Time Button (Compact banner if eligible) */}
         {canDeclare && (
@@ -714,6 +726,7 @@ export function GameTable() {
         </div>
       )}
     </main>
+    </PresentationProvider>
   );
 }
 

@@ -86,11 +86,17 @@ export function PlayerDensityGrid({
           const trapCount = player.traps?.length ?? 0;
           const hasImageError = imageErrors[id];
 
+          const isMuffinTime10 = cardCount === 10;
+
           return (
             <div
               key={id}
+              data-player-anchor={id}
+              data-trap-anchor={id}
               className={`relative flex flex-col items-center justify-between rounded-xl border p-1 transition-all text-center min-w-0 ${
-                isCurrentTurn
+                isMuffinTime10
+                  ? 'border-amber-500 bg-gradient-to-b from-amber-100/90 via-orange-50/60 to-white shadow-[0_0_12px_rgba(245,158,11,0.5)] ring-2 ring-amber-400'
+                  : isCurrentTurn
                   ? 'border-primary bg-gradient-to-b from-primary/15 via-pink-50/60 to-white shadow-[0_0_10px_rgba(237,31,79,0.3)] ring-2 ring-primary/60'
                   : isMe
                   ? 'border-primary/40 bg-pink-50/40 shadow-2xs'
@@ -98,9 +104,16 @@ export function PlayerDensityGrid({
               } ${count <= 4 ? 'min-h-[72px] p-1.5' : count <= 8 ? 'min-h-[66px]' : 'min-h-[60px]'}`}
             >
               {/* Compact Turn Overlay Badge */}
-              {isCurrentTurn && (
+              {isCurrentTurn && !isMuffinTime10 && (
                 <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-1.5 py-0.2 text-[7px] font-black text-white shadow-xs tracking-tight animate-bounce z-10 whitespace-nowrap">
                   กำลังเล่น
+                </span>
+              )}
+
+              {/* Muffin Time 10-Card Badge */}
+              {isMuffinTime10 && (
+                <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-1.5 py-0.2 text-[7.5px] font-black text-white shadow-xs tracking-tight animate-pulse z-10 whitespace-nowrap">
+                  🧁 10 ใบ!
                 </span>
               )}
 

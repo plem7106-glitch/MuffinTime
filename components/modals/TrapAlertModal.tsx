@@ -140,8 +140,8 @@ export function TrapAlertModal({
           </p>
 
           {/* Actual Trap Card (Using reusable Card component) */}
-          <div className="my-1 flex justify-center w-full">
-            <div className="w-40 sm:w-44 shrink-0 shadow-md rounded-2xl overflow-hidden pointer-events-none">
+          <div className="my-2 flex justify-center w-full">
+            <div className="w-[min(58vw,220px)] sm:w-[230px] aspect-[2/3] shrink-0 shadow-xl rounded-2xl overflow-hidden pointer-events-none">
               <Card
                 card={fullTrapCard}
                 type="trap"

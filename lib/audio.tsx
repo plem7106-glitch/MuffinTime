@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import { soundManager } from './presentation/soundManager';
+
 export type AudioPhase = 'pre-game' | 'gameplay';
 
 export interface AudioContextValue {
@@ -360,7 +362,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setIsSfxEnabled((prev) => {
       const next = !prev;
       isSfxEnabledRef.current = next;
-      localStorage.setItem('muffin_sfx_enabled', String(next));
+      soundManager.setSfxEnabled(next);
       return next;
     });
   }, []);
