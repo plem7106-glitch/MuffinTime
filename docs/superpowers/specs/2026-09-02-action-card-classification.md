@@ -287,11 +287,13 @@ comparison, not treated as tied at 0.
 | A109 | ไม่มีประโยชน์ | Literally nothing happens | `kind: no_op` |
 | A115 | คนแคระตัวสูง | Tallest gives 3 cards to shortest | **implemented** — `needsDualTargetSelection`, two sequential single-target picks (tallest, then shortest); rejected reusing the multi-select roster because click order alone can't safely disambiguate two roles (a deselect-reselect fumble silently swaps them with no on-screen indication) |
 
-**A166 (still deferred, not Phase 1 or Phase 2):** "หมดแก้วเร็วก็รวย" / "Speed Chug Bonus" —
-checked `description_en` and `description_th` directly in `data/cards.json`; neither names who
-draws the 3 cards (the chooser or the chosen). This is a rules-ambiguity block, not a missing
-primitive — needs a call from the group/friend against the physical rulebook, not a guessed
-default.
+**A166 — implemented 2026-09-02, ruling confirmed with the user (not Phase 1 or Phase 2):**
+"หมดแก้วเร็วก็รวย" / "Speed Chug Bonus" — `description_en`/`description_th` never named who
+draws the 3 cards (the chooser or the chosen); this was a rules-ambiguity block, not a missing
+primitive. Asked the user directly rather than guessing a default: the target draws on success
+(beats the actor's count of 5), the actor draws on failure. Needed a new
+`ActionRuleDefinition.needsTargetThenOutcome` flag since the two outcomes have different
+recipients — see `game/actionRules/definitions.ts`'s A166 entry.
 
 **Phase 2 (13 cards, deferred — need core turn/engine changes beyond a single `executeEffect`):**
 
@@ -322,12 +324,13 @@ grouped-pattern cards, + 26 unique (15 Phase 1 + 11 Phase 2) = **173**, matching
 **Post-implementation update (2026-09-02):** two cards originally counted inside Family
 grouped patterns (C3's A091, H1's A064) turned out to need the same class of core-engine
 change as the Phase 2 batch once actually implemented, and moved there. One originally-listed
-Phase 1 unique card (A115) shipped after adding a small dual-target-selection primitive; one
-(A166) stays deferred as a genuine rules-ambiguity, not an engine gap. Current status: **153
-of 173 implemented** (A037/A066/A137 birthday cards shipped 2026-09-02, see §I4/§J4), 13
-Phase 2 (unchanged, all still need core turn/engine work — includes A064/A091 moved in from
-Family groups), 1 blocked on a rules-ambiguity call (A166), 6 remaining "Group 2" cards
-(A023/A024/A027/A118/A135/A158 — see the handoff note
-`docs/superpowers/specs/2026-09-02-remaining-work-handoff.md` for next-session priority). See
-`game/actionRules/definitions.ts`'s trailing comments for the up-to-date per-card reasoning —
-this doc is the historical classification pass, that file is the live source of truth.
+Phase 1 unique card (A115) shipped after adding a small dual-target-selection primitive.
+Current status: **160 of 173 implemented** — only the 13-card Phase 2 batch remains
+(`A017, A028, A035, A040, A064, A091, A092, A094, A100, A108, A119, A126, A130`, unchanged,
+all still need core turn/engine work). Everything else that was deferred at the earlier
+153/173 checkpoint has since shipped: A023/A024/A027/A118/A135/A158 ("Group 2", data-collection
+cards) and A166 (the rules-ambiguity block, resolved via a direct ruling from the user — see
+above). See the handoff note `docs/superpowers/specs/2026-09-02-remaining-work-handoff.md` for
+what's left and `game/actionRules/definitions.ts`'s trailing comments for up-to-date per-card
+reasoning — this doc is the historical classification pass, that file is the live source of
+truth.

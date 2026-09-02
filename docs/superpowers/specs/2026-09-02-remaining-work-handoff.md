@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 159/173 Action cards implemented -- Group 2 is fully done
+## Status: 160/173 Action cards implemented -- Group 2 and Group 3 are fully done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -31,9 +31,10 @@ independently).
   merging).
 - `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
   `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
-  `ActionRuleDefinition.needsNumberInput`), and A118/A158 (`RoomState.gameSuggesterId`,
-  `ActionRuleDefinition.needsDrinkCheck`). **Branch your next work off `feature/birthday-cards`,
-  not `main`**, or you'll be missing that infrastructure and these 9 extra cards.
+  `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
+  `ActionRuleDefinition.needsDrinkCheck`), and A166 (`ActionRuleDefinition.needsTargetThenOutcome`).
+  **Branch your next work off `feature/birthday-cards`, not `main`**, or you'll be missing
+  that infrastructure and these 10 extra cards.
 - When your work is done and tests pass: push to this same branch if PR #3 is still open
   (it'll pick up the new commits automatically), or open a fresh PR **into `main`** if #3
   already merged. Use `git push` and `gh pr create`/`gh pr view` — `gh` is authenticated in
@@ -42,7 +43,7 @@ independently).
   status` yourself rather than assuming either way.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (at the 159/173 checkpoint): `npx vitest run` → 529
+- Last known-good check on this branch (at the 160/173 checkpoint): `npx vitest run` → 533
   passed, `npx tsc --noEmit` → clean. Run both again before you start — confirm your baseline.
 
 ## How to implement a card (the pattern)
@@ -87,7 +88,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 14 cards left, 2 groups (Group 2 is done)
+## What's next — 13 cards left, 1 group (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -115,22 +116,30 @@ All 6 cards implemented: A135, A023, A024, A027, A118, A158. See
   drink tracking, this precedent doesn't preclude adding it then — it was scoped to what
   A158 alone needed.
 
-### Group 1 (13 cards, needs core turn/engine changes — untouched)
+### Group 3 — DONE (160/173 checkpoint)
+
+`A166` "หมดแก้วเร็วก็รวย" was blocked on a genuine rules ambiguity (neither description_en nor
+description_th says who draws the 3 cards). Asked the user directly for a ruling rather than
+guessing: **the target draws 3 on success** (beats the actor's slow count of 5), **the actor
+draws 3 on failure**. Since the two outcomes have *different* recipients (unlike the existing
+`kind: 'outcome_entry'` + `needsTargetSelection` cards, e.g. A006, where picking a target *is*
+the outcome and skipping the pick means no-op), this needed a new two-step flow: a new
+`ActionRuleDefinition.needsTargetThenOutcome` flag drives "pick a target, then report a binary
+outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePhase` local
+state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
+in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
+
+### Group 1 (13 cards, needs core turn/engine changes — untouched, all that's left)
 
 `A017, A028, A035, A040, A064, A091, A092, A094, A100, A108, A119, A126, A130`. Each needs
 something beyond a single `executeEffect`: recursive resolution, turn-economy exceptions,
 an action-history log, multi-hop delegated targeting, a full game reset, or a hook inside
 `draw()` (`game/pile.ts`), the most-called primitive in the game. Full per-card reasoning
 in the classification doc's "Phase 2" table. This is its own planning effort — don't start
-it casually inside a Group 2 PR; it likely wants a `superpowers:brainstorming` +
-`superpowers:writing-plans` pass of its own given the engine-level surface area.
-
-### Group 3 (1 card, blocked on a rules question)
-
-`A166` "หมดแก้วเร็วก็รวย" — the Thai and English card text both fail to say who draws the 3
-cards (the player who chooses, or the player who gets chosen). This is a genuine rules
-ambiguity in the source text, not a missing primitive — get a ruling from whoever owns the
-physical rulebook before writing it. Do not guess a default.
+it casually inside a small-batch PR like the ones above; it likely wants a
+`superpowers:brainstorming` + `superpowers:writing-plans` pass of its own given the
+engine-level surface area. This is the entire remaining scope — once it's done, all 173
+Action cards are implemented.
 
 ## Known gap, not yet built (unrelated to the above)
 
