@@ -11,6 +11,7 @@ import {
   resolvePendingActionObligations,
   canEndTurn,
   resolveTurnArrival,
+  jumpToPlayerTurn,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -513,6 +514,111 @@ describe('resolveTurnArrival', () => {
     // Untouched -- resolveTurnArrival returns immediately once a win check
     // finishes the game, same short-circuit advanceAndCheckWin had inline.
     expect(next.pendingActionObligations).toEqual(['p1']);
+  });
+});
+
+describe('jumpToPlayerTurn (A119)', () => {
+  it('lands on the target and resets their per-turn flags via beginTurn', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: false },
+        p3: { skipNextTurn: false, placedTrapThisTurn: true, hasDrawnThisTurn: true, hasPlayedActionThisTurn: true },
+      },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p3');
+    expect(next.currentTurnIndex).toBe(2);
+    expect(next.turnPhase).toBe('trap_placement');
+    expect(next.players.p3.placedTrapThisTurn).toBe(false);
+    expect(next.players.p3.hasDrawnThisTurn).toBe(false);
+    expect(next.players.p3.hasPlayedActionThisTurn).toBe(false);
+  });
+
+  it('leaves players strictly between the current position and the target untouched', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3', 'p4'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: false, hasDrawnThisTurn: true },
+        p3: { skipNextTurn: false, hasPlayedActionThisTurn: true },
+        p4: { skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p4');
+    // p2 and p3 were jumped over -- their pre-existing per-turn state must
+    // survive untouched, same treatment advanceTurn gives a skipNextTurn'd
+    // player it steps past.
+    expect(next.players.p2.hasDrawnThisTurn).toBe(true);
+    expect(next.players.p3.hasPlayedActionThisTurn).toBe(true);
+  });
+
+  it('honors an existing skipNextTurn flag on the target itself, continuing past them', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: true },
+        p3: { skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p2');
+    expect(next.currentTurnIndex).toBe(2); // landed on p3, not p2
+    expect(next.players.p2.skipNextTurn).toBe(false); // cleared on the way past
+  });
+
+  it('bumps roundNumber when the jump crosses the start-of-lap boundary', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 2, // p3's turn
+      direction: 1,
+      roundNumber: 1,
+      players: { p1: { skipNextTurn: false }, p2: { skipNextTurn: false }, p3: { skipNextTurn: false } },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p1'); // wraps past index 0
+    expect(next.currentTurnIndex).toBe(0);
+    expect(next.roundNumber).toBe(2);
+  });
+
+  it('does not bump roundNumber when the jump stays within the current lap', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      roundNumber: 1,
+      players: { p1: { skipNextTurn: false }, p2: { skipNextTurn: false }, p3: { skipNextTurn: false } },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p3');
+    expect(next.roundNumber).toBe(1);
+  });
+
+  it("clears a GlobalRestriction sourced by the landed-on player", () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: { p1: { skipNextTurn: false }, p2: { skipNextTurn: false }, p3: { skipNextTurn: false } },
+      globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p3' }],
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p3');
+    expect(next.globalRestrictions).toEqual([]);
+  });
+
+  it('is a no-op when targetId is not found in turnOrder', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: { p1: {}, p2: {}, p3: {} },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'nobody');
+    expect(next.currentTurnIndex).toBe(0);
   });
 });
 

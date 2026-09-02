@@ -294,6 +294,61 @@ export function resolveTurnArrival(state: RoomState, currentId: PlayerId): RoomS
   return resolvePendingActionObligations(afterPendingChecks, currentId);
 }
 
+/**
+ * A119 "จะรอทำไม?" (Why Wait?): jumps play immediately to targetId's next
+ * turn, skipping everyone in between for this cycle with zero side effects
+ * (mirrors how advanceTurn's own loop treats a skipNextTurn-flagged player
+ * it steps past -- see the design spec's "Design decisions made by
+ * precedent" section). Two phases:
+ *   1. Walk step-by-step from the current position to targetId's raw slot,
+ *      touching nothing along the way.
+ *   2. From targetId's slot onward, behave exactly like advanceTurn's own
+ *      stepping loop -- if skipNextTurn is set, clear it and keep walking
+ *      until landing on someone who isn't flagged.
+ * Lands via beginTurn (flag reset + restriction clearing), same as
+ * advanceTurn/emergencyForceSkipTurn.
+ */
+export function jumpToPlayerTurn(state: RoomState, targetId: PlayerId): RoomState {
+  const next = cloneState(state);
+  const order = next.turnOrder && next.turnOrder.length > 0 ? next.turnOrder : (next.seatOrder ?? []);
+  const count = order.length;
+  const targetIndex = order.indexOf(targetId);
+  if (count <= 0 || targetIndex === -1) return next;
+
+  const dir = next.direction ?? (next.playDirection === 'counterclockwise' ? -1 : 1);
+  let index = next.currentTurnIndex;
+  let wrapped = false;
+
+  // Phase 1: walk to targetId's raw slot, no side effects along the way.
+  let steps = 0;
+  while (index !== targetIndex && steps <= count) {
+    const nextIdx = (((index + dir) % count) + count) % count;
+    if (nextIdx === 0) wrapped = true;
+    index = nextIdx;
+    steps++;
+  }
+
+  // Phase 2: from targetId's slot onward, honor skipNextTurn exactly like
+  // advanceTurn's own loop.
+  let attempts = 0;
+  while (next.players[order[index]]?.skipNextTurn && attempts <= count) {
+    next.players[order[index]].skipNextTurn = false;
+    const nextIdx = (((index + dir) % count) + count) % count;
+    if (nextIdx === 0) wrapped = true;
+    index = nextIdx;
+    attempts++;
+  }
+
+  next.currentTurnIndex = index;
+  next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
+  if (wrapped) {
+    next.roundNumber = (next.roundNumber ?? 1) + 1;
+  }
+
+  const activePlayerId = order[index];
+  return beginTurn(next, activePlayerId);
+}
+
 export function clearMuffinTimeDeclaration(state: RoomState, playerId: PlayerId): RoomState {
   const next = cloneState(state);
   if (next.players[playerId]) {
