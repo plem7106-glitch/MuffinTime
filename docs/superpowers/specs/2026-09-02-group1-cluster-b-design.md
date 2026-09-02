@@ -95,7 +95,10 @@ below is still needed — `main`'s refactor didn't touch the `resolvePendingWinC
    in it — the UI's `TargetSelector` should never actually produce an invalid target, but
    the function doesn't trust that from the outside.
 
-A119's card definition in `game/actionRules/definitions.ts`:
+A119's card definition in `game/actionRules/definitions.ts` (**updated post-implementation**
+— the version below reflects what actually shipped, including a guard added during review
+that the original draft above didn't have; see "A real bug the review process caught"
+below for why):
 
 ```ts
 A119: {
@@ -106,6 +109,16 @@ A119: {
   executeEffect: (state, frame) => {
     const targetId = frame.targetIds[0];
     if (!targetId) return state;
+    // Guard added during review -- see "A real bug the review process caught" below.
+    // jumpToPlayerTurn no-ops (returns the current player's slot unchanged,
+    // without calling beginTurn) both when targetId is the actor themselves
+    // and when targetId isn't found in turnOrder/seatOrder at all. Without
+    // this check, resolveTurnArrival would still run below against the
+    // unchanged actor -- and checkWinnerAtTurnStart is a live, non-consume-once
+    // predicate, so a player already eligible for muffin time would win
+    // immediately instead of waiting for their genuine next turn.
+    const order = state.turnOrder?.length ? state.turnOrder : (state.seatOrder ?? []);
+    if (targetId === frame.actorId || !order.includes(targetId)) return state;
     const jumped = jumpToPlayerTurn(state, targetId);
     const currentId = jumped.turnOrder[jumped.currentTurnIndex];
     return resolveTurnArrival(jumped, currentId);
@@ -116,6 +129,29 @@ A119: {
 **A119 introduces zero new `PlayerState`/`RoomState` fields** — nothing to add to
 `game/room.ts`'s `startGame`/`resetForPlayAgain`, no reset-gap risk of the kind Cluster A
 hit four times.
+
+## A real bug the review process caught
+
+The `executeEffect` shown above added a guard the original design draft (further up this
+page) never anticipated. Task 3's code review found that self-targeting A119 while already
+eligible for and having declared muffin time triggered an *immediate, premature win* —
+bypassing the "declare now, verify at your genuine next turn" mechanic entirely — because
+`jumpToPlayerTurn`'s self-target no-op still leaves `resolveTurnArrival` running against
+the (unmoved) actor, and `checkWinnerAtTurnStart` is a live predicate, not consume-once.
+A follow-up final-cluster review then found and reproduced a *second* path into the exact
+same failure mode: an invalid/not-found `targetId` hits the identical no-op-without-a-jump
+shape in `jumpToPlayerTurn`. Both are currently unreachable through the shipped UI (the
+`TargetSelector` candidate list always excludes the actor and only ever offers ids that are
+actually in `turnOrder`), but neither was structurally prevented at the engine layer before
+these fixes — only by the UI's own filtering.
+
+**Takeaway for the next card that chains `resolveTurnArrival` (or anything reaching
+`checkWinnerAtTurnStart`) after a turn-transition helper's own `executeEffect`:** enumerate
+*every* no-op/early-return branch in the helper being called, then check each one against
+whether it's safe to still run the win-check chain on whatever player the call started
+with. Don't assume "the UI won't let this happen" is enough — this cluster's fix cycle
+initially closed only the more obvious of the two paths (self-target) and needed a second,
+separate review pass to find the sibling (invalid target) with the identical root cause.
 
 ## Data flow / architecture note
 
