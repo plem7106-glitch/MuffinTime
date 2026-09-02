@@ -41,7 +41,14 @@ export function getTurnPreviewSequence(
 
 export function advanceTurn(state: RoomState): RoomState {
   const next = cloneState(state);
-  const order = next.seatOrder && next.seatOrder.length > 0 ? next.seatOrder : next.turnOrder;
+  // turnOrder, not seatOrder, decides whose turn it is -- every gameplay
+  // gate (lib/session.tsx) and the UI (GameTable's currentTurnPlayerId) read
+  // turnOrder[currentTurnIndex]. seatOrder can diverge from turnOrder after
+  // a seat-shuffle Action card (A010/A156/A172) and nothing resyncs them, so
+  // walking seatOrder here would reset the wrong player's per-turn flags and
+  // hand the turn to someone who never actually played. Matches
+  // emergencyForceSkipTurn's array preference below.
+  const order = next.turnOrder && next.turnOrder.length > 0 ? next.turnOrder : (next.seatOrder ?? []);
   const count = order.length;
   if (count <= 0) return next;
 

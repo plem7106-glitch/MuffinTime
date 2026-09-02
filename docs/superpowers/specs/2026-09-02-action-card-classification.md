@@ -168,13 +168,19 @@ Reverted in the same session before merging. `rotateSeatOrder`/`swapSeats` now d
 leave `currentTurnIndex` alone; regression tests in `game/actionRules/definitions.test.ts`
 assert `turnOrder[currentTurnIndex]` stays pointed at the actor across all 3 cards.
 
-**Real, narrower, still-open issue (not fixed, low severity):** `advanceTurn` (`game/turn.ts`)
-prefers `seatOrder` over `turnOrder` when walking to find the next non-skipped player, and reads
-`skipNextTurn` by seat position. Once `seatOrder` and `turnOrder` diverge (exactly the 3 cards
-above), that walk can check the wrong player's `skipNextTurn` flag for one turn — a narrow edge
-case (needs a seat-shuffle card played the same round as someone's `skipNextTurn` flag being
-set) that predates this session and is out of scope here; `advanceTurn` itself would need to
-walk `turnOrder` instead of preferring `seatOrder` to close it.
+**Second real bug found (same review pass) — fixed, not deferred:** `advanceTurn`
+(`game/turn.ts`) preferred `seatOrder` over `turnOrder` when walking to find the next
+non-skipped player and when resetting per-turn flags (`placedTrapThisTurn`,
+`hasDrawnThisTurn`, `hasPlayedActionThisTurn`) on the new active player. This was low-severity
+before this session (only `placedTrapThisTurn` was at stake) but the collaborator's concurrent
+main-branch work added the two `hasDrawnThisTurn`/`hasPlayedActionThisTurn` gates — once
+`seatOrder` and `turnOrder` diverge (permanently, after A010/A156/A172, since nothing resyncs
+them), `advanceTurn` would reset those flags on the *wrong* player every turn for the rest of
+the game, and the real next player would start their turn still marked as having already
+played/drawn — a permanent soft-lock ("คุณใช้แอ็กชันประจำเทิร์นไปแล้ว") for anyone after a
+seat-shuffle card. Fixed by making `advanceTurn` prefer `turnOrder`, matching
+`emergencyForceSkipTurn`'s existing (already-correct) preference. Regression test in
+`game/turn.test.ts` ("walks turnOrder, not seatOrder...") covers the diverged-arrays case.
 
 **F2. All players' hands normalized to a fixed size** — 2 cards: A044, A129
 
