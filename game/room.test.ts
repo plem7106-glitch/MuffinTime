@@ -314,7 +314,7 @@ describe('restartGame (A092)', () => {
       currentTurnIndex: 2,
       direction: 1,
       muffinTimeTarget: 6,
-      drawPile: ['A01', 'A02', 'A03'],
+      drawPile: ['A01', 'A02', 'A03', 'A04', 'A05', 'A06'],
       discardPile: ['A04'],
       players: {
         host1: { name: 'Host', hand: ['A05'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
@@ -364,6 +364,10 @@ describe('restartGame (A092)', () => {
     expect(next.placedTrapMeta).toEqual({});
     expect(next.pendingForcedDiscards).toEqual({});
     expect(next.roundNumber).toBe(1);
+    expect(next.players.host1.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3);
+    expect(next.drawPile.length).toBe(1); // 10 pooled - 9 dealt
   });
 
   it('preserves hostId, joinOrder, maxPlayers, gameSuggesterId, and per-player name/connected/birthdayMMDD', () => {
@@ -389,5 +393,25 @@ describe('restartGame (A092)', () => {
       muffinTimeTarget: 10, drawPile: [], discardPile: [], players: {},
     } as unknown as RoomState;
     expect(restartGame(room)).toEqual(room);
+  });
+
+  it('throws if the pooled cards cannot cover a 3-card deal for every player', () => {
+    const room = {
+      status: 'playing',
+      hostId: 'host1',
+      seatOrder: ['host1', 'p2', 'p3'],
+      turnOrder: ['host1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile: ['A01'],
+      discardPile: [],
+      players: {
+        host1: { name: 'Host', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'P2', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'P3', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    expect(() => restartGame(room, () => 0)).toThrow('not enough cards');
   });
 });

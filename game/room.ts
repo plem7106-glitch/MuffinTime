@@ -291,6 +291,9 @@ export function restartGame(state: RoomState, rng: Rng = Math.random): RoomState
   for (const pid of playerIds) {
     pool.push(...next.players[pid].hand, ...next.players[pid].traps);
   }
+  if (pool.length < playerIds.length * 3) {
+    throw new Error('restartGame: not enough cards in the pool to deal 3 to every player');
+  }
   next.drawPile = shuffle(pool, rng);
   next.discardPile = [];
 
