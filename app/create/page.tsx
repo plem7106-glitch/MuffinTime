@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
+import type { DevReactionScenario } from '../../lib/devReactionScenarios';
 import { usePlayer } from '../../lib/player';
 import {
   ChevronLeftIcon,
@@ -45,6 +46,7 @@ function CreateRoomContent() {
   // Bot room state
   const [botMaxPlayers, setBotMaxPlayers] = useState(3);
   const [isCreatingBots, setIsCreatingBots] = useState(false);
+  const [scenario, setScenario] = useState<DevReactionScenario | ''>('');
 
   // Submit Friends Room
   async function handleFriendsSubmit(e?: React.FormEvent) {
@@ -73,7 +75,7 @@ function CreateRoomContent() {
     if (birthdayMMDD) setPlayerBirthday(birthdayMMDD);
     setIsCreatingBots(true);
     try {
-      const code = createBotRoom(botMaxPlayers, finalName, birthdayMMDD);
+      const code = createBotRoom(botMaxPlayers, finalName, birthdayMMDD, scenario || undefined);
       router.push(`/room/${code}`);
     } catch {
       setIsCreatingBots(false);
@@ -371,6 +373,23 @@ function CreateRoomContent() {
               <span>• เหมาะสำหรับการทดสอบ UI, ตารางเกม, และลองใช้การ์ดต่างๆ</span>
             </div>
           </div>
+
+          {process.env.NODE_ENV !== 'production' && (
+            <label className="flex flex-col gap-1 text-xs font-bold text-ink">
+              DEV Reaction Scenario
+              <select value={scenario} onChange={(e) => setScenario(e.target.value as DevReactionScenario | '')} className="min-h-[44px] rounded-xl border border-primary/30 bg-white px-3">
+                <option value="">Random Game</option>
+                <option value="r1-simple-counter">R1 Simple Counter</option>
+                <option value="r2-c35">R2 C35 Redirect</option>
+                <option value="r5-counter-chain">R5 Counter-to-Counter</option>
+                <option value="r6-multiple-responders">R6 Multiple Responders</option>
+                <option value="s1-c43">S1 C43 Target + Cancel</option>
+                <option value="s2-c48">S2 C48 Draw</option>
+                <option value="s3-c50">S3 C50 Steal</option>
+                <option value="s4-c41">S4 C41 Pure Social</option>
+              </select>
+            </label>
+          )}
 
           <button
             type="submit"

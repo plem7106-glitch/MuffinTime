@@ -48,7 +48,9 @@ export function createStackFrame(
   // Default eligible responders: calculated independently from affected players (or all non-actors)
   const eligibleResponderIds =
     params.eligibleResponderIds ??
-    (affectedPlayerIds.length > 0
+    (params.sourceType === 'counter'
+      ? Object.keys(state.players).filter((id) => id !== params.actorId)
+      : affectedPlayerIds.length > 0
       ? affectedPlayerIds.filter((id) => id !== params.actorId)
       : Object.keys(state.players).filter((id) => id !== params.actorId));
 

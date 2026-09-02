@@ -230,6 +230,9 @@ export interface RoomState {
 
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;
+  /** Development-only deterministic scenario marker; never set by normal rooms. */
+  devScenario?: string;
+  devForcedBotAction?: { code: CardCode; targetId?: PlayerId };
   lastResult?: LastResult | null;
 }
 

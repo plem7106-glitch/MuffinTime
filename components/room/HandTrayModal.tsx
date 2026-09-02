@@ -7,6 +7,7 @@ import { getCardDisplay, type CardDisplay } from '../../data/cards/display';
 import { Card, CARD_TYPE_THEMES } from '../card/Card';
 import { CloseIcon, CardsIcon, CheckIcon } from '../ui/Icons';
 import { soundManager } from '../../lib/presentation/soundManager';
+import { getSocialCounterConfig, isSocialCounter } from '../../game/socialCounter';
 
 export function HandTrayModal({
   isOpen,
@@ -22,6 +23,7 @@ export function HandTrayModal({
   onPlayAction,
   onPlaceTrap,
   onRequestTarget,
+  onPlaySocialCounter,
 }: {
   isOpen: boolean;
   hand: CardCode[];
@@ -36,6 +38,7 @@ export function HandTrayModal({
   onPlayAction: (code: CardCode) => void;
   onPlaceTrap: (code: CardCode) => void;
   onRequestTarget: (card: CardDisplay) => void;
+  onPlaySocialCounter: (card: CardDisplay) => void;
 }) {
   const [selectedCode, setSelectedCode] = useState<CardCode | null>(null);
   const [fullscreenCode, setFullscreenCode] = useState<CardCode | null>(null);
@@ -55,7 +58,7 @@ export function HandTrayModal({
       titleEn: full?.name_en,
       description: full?.description_th ?? display.effect,
       image: full?.image,
-      needsTarget: display.needsTarget,
+      needsTarget: display.needsTarget || Boolean(getSocialCounterConfig(selectedCode)?.needsTarget),
       display,
     };
   }, [selectedCode]);
@@ -95,6 +98,17 @@ export function HandTrayModal({
     if (selectedCardInfo.type === 'trap') {
       if (trapsCount >= 3) return;
       onPlaceTrap(selectedCardInfo.code);
+      setSelectedCode(null);
+      onClose();
+      return;
+    }
+
+    if (selectedCardInfo.type === 'counter' && isSocialCounter(selectedCardInfo.code)) {
+      if (selectedCardInfo.needsTarget) {
+        onPlaySocialCounter(selectedCardInfo.display);
+      } else {
+        onPlaySocialCounter(selectedCardInfo.display);
+      }
       setSelectedCode(null);
       onClose();
       return;
@@ -341,10 +355,13 @@ export function HandTrayModal({
                       </span>
                     </button>
                   )
+                ) : selectedCardInfo.type === 'counter' && isSocialCounter(selectedCardInfo.code) ? (
+                  <button type="button" onClick={handleActionConfirm} className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-counter px-4 text-xs sm:text-sm font-black text-white shadow-md shadow-counter/25 transition-all hover:opacity-95 active:scale-[0.98]">
+                    <CheckIcon className="h-4 w-4 stroke-[3]" />
+                    <span>{selectedCardInfo.needsTarget ? 'เลือกเป้าหมาย' : 'ใช้ไพ่ใบนี้'}</span>
+                  </button>
                 ) : (
-                  <div className="flex min-h-[40px] flex-1 items-center justify-center rounded-xl border border-counter/30 bg-counter/10 px-3 text-[11px] font-bold text-counter">
-                    ใช้ตอบโต้เมื่อมีการเล่น Action หรือ Trap
-                  </div>
+                  <div className="flex min-h-[40px] flex-1 items-center justify-center rounded-xl border border-counter/30 bg-counter/10 px-3 text-[11px] font-bold text-counter">ใช้ตอบโต้เมื่อมีการเล่น Action หรือ Trap</div>
                 )
               ) : (
                 <div className="flex min-h-[40px] flex-1 items-center justify-center rounded-xl border border-gray-200 bg-gray-100/70 px-3 text-[11px] font-bold text-ink-secondary">

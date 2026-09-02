@@ -67,6 +67,18 @@ describe('Reaction Stack Foundation', () => {
     expect(state.reactionStack?.length).toBe(2);
   });
 
+  it('gives a Counter frame to every other player, not only the Counter actor', () => {
+    let state = createMockRoom();
+    state = pushStackFrame(state, {
+      sourceType: 'action', sourceCode: 'A01', actorId: 'p1', targetIds: ['p2'],
+    });
+    state = pushStackFrame(state, {
+      sourceType: 'counter', sourceCode: 'C17', actorId: 'p2', targetIds: ['p2'],
+    });
+
+    expect(getTopFrame(state)?.eligibleResponderIds).toEqual(['p1', 'p3']);
+  });
+
   it('resolves LIFO and pops child frame before resuming parent frame', () => {
     let state = createMockRoom();
     state = pushStackFrame(state, {

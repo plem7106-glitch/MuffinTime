@@ -4,6 +4,24 @@ import type { ForcedDiscardOperation } from '../forcedDiscard';
 import type { StealOperation } from '../steal';
 
 export type CounterStatus = 'implemented' | 'not_implemented';
+export interface CounterInteraction {
+  requiresTarget: boolean;
+  targetType?: 'other_player';
+  payloadKey?: string;
+}
+
+const COUNTER_INTERACTIONS: Partial<Record<CardCode, CounterInteraction>> = {
+  C04: { requiresTarget: true, targetType: 'other_player', payloadKey: 'newVictimId' },
+  C34: { requiresTarget: true, targetType: 'other_player', payloadKey: 'newTargetId' },
+  C35: { requiresTarget: true, targetType: 'other_player', payloadKey: 'newTargetId' },
+  C39: { requiresTarget: true, targetType: 'other_player', payloadKey: 'newTargetId' },
+  C40: { requiresTarget: true, targetType: 'other_player', payloadKey: 'newTargetId' },
+  C45: { requiresTarget: true, targetType: 'other_player', payloadKey: 'newTargetId' },
+};
+
+export function getCounterInteraction(code: CardCode): CounterInteraction {
+  return COUNTER_INTERACTIONS[code] ?? { requiresTarget: false };
+}
 const IMPLEMENTED_COUNTERS = new Set<CardCode>([
   'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27', 'C28', 'C29', 'C30', 'C31', 'C32', 'C33', 'C34', 'C35', 'C36', 'C37', 'C38', 'C39', 'C40', 'C41', 'C42', 'C43', 'C44', 'C45', 'C46', 'C47', 'C48', 'C49', 'C50'
 ]);
@@ -225,4 +243,77 @@ export function getPlayableCounters(
   if (!pending) return [];
   const canonicalCounters = new Set(getCardsByType('counter').map((card) => card.id));
   return hand.filter((code) => canonicalCounters.has(code) && isCounterEligible(code, pending, context));
+}
+
+/**
+ * Builds the Counter context from the authoritative active StackFrame.  Keeping
+ * this here prevents the UI, session command, and bot automation from deriving
+ * different targets for the same response window.
+ */
+export function getCounterContextForActiveFrame(state: RoomState, actorId: PlayerId): CounterContext | undefined {
+  const top = state.reactionStack?.[state.reactionStack.length - 1];
+  if (!top) return undefined;
+
+  const forcedDiscardOperationId = (top.customPayload?.forcedDiscardOperationId as string | undefined)
+    ?? Object.keys(state.pendingForcedDiscards ?? {})[0];
+  const forcedDiscardOp = forcedDiscardOperationId ? state.pendingForcedDiscards?.[forcedDiscardOperationId] : undefined;
+  if (forcedDiscardOp) {
+    return {
+      actorId,
+      targetPlayerId: forcedDiscardOp.targetPlayerId,
+      operationKind: 'forced_discard',
+      forcedDiscardOp,
+      roomState: state,
+    };
+  }
+
+  const stealOperationId = (top.customPayload?.stealOperationId as string | undefined)
+    ?? Object.keys(state.pendingSteals ?? {})[0];
+  const stealOp = stealOperationId ? state.pendingSteals?.[stealOperationId] : undefined;
+  if (stealOp) {
+    return {
+      actorId,
+      targetPlayerId: stealOp.victimId,
+      operationKind: 'steal',
+      stealOp,
+      roomState: state,
+    };
+  }
+
+  if (top.sourceType === 'action') {
+    return {
+      actorId,
+      actionActorId: top.actorId,
+      targetPlayerId: top.targetIds[0],
+      roomState: state,
+    };
+  }
+
+  return { actorId, roomState: state };
+}
+
+/** Returns the only cards a pending responder may legally play right now. */
+export function getPlayableCountersForActiveFrame(state: RoomState, responderId: PlayerId): CardCode[] {
+  const top = state.reactionStack?.[state.reactionStack.length - 1];
+  const pending = state.pendingResponse;
+  if (!top || !pending || pending.responseId !== top.frameId) return [];
+  if (!top.eligibleResponderIds.includes(responderId) || top.responses[responderId]?.status !== 'pending') return [];
+  return getPlayableCounters(
+    state.players[responderId]?.hand ?? [],
+    pending,
+    getCounterContextForActiveFrame(state, responderId)
+  );
+}
+
+/** Pending responders that have no legal Counter choice on the active frame. */
+export function getZeroEligibleCounterResponderIds(state: RoomState): PlayerId[] {
+  const top = state.reactionStack?.[state.reactionStack.length - 1];
+  const pending = state.pendingResponse;
+  if (!top || !pending || pending.responseId !== top.frameId) return [];
+  const countersDisabled = state.globalRestrictions?.some((restriction) => restriction.type === 'no_counters') ?? false;
+  return top.eligibleResponderIds.filter(
+    (responderId) =>
+      top.responses[responderId]?.status === 'pending' &&
+      (countersDisabled || getPlayableCountersForActiveFrame(state, responderId).length === 0)
+  );
 }

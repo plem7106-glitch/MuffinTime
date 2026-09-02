@@ -49,7 +49,8 @@ import {
   executeTrapFrameEffect,
 } from '../game/trapRules/engine';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
-import { getPlayableCounters, type CounterContext } from '../game/counterRules/registry';
+import { getCounterContextForActiveFrame, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds } from '../game/counterRules/registry';
+import { createDevReactionScenario, type DevReactionScenario } from './devReactionScenarios';
 import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { resolveSteal } from '../game/steal';
@@ -57,6 +58,7 @@ import { getPlayableActions, isActionImplemented, executeActionFrameEffect } fro
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
 import { executeManualRecoveryDiscard, executeManualRecoveryGive } from '../game/recovery';
+import { playSocialCounter as enginePlaySocialCounter } from '../game/socialCounter';
 import {
   decideBotTurn,
   decideBotTrapPlacement,
@@ -98,7 +100,7 @@ export interface GameSessionValue {
   error: string | null;
   clearLastResult: () => void;
   createRoom: (maxPlayers: number, hostName: string, hostBirthdayMMDD?: string) => Promise<string>;
-  createBotRoom: (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string) => string;
+  createBotRoom: (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string, scenario?: DevReactionScenario) => string;
   joinRoom: (code: string, playerName: string, playerBirthdayMMDD?: string) => Promise<void>;
   previewRoom: (code: string) => Promise<RoomState | null>;
   resumeRoom: (code: string) => Promise<void>;
@@ -118,7 +120,7 @@ export interface GameSessionValue {
   initiateTrapInteraction: (code: CardCode, targetId: PlayerId) => void;
   respondToTrapInteraction: (interactionId: string, decision: 'accept' | 'refuse') => void;
   playCounter: (code: CardCode, responseId: string, actorIdOverride?: PlayerId, customPayloadOverride?: Record<string, unknown>) => void;
-  skipCounter: (responseId: string) => void;
+  skipCounter: (responseId: string, responderIdOverride?: PlayerId) => void;
   declareMuffinTime: () => void;
   finishGame: (winnerId: PlayerId, reason?: 'normal' | 'manual') => void;
   playAgain: () => void;
@@ -126,6 +128,7 @@ export interface GameSessionValue {
   finishShuffleDrawPile: () => void;
   manualDiscard: (cardCodes: CardCode[]) => void;
   manualGiveCard: (recipientId: PlayerId, cardCodes: CardCode[]) => void;
+  playSocialCounter: (code: CardCode, targetPlayerId?: PlayerId) => void;
 }
 
 const GameSessionContext = createContext<GameSessionValue | null>(null);
@@ -221,7 +224,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const createBotRoomFn = useCallback(
-    (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string) => {
+    (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string, scenario?: DevReactionScenario) => {
       if (channelRef.current) {
         unsubscribeFromRoom(channelRef.current);
         channelRef.current = null;
@@ -233,8 +236,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       // Bots deliberately get no birthdayMMDD -- there's no real person to
       // self-report one, and fabricating a date would silently skew A037/
       // A066/A137's "closest birthday" comparisons.
-      let state = engineCreateRoom(hostId, actualHostName, boundedMax, hostBirthdayMMDD);
-      for (let i = 1; i <= boundedMax - 1; i++) {
+      let state = scenario && process.env.NODE_ENV !== 'production'
+        ? createDevReactionScenario(scenario, hostId, actualHostName)
+        : engineCreateRoom(hostId, actualHostName, boundedMax, hostBirthdayMMDD);
+      for (let i = scenario && process.env.NODE_ENV !== 'production' ? 3 : 1; i <= boundedMax - 1; i++) {
         const botId = `bot-${i}`;
         const botName = BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length];
         state = addPlayer(state, botId, botName);
@@ -398,6 +403,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       run((state) => {
         if (state.reactionStack && state.reactionStack.length > 0) return state;
         if (state.pendingResponse || state.pendingInteraction) return state;
+        if (state.devScenario && process.env.NODE_ENV !== 'production') return state;
         if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
         const pid = myPlayerId!;
         const player = state.players[pid];
@@ -538,7 +544,8 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (resolvingFrame.sourceType === 'counter') {
           // 1. Primary Interception: Apply cancellation to parent frame if un-cancelled
           const parentId = resolvingFrame.parentFrameId ?? (resolvingFrame.customPayload?.parentFrameId as string | undefined);
-          if (parentId) {
+          const redirectsParentTarget = ['C34', 'C35', 'C45'].includes(resolvingFrame.sourceCode);
+          if (parentId && !redirectsParentTarget) {
             next = addModifierToFrame(next, parentId, {
               modifierId: `mod-${resolvingFrame.sourceCode}-${Date.now()}`,
               sourceFrameId: resolvingFrame.frameId,
@@ -695,24 +702,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (state.globalRestrictions?.some((r) => r.type === 'no_counters')) return state;
         const counterActorId = actorIdOverride ?? myPlayerId!;
         if (!counterActorId || !state.players[counterActorId]) return state;
-        const topFrame = top;
-        const forcedOpId = (topFrame.customPayload?.forcedDiscardOperationId as string | undefined)
-          ?? Object.keys(state.pendingForcedDiscards ?? {})[0];
-        const forcedOp = forcedOpId ? state.pendingForcedDiscards?.[forcedOpId] : undefined;
+        const ctx = getCounterContextForActiveFrame(state, counterActorId);
+        const stealOp = ctx?.stealOp;
 
-        const stealOpId = (topFrame.customPayload?.stealOperationId as string | undefined)
-          ?? Object.keys(state.pendingSteals ?? {})[0];
-        const stealOp = stealOpId ? state.pendingSteals?.[stealOpId] : undefined;
-
-        const ctx: CounterContext | undefined = forcedOp
-          ? { actorId: counterActorId, targetPlayerId: forcedOp.targetPlayerId, operationKind: 'forced_discard' as const, forcedDiscardOp: forcedOp, roomState: state }
-          : stealOp
-          ? { actorId: counterActorId, targetPlayerId: stealOp.victimId, operationKind: 'steal' as const, stealOp, roomState: state }
-          : state.pendingResponse?.kind === 'action'
-          ? { actorId: counterActorId, actionActorId: topFrame.actorId ?? state.pendingResponse.actorId, targetPlayerId: topFrame.actorId ?? state.pendingResponse.actorId, roomState: state }
-          : undefined;
-
-        if (!state.pendingResponse || !getPlayableCounters(state.players[counterActorId]?.hand ?? [], state.pendingResponse, ctx).includes(code)) return state;
+        if (!getPlayableCountersForActiveFrame(state, counterActorId).includes(code)) return state;
 
         if (code === 'C04') {
           const newVictimId = customPayloadOverride?.newVictimId as string | undefined;
@@ -769,25 +762,17 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const skipCounter = useCallback(
-    (responseId: string) =>
+    (responseId: string, responderIdOverride?: PlayerId) =>
       run((state) => {
         const top = getTopFrame(state);
         if (!top || top.frameId !== responseId) return state;
 
         let next = state;
-        if (myPlayerId && top.eligibleResponderIds.includes(myPlayerId)) {
-          next = submitResponse(next, responseId, myPlayerId, {
+        const responderId = responderIdOverride ?? myPlayerId;
+        if (responderId && top.eligibleResponderIds.includes(responderId)) {
+          next = submitResponse(next, responseId, responderId, {
             status: 'skipped',
           });
-        } else {
-          // Auto-skipping for bot responders or responders without counters
-          for (const pid of top.eligibleResponderIds) {
-            if (top.responses[pid]?.status === 'pending') {
-              next = submitResponse(next, responseId, pid, {
-                status: 'skipped',
-              });
-            }
-          }
         }
 
         next = resolveCompletedStackFrames(next);
@@ -830,6 +815,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const senderId = myPlayerId!;
         return executeManualRecoveryGive(state, senderId, recipientId, cardCodes);
       }),
+    [run, myPlayerId]
+  );
+
+  const playSocialCounter = useCallback(
+    (code: CardCode, targetPlayerId?: PlayerId) =>
+      run((state) => enginePlaySocialCounter(state, myPlayerId!, code, targetPlayerId)),
     [run, myPlayerId]
   );
 
@@ -892,6 +883,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const executedBotTurnKeyRef = useRef<string | null>(null);
+  const autoSkippedResponseKeysRef = useRef(new Set<string>());
 
   // Auto-skip or bot-respond to counter windows
   useEffect(() => {
@@ -899,97 +891,78 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     if (!pendingResponse || !myPlayerId || !roomState) return;
     if (myPlayerId !== roomState.hostId) return;
 
+    const top = getTopFrame(roomState);
+    if (!top || top.frameId !== pendingResponse.responseId) return;
+    const pendingResponderIds = top.eligibleResponderIds.filter(
+      (id) => top.responses[id]?.status === 'pending'
+    );
+    const playableCountersFor = (responderId: PlayerId) =>
+      getPlayableCountersForActiveFrame(roomState, responderId);
+    const skipFirstZeroEligibleResponder = () => {
+      const responderId = getZeroEligibleCounterResponderIds(roomState)[0];
+      if (!responderId) return false;
+      const key = `${pendingResponse.responseId}:${responderId}`;
+      if (autoSkippedResponseKeysRef.current.has(key)) return true;
+      autoSkippedResponseKeysRef.current.add(key);
+      skipCounter(pendingResponse.responseId, responderId);
+      return true;
+    };
+
     const isBot = roomCode?.startsWith('bot-');
 
     if (isBot) {
-      // In local bot mode, check if human has an active interaction to decide
-      const isHumanActor = pendingResponse.actorId === myPlayerId;
-      const isHumanTarget = !pendingResponse.targetId || pendingResponse.targetId === myPlayerId;
-      const noCounters = roomState.globalRestrictions?.some((r) => r.type === 'no_counters') ?? false;
-      const humanHand = roomState.players[myPlayerId]?.hand ?? [];
-      const topFrame = getTopFrame(roomState);
-      const forcedOpId = (topFrame?.customPayload?.forcedDiscardOperationId as string | undefined)
-        ?? Object.keys(roomState.pendingForcedDiscards ?? {})[0];
-      const forcedOp = forcedOpId ? roomState.pendingForcedDiscards?.[forcedOpId] : undefined;
-
-      const stealOpId = (topFrame?.customPayload?.stealOperationId as string | undefined)
-        ?? Object.keys(roomState.pendingSteals ?? {})[0];
-      const stealOp = stealOpId ? roomState.pendingSteals?.[stealOpId] : undefined;
-
-      const humanCtx: CounterContext | undefined = forcedOp
-        ? { actorId: myPlayerId, targetPlayerId: forcedOp.targetPlayerId, operationKind: 'forced_discard' as const, forcedDiscardOp: forcedOp }
-        : stealOp
-        ? { actorId: myPlayerId, targetPlayerId: stealOp.victimId, operationKind: 'steal' as const, stealOp }
-        : pendingResponse?.kind === 'action'
-        ? { actorId: myPlayerId, actionActorId: topFrame?.actorId ?? pendingResponse.actorId, targetPlayerId: topFrame?.actorId ?? pendingResponse.actorId, roomState }
-        : undefined;
-
-      const humanCanCounter = !noCounters && getPlayableCounters(humanHand, pendingResponse, humanCtx).length > 0;
-
-      // 1. If human was hit by a trap, human sees TrapAlertModal to decide counter/decline
-      if (!isHumanActor && isHumanTarget && pendingResponse.kind === 'trap') {
+      const humanIsPendingResponder = pendingResponderIds.includes(myPlayerId);
+      // A targeted trap has its own explicit alert flow.
+      if (humanIsPendingResponder && pendingResponse.kind === 'trap') {
         return;
       }
-      // 2. If human can counter an action/forced discard/steal, human sees CounterModal to decide play/skip
-      if (!isHumanActor && humanCanCounter) {
+      // Preserve the human decision whenever a legal Counter exists.
+      if (humanIsPendingResponder && playableCountersFor(myPlayerId).length > 0) {
         return;
       }
 
-      // 3. Otherwise (bot-on-bot action/trap, human's own action/trap, or human has no valid counters):
-      // Check if an eligible bot responder can play a counter
+      // A responder with no legal card has no decision.  Advance through the
+      // normal command one responder at a time so each new top state is
+      // recalculated before another automatic pass.
+      if (skipFirstZeroEligibleResponder()) return;
+
       const responseId = pendingResponse.responseId;
-      const top = getTopFrame(roomState);
-      const eligibleBotIds = top?.eligibleResponderIds.filter((id) => id.startsWith('bot-')) ?? [];
+      const eligibleBotIds = pendingResponderIds.filter((id) => id.startsWith('bot-'));
 
       const timer = setTimeout(() => {
         // Evaluate bot counter decisions
         let botCounterActorId: string | null = null;
         let botCounterCode: string | null = null;
         let botCustomPayload: Record<string, unknown> | undefined;
-        if (!noCounters) {
-          for (const botId of eligibleBotIds) {
-            const botCtx: CounterContext | undefined = forcedOp
-              ? { actorId: botId, targetPlayerId: forcedOp.targetPlayerId, operationKind: 'forced_discard' as const, forcedDiscardOp: forcedOp, roomState }
-              : stealOp
-              ? { actorId: botId, targetPlayerId: stealOp.victimId, operationKind: 'steal' as const, stealOp, roomState }
-              : pendingResponse?.kind === 'action'
-              ? { actorId: botId, actionActorId: top?.actorId ?? pendingResponse.actorId, targetPlayerId: top?.actorId ?? pendingResponse.actorId, roomState }
-              : undefined;
-            const decision = decideBotCounter(roomState, botId, pendingResponse, botCtx);
+        for (const botId of eligibleBotIds) {
+          const decision = decideBotCounter(
+            roomState,
+            botId,
+            pendingResponse,
+            getCounterContextForActiveFrame(roomState, botId)
+          );
             if (decision.action === 'counter') {
               botCounterActorId = botId;
               botCounterCode = decision.code;
               botCustomPayload = decision.customPayload;
               break;
             }
-          }
         }
 
         if (botCounterActorId && botCounterCode) {
           playCounter(botCounterCode, responseId, botCounterActorId, botCustomPayload);
         } else {
-          skipCounter(responseId);
+          const botId = eligibleBotIds[0];
+          if (botId) skipCounter(responseId, botId);
         }
       }, 450);
       return () => clearTimeout(timer);
     }
 
-    // Multiplayer room logic (all human players):
-    const eligibleIds =
-      pendingResponse.kind === 'trap' && pendingResponse.targetId
-        ? [pendingResponse.targetId]
-        : Object.keys(roomState.players).filter((id) => id !== pendingResponse.actorId);
-
-    const anyoneCanRespond = eligibleIds.some((id) => {
-      const hand = roomState.players[id]?.hand ?? [];
-      return getPlayableCounters(hand, pendingResponse).length > 0;
-    });
-    if (anyoneCanRespond) return;
-
-    const responseId = pendingResponse.responseId;
-    const timer = setTimeout(() => skipCounter(responseId), 400);
-    return () => clearTimeout(timer);
-  }, [roomState, myPlayerId, skipCounter, run, roomCode]);
+    // Multiplayer uses the same authoritative top frame and per-responder
+    // eligibility. Players with any legal Counter remain pending for UI input.
+    skipFirstZeroEligibleResponder();
+  }, [roomState, myPlayerId, skipCounter, roomCode, playCounter]);
 
   // Auto-play bot turns in local bot rooms
   useEffect(() => {
@@ -1047,7 +1020,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const decision = decideBotTurn(state, currentBotId);
+        const forced = process.env.NODE_ENV !== 'production' && state.devScenario && state.devForcedBotAction && currentBotId === 'bot-1'
+          ? state.devForcedBotAction
+          : null;
+        const decision = forced
+          ? { action: 'play' as const, code: forced.code, targetId: forced.targetId }
+          : decideBotTurn(state, currentBotId);
         if (decision.action === 'draw') {
           let next = draw(state, currentBotId, 1);
           if (next.players[currentBotId]) {
@@ -1073,12 +1051,14 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           afterDiscard.players[currentBotId].hasPlayedActionThisTurn = true;
           afterDiscard.players[currentBotId].hasDrawnThisTurn = false;
         }
-        return pushStackFrame(afterDiscard, {
+        const next = pushStackFrame(afterDiscard, {
           sourceType: 'action',
           sourceCode: decision.code,
           actorId: currentBotId,
           targetIds: decision.targetId ? [decision.targetId] : [],
         });
+        if (forced) next.devForcedBotAction = undefined;
+        return next;
       });
     }, 600);
     return () => clearTimeout(timer);
@@ -1147,6 +1127,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     finishShuffleDrawPile,
     manualDiscard,
     manualGiveCard,
+    playSocialCounter,
   };
 
   return <GameSessionContext.Provider value={value}>{children}</GameSessionContext.Provider>;

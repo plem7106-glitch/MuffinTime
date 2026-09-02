@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
 import { getNextPlayerId, isMuffinTimeEligible, canEndTurn } from '../../game/turn';
-import { getPlayableCounters } from '../../game/counterRules/registry';
+import { getPlayableCountersForActiveFrame, getCounterInteraction } from '../../game/counterRules/registry';
 import { getCardDisplay, type CardDisplay } from '../../data/cards/display';
 import { GameHeader } from './GameHeader';
 
@@ -27,6 +27,7 @@ import { DateInviteModal } from '../modals/DateInviteModal';
 import { canActivateManualTrap } from '../../game/trapRules/engine';
 import { getTrapRule } from '../../game/trapRules/registry';
 import { getActionRule } from '../../game/actionRules/registry';
+import { getSocialCounterConfig, isSocialCounter } from '../../game/socialCounter';
 
 import { TrapModal } from '../modals/TrapModal';
 import { TrapAlertModal } from '../modals/TrapAlertModal';
@@ -75,6 +76,7 @@ export function GameTable() {
     leaveRoom,
     manualDiscard,
     manualGiveCard,
+    playSocialCounter,
   } = useGameSession();
 
   // Modals & Panels State
@@ -93,6 +95,8 @@ export function GameTable() {
   const [pendingTargetCard, setPendingTargetCard] = useState<CardDisplay | null>(null);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
   const [chosenTargets, setChosenTargets] = useState<PlayerId[]>([]);
+  const [pendingSocialCard, setPendingSocialCard] = useState<CardDisplay | null>(null);
+  const [chosenSocialTarget, setChosenSocialTarget] = useState<PlayerId | null>(null);
 
   // Dual-role target flow (A115: tallest, then shortest -- two sequential
   // single-target picks, since click order in a multi-select roster can't
@@ -118,9 +122,9 @@ export function GameTable() {
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
   const [chosenTrapTargets, setChosenTrapTargets] = useState<PlayerId[]>([]);
 
-  // C04 Counter Target Flow State
-  const [pendingC04Code, setPendingC04Code] = useState<CardCode | null>(null);
-  const [chosenC04Target, setChosenC04Target] = useState<PlayerId | null>(null);
+  // Generic digital Counter target flow state. Selection is local until Confirm.
+  const [pendingCounterCode, setPendingCounterCode] = useState<CardCode | null>(null);
+  const [chosenCounterTarget, setChosenCounterTarget] = useState<PlayerId | null>(null);
 
   // Auto-close trap open flow or C04 target flow if a counter response window opens or closes
   useEffect(() => {
@@ -130,11 +134,11 @@ export function GameTable() {
       setAwaitingTrapTarget(false);
       setChosenTrapTarget(null);
     }
-    if (!pendingResponse && pendingC04Code !== null) {
-      setPendingC04Code(null);
-      setChosenC04Target(null);
+    if (!pendingResponse && pendingCounterCode !== null) {
+      setPendingCounterCode(null);
+      setChosenCounterTarget(null);
     }
-  }, [pendingResponse, pendingTrapOpen, pendingTrapCode, awaitingTrapTarget, pendingC04Code]);
+  }, [pendingResponse, pendingTrapOpen, pendingTrapCode, awaitingTrapTarget, pendingCounterCode]);
 
   if (!activeRoom || !myPlayerId) return null;
 
@@ -382,8 +386,12 @@ export function GameTable() {
 
   // Legally valid Counter response cards available in local hand for the active pendingResponse
   const validCounterCards = useMemo(() => {
-    return getPlayableCounters(me.hand, pendingResponse);
-  }, [me.hand, pendingResponse]);
+    return getPlayableCountersForActiveFrame(state, myPlayerId);
+  }, [myPlayerId, state]);
+
+  const counterTargetCandidates = useMemo(() => {
+    return opponentCandidates.filter((c) => c.id !== pendingResponse?.actorId && c.id !== myPlayerId);
+  }, [opponentCandidates, pendingResponse?.actorId, myPlayerId]);
 
 
   return (
@@ -532,6 +540,14 @@ export function GameTable() {
         onPlayAction={handlePlayActionDirect}
         onPlaceTrap={handlePlaceTrap}
         onRequestTarget={handleRequestTarget}
+        onPlaySocialCounter={(card) => {
+          if (card.needsTarget || Boolean(getSocialCounterConfig(card.code)?.needsTarget)) {
+            setPendingSocialCard(card);
+            setChosenSocialTarget(null);
+          } else {
+            playSocialCounter(card.code);
+          }
+        }}
       />
 
       {/* 10. Action Card Target Selector (single target, or multi-select roster
@@ -712,9 +728,9 @@ export function GameTable() {
         responseId={pendingResponse?.responseId}
         onPlayCounter={(code) => {
           if (!pendingResponse) return;
-          if (code === 'C04') {
-            setPendingC04Code('C04');
-            setChosenC04Target(null);
+          if (getCounterInteraction(code).requiresTarget) {
+            setPendingCounterCode(code);
+            setChosenCounterTarget(null);
             return;
           }
           playCounter(code, pendingResponse.responseId);
@@ -728,9 +744,9 @@ export function GameTable() {
         counterCards={validCounterCards}
         onPlay={(code) => {
           if (!pendingResponse) return;
-          if (code === 'C04') {
-            setPendingC04Code('C04');
-            setChosenC04Target(null);
+          if (getCounterInteraction(code).requiresTarget) {
+            setPendingCounterCode(code);
+            setChosenCounterTarget(null);
             return;
           }
           playCounter(code, pendingResponse.responseId);
@@ -738,28 +754,44 @@ export function GameTable() {
         onSkip={() => pendingResponse && skipCounter(pendingResponse.responseId)}
       />
 
-      {/* 14.5 C04 Target Redirect Selector */}
+      {/* 14.5 Generic target selector for digital Counters */}
       <TargetSelector
-        open={pendingC04Code === 'C04' && pendingResponse !== null}
-        candidates={opponentCandidates.filter(
-          (c) => c.id !== pendingResponse?.actorId && c.id !== myPlayerId
-        )}
-        selectedId={chosenC04Target}
-        onSelect={(id) => setChosenC04Target(id)}
+        open={pendingSocialCard !== null}
+        candidates={opponentCandidates}
+        selectedId={chosenSocialTarget}
+        onSelect={setChosenSocialTarget}
         onConfirm={() => {
-          if (pendingResponse && chosenC04Target) {
-            playCounter('C04', pendingResponse.responseId, undefined, {
-              newVictimId: chosenC04Target,
+          if (!pendingSocialCard || !chosenSocialTarget) return;
+          playSocialCounter(pendingSocialCard.code, chosenSocialTarget);
+          setPendingSocialCard(null);
+          setChosenSocialTarget(null);
+        }}
+        onCancel={() => {
+          setPendingSocialCard(null);
+          setChosenSocialTarget(null);
+        }}
+        prompt={pendingSocialCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+      <TargetSelector
+        open={pendingCounterCode !== null && pendingResponse !== null}
+        candidates={counterTargetCandidates}
+        selectedId={chosenCounterTarget}
+        onSelect={(id) => setChosenCounterTarget(id)}
+        onConfirm={() => {
+          if (pendingResponse && pendingCounterCode && chosenCounterTarget) {
+            const payloadKey = getCounterInteraction(pendingCounterCode).payloadKey;
+            playCounter(pendingCounterCode, pendingResponse.responseId, undefined, {
+              [payloadKey ?? 'targetPlayerId']: chosenCounterTarget,
             });
-            setPendingC04Code(null);
-            setChosenC04Target(null);
+            setPendingCounterCode(null);
+            setChosenCounterTarget(null);
           }
         }}
         onCancel={() => {
-          setPendingC04Code(null);
-          setChosenC04Target(null);
+          setPendingCounterCode(null);
+          setChosenCounterTarget(null);
         }}
-        prompt="เลือกผู้เล่นที่คุณต้องการให้ถูกขโมยไพ่แทนคุณ (C04 Not My Hand!)"
+        prompt={pendingCounterCode ? getCardDisplay(pendingCounterCode).effect : 'เลือกผู้เล่นเป้าหมาย'}
       />
 
 

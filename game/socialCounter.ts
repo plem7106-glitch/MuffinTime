@@ -1,6 +1,6 @@
 import { cloneState } from './util';
 import { draw } from './pile';
-import { executeRandomSteal } from './primitives';
+import { resolveSteal } from './steal';
 import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 import type { RoomState, PlayerId, CardCode } from './types';
 import type { SocialCounterPlayedPayload } from './events';
@@ -156,7 +156,7 @@ export function playSocialCounter(
       // "Stop another player from controlling you, then steal 1 card from them."
       // Uses authoritative steal primitive.
       if (targetPlayerId && next.players[targetPlayerId]) {
-        next = executeRandomSteal(next, targetPlayerId, actorId, 1).state;
+        next = resolveSteal(next, targetPlayerId, actorId, 1, 'random', actorId, 'C50');
       }
       break;
     }

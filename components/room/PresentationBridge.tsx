@@ -87,6 +87,16 @@ export function PresentationBridge({ state, viewerId }: PresentationBridgeProps)
             actorName: state.players[payload.actorId || actorId]?.name ?? actorName,
             cardCode: payload.counterCode,
           });
+        } else if (ev.type === GAME_EVENT_TYPES.SOCIAL_COUNTER_PLAYED) {
+          const payload = ev.payload as any;
+          enqueuePresentationEvent({
+            type: 'COUNTER_PLAYED',
+            actorId: payload.actorId || actorId,
+            actorName: state.players[payload.actorId || actorId]?.name ?? actorName,
+            targetId: payload.targetPlayerId,
+            targetName: payload.targetPlayerId ? state.players[payload.targetPlayerId]?.name : undefined,
+            cardCode: payload.counterCode,
+          });
         } else if (ev.type === GAME_EVENT_TYPES.TRAP_ACTIVATED) {
           const payload = ev.payload as any;
           enqueuePresentationEvent({
