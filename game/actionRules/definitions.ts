@@ -1794,6 +1794,15 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
+      // Explicit full no-op on self-targeting, independent of the UI's
+      // opponentCandidates filtering (bots/tests/future refactors could
+      // still call this with targetId === actorId). jumpToPlayerTurn's own
+      // self-target guard only skips the jump itself -- it still returns a
+      // state whose current player is the actor, so resolveTurnArrival
+      // would run (and re-evaluate checkWinnerAtTurnStart) for them
+      // mid-turn without this check, which can end the game prematurely if
+      // they'd already declared muffin time earlier in their own turn.
+      if (targetId === frame.actorId) return state;
       const jumped = jumpToPlayerTurn(state, targetId);
       const currentId = jumped.turnOrder[jumped.currentTurnIndex];
       return resolveTurnArrival(jumped, currentId);

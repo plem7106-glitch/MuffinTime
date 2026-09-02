@@ -1287,4 +1287,20 @@ describe('A119 (skip play forward to a chosen player\'s next turn)', () => {
     const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'me', {}));
     expect(next).toEqual(state);
   });
+
+  it('does not trigger a premature win when self-targeting while muffin time is already declared', () => {
+    // Confirms the executeEffect-level guard (targetId === frame.actorId ->
+    // return state unchanged), not jumpToPlayerTurn's own internal guard.
+    // Before that guard existed, this exact scenario DID end the game
+    // early: jumpToPlayerTurn's self-target no-op still leaves the actor as
+    // jumped.turnOrder[jumped.currentTurnIndex], so resolveTurnArrival ran
+    // for them mid-turn and checkWinnerAtTurnStart (a live predicate, not
+    // consume-once) declared them the winner right there -- observed via a
+    // console.log probe: status: 'finished', winnerId: 'me'.
+    const state = threePlayerState();
+    state.muffinTimeTarget = state.players.me.hand.length; // make 'me' currently eligible
+    state.players.me.hasCalledMuffinTime = true;
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'me', {}));
+    expect(next).toEqual(state);
+  });
 });
