@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 163/173 Action cards implemented -- Group 2, Group 3, and Group 1 Cluster A are done
+## Status: 164/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -55,10 +55,11 @@ independently).
   `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
   `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
   `ActionRuleDefinition.needsDrinkCheck`), A166 (`ActionRuleDefinition.needsTargetThenOutcome`),
-  and A100/A035/A040 (`PlayerState.bonusActionPlaysRemaining`/`mustPlayActionThisTurn`,
-  `RoomState.pendingActionObligations`/`actionRedirect`). **Branch your next work off
-  `feature/birthday-cards`, not `main`**, or you'll be missing that infrastructure and these
-  13 extra cards.
+  A100/A035/A040 (`PlayerState.bonusActionPlaysRemaining`/`mustPlayActionThisTurn`,
+  `RoomState.pendingActionObligations`/`actionRedirect`), and A119 (`game/turn.ts`'s
+  `jumpToPlayerTurn`/`resolveTurnArrival` — no new `PlayerState`/`RoomState` fields).
+  **Branch your next work off `feature/birthday-cards`, not `main`**, or you'll be missing
+  that infrastructure and these 14 extra cards.
 - When your work is done and tests pass: push to this same branch if PR #3 is still open
   (it'll pick up the new commits automatically), or open a fresh PR **into `main`** if #3
   already merged. Use `git push` and `gh pr create`/`gh pr view` — `gh` is authenticated in
@@ -67,10 +68,22 @@ independently).
   status` yourself rather than assuming either way.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (post-merge-with-main): `npx vitest run` → 587
-  passed (43 files, up from 37 pre-merge — the extra files are `main`'s new trap/
-  presentation test suites), `npx tsc --noEmit` → clean. Run both again before you start —
-  confirm your baseline.
+- Last known-good check on this branch (post-Cluster-B checkpoint): `npx vitest run` → 609
+  passed (43 files), `npx tsc --noEmit` → clean. Run both again before you start — confirm
+  your baseline.
+- **A card whose `executeEffect` triggers a turn transition (calling `resolveTurnArrival`
+  or anything reaching `checkWinnerAtTurnStart`) must independently guard against running
+  that chain on a player who didn't genuinely just have their turn begin.** Cluster B (A119)
+  hit this twice: `jumpToPlayerTurn` no-ops on both a self-target and an invalid/not-found
+  target, and in both cases `resolveTurnArrival` would still fire against the unmoved actor
+  unless the caller checks first — `checkWinnerAtTurnStart` is a *live*, non-consume-once
+  predicate, so this silently produced a premature win. See A119's `executeEffect` in
+  `definitions.ts` for the guard pattern, and
+  `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md`'s "A real bug the review
+  process caught" section for the full story. If you build a similar turn-jump-style card,
+  enumerate *every* no-op/early-return branch of whatever engine helper you're calling —
+  don't assume the UI's own filtering (e.g. `TargetSelector` excluding the actor) is enough,
+  since the engine layer itself has no such guarantee unless you add one.
 - **If you add a new per-turn `PlayerState` field, reset it in `game/turn.ts`'s
   `beginTurn`** — as of the merge above, this is the *one* place `advanceTurn` and
   `emergencyForceSkipTurn` both funnel through, so there's only one call site to remember
@@ -123,7 +136,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 10 cards left, all in Group 1 (Group 2 and Group 3 are done)
+## What's next — 9 cards left, all in Group 1 (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -164,13 +177,15 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 — Cluster A DONE (163/173 checkpoint), 6 clusters / 10 cards remain
+### Group 1 — Clusters A & B DONE (164/173 checkpoint), 5 clusters / 9 cards remain
 
 Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
 decomposed into 7 clusters by shared mechanism during brainstorming — see
 `docs/superpowers/specs/2026-09-02-group1-cluster-a-design.md` for the full decomposition
-table and rationale. **Cluster A (A100, A035, A040 — persistent per-player/table flags,
-the lowest-risk cluster) is done.** Its own plan/spec docs are
+table and rationale.
+
+**Cluster A (A100, A035, A040 — persistent per-player/table flags, the lowest-risk
+cluster) is done.** Its own plan/spec docs are
 `docs/superpowers/specs/2026-09-02-group1-cluster-a-design.md` and
 `docs/superpowers/plans/2026-09-02-group1-cluster-a.md`.
 
@@ -200,12 +215,43 @@ the lowest-risk cluster) is done.** Its own plan/spec docs are
   bypassed the 1-action-per-turn limit before this cluster; this wasn't specifically
   addressed). Neither blocks merge; flagged for whoever picks up bot-room support later.
 
-**Remaining: 6 clusters, 10 cards** — `A017, A028, A064, A091, A092, A094, A108, A119,
-A126, A130`. Each needs its own spec (and likely its own plan) before implementation,
-following the same brainstorming → writing-plans → subagent-driven-development flow used
-for Cluster A. Per the original decomposition:
+**Cluster B (A119, the only "turn-order mutation" card) is done.** Its own plan/spec docs
+are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
+`docs/superpowers/plans/2026-09-02-group1-cluster-b.md`.
 
-- **Cluster B** (turn-order mutation): `A119`
+- **A119** "จะรอทำไม?" — choose another player, skip play immediately forward to their next
+  turn. `game/turn.ts` gained `jumpToPlayerTurn(state, targetId)` (a two-phase walk: players
+  strictly in between get zero side effects, mirroring how `advanceTurn` already treats a
+  `skipNextTurn`-flagged player it steps past; an existing `skipNextTurn` on the target
+  itself is honored the same way `advanceTurn`'s own loop does — ruling confirmed with the
+  user) and `resolveTurnArrival(state, currentId)` (the pending-win-check/muffin-time/
+  pending-obligation chain, extracted out of `lib/session.tsx`'s `advanceAndCheckWin` so
+  both a normal turn-end and A119's immediate jump share one tested path). Lands via the
+  pre-existing `beginTurn` from the `main` merge above — zero new `PlayerState`/`RoomState`
+  fields.
+- **The review process found and fixed a genuinely real, reproduced bug, not a theoretical
+  one**: self-targeting A119 (or targeting an invalid/not-found player) while already
+  eligible for and having declared muffin time triggered an *immediate premature win* —
+  bypassing the "declare now, verify at your genuine next turn" mechanic — because
+  `jumpToPlayerTurn`'s no-op paths still let `resolveTurnArrival` run against the unmoved
+  actor, and `checkWinnerAtTurnStart` is a live predicate, not consume-once. Currently
+  unreachable through the shipped UI (the `TargetSelector` candidate list already excludes
+  the actor and only ever offers valid ids), but nothing enforced it at the engine layer
+  before the fix. Both paths are now closed by one up-front guard in A119's `executeEffect`
+  — see the "guard against a turn-transition-triggering card" note above and the design
+  spec's "A real bug the review process caught" section for the full story.
+- This took the most review cycles of any card in Cluster A or B — 2 fix rounds on
+  `jumpToPlayerTurn` itself (a missing self-target guard, then a non-discriminating
+  `direction: -1` test) and 3 more on the card-definition wiring (a missing integration
+  test, then the two-part premature-win bug above). Worth knowing going into Cluster D
+  (recursive/forced card resolution) — that cluster's engine surface area is bigger than
+  Cluster B's, so budget for a similar or greater number of review-fix cycles.
+
+**Remaining: 5 clusters, 9 cards** — `A017, A028, A064, A091, A092, A094, A108, A126, A130`.
+Each needs its own spec (and likely its own plan) before implementation, following the
+same brainstorming → writing-plans → subagent-driven-development flow used for Clusters
+A and B. Per the original decomposition:
+
 - **Cluster C** (2-hop delegated targeting): `A126`, `A130`
 - **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
   system directly): `A017`, `A028`, `A094`, `A108`
@@ -217,7 +263,7 @@ Full per-card reasoning for all of these is in the classification doc's "Phase 2
 (`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
 these casually inside a small-batch PR — each wants its own
 `superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
-surface area, the same way Cluster A got one.
+surface area, the same way Clusters A and B got one.
 
 ## Known gap, not yet built (unrelated to the above)
 
