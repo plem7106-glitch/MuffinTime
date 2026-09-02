@@ -17,15 +17,16 @@ describe('draw', () => {
     expect(next.drawPile).toEqual(['A01']);
   });
 
-  it('reshuffles the discard pile into the draw pile when it runs out', () => {
+  it('stops drawing when drawPile runs out without fabricating cards', () => {
     const state = {
       drawPile: ['A01'],
       discardPile: ['A10', 'A11', 'A12'],
       players: { p1: { hand: [] } },
     } as unknown as RoomState;
-    const next = draw(state, 'p1', 3, () => 0);
-    expect(next.players.p1.hand.length).toBe(3);
-    expect(next.discardPile).toEqual(['A12']);
+    const next = draw(state, 'p1', 3);
+    expect(next.players.p1.hand.length).toBe(1);
+    expect(next.drawPile.length).toBe(0);
+    expect(next.discardPile).toEqual(['A10', 'A11', 'A12']);
   });
 
   it('stops drawing early if both piles are exhausted', () => {

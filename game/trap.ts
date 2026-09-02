@@ -35,6 +35,16 @@ export function placeTrap(state: RoomState, playerId: PlayerId, cardCode: CardCo
   player.hand.splice(pos, 1);
   player.traps.push(cardCode);
 
+  next.placedTrapMeta = {
+    ...next.placedTrapMeta,
+    [`${playerId}_${cardCode}`]: {
+      ownerId: playerId,
+      placedSequence: next.sequenceNumber ?? 0,
+      placedRound: next.roundNumber ?? 1,
+      placedByPlayerTurnIndex: next.currentTurnIndex,
+    },
+  };
+
   if (isCurrentTurn) {
     player.placedTrapThisTurn = true;
     next.turnPhase = 'main';

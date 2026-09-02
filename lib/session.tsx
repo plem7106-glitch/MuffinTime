@@ -23,6 +23,7 @@ import {
   emergencyForceSkipTurn,
   checkWinnerAtTurnStart,
   declareMuffinTime as engineDeclareMuffinTime,
+  finishByDeckExhaustion,
 } from '../game/turn';
 import {
   pushStackFrame,
@@ -40,11 +41,10 @@ import {
   respondToTrapInteraction as engineRespondToTrapInteraction,
   executeTrapFrameEffect,
 } from '../game/trapRules/engine';
-import { createGameEvent, GAME_EVENT_TYPES } from '../game/events';
+import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getPlayableCounters } from '../game/counterRules/registry';
 import { resolveCounterEffect } from '../game/counterRules/engine';
 import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
-import { isTrapImplemented } from '../game/trapRules/registry';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
 import {
@@ -98,6 +98,7 @@ export interface GameSessionValue {
   setPlayDirection: (direction: PlayDirection) => void;
   confirmTurnOrder: () => void;
   drawCard: () => void;
+  endTurn: () => void;
   hostSkipTurn: () => void;
   playAction: (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => void;
   placeTrapCard: (code: CardCode) => void;
@@ -373,12 +374,37 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     () =>
       run((state) => {
         if (state.reactionStack && state.reactionStack.length > 0) return state;
-        if (state.pendingResponse) return state;
+        if (state.pendingResponse || state.pendingInteraction) return state;
         if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
-        let next = draw(state, myPlayerId!, 1);
+        const pid = myPlayerId!;
+        const player = state.players[pid];
+        if (player?.hasDrawnThisTurn) return state;
+        let next = state;
+        if (next.drawPile.length === 0) {
+          return finishByDeckExhaustion(next);
+        }
+        next = draw(next, pid, 1);
+        if (next.players[pid]) {
+          next.players[pid].hasDrawnThisTurn = true;
+        }
+        next.turnPhase = 'main';
         // Check automatic state traps (e.g. T09 Card Sick > 10 cards)
         next = checkAndTriggerAutomaticTraps(next);
-        return advanceAndCheckWin(next);
+        return next;
+      }),
+    [run, myPlayerId]
+  );
+
+  const endTurn = useCallback(
+    () =>
+      run((state) => {
+        if (state.reactionStack && state.reactionStack.length > 0) return state;
+        if (state.pendingResponse || state.pendingInteraction) return state;
+        if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
+        const pid = myPlayerId!;
+        const player = state.players[pid];
+        if (!player?.hasDrawnThisTurn) return state;
+        return advanceAndCheckWin(state);
       }),
     [run, myPlayerId]
   );
@@ -398,21 +424,28 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) =>
       run((state) => {
         if (state.reactionStack && state.reactionStack.length > 0) return state;
-        if (state.pendingResponse) return state;
+        if (state.pendingResponse || state.pendingInteraction) return state;
         if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
         if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
         const actorId = myPlayerId!;
+        const player = state.players[actorId];
+        if (player?.hasPlayedActionThisTurn) return state;
         if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
         if ((code === 'A014' || code === 'A016') && !targetId) return state;
         if (targetId && !state.players[targetId]) return state;
         const afterDiscard = discard(state, actorId, 1, [code]);
-        return pushStackFrame(afterDiscard, {
+        if (afterDiscard.players[actorId]) {
+          afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+        }
+        const next = pushStackFrame(afterDiscard, {
           sourceType: 'action',
           sourceCode: code,
           actorId,
           targetIds: targetId ? [targetId] : [],
           ...(customPayload ? { customPayload } : {}),
         });
+        appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.ACTION_PLAYED, actorId, { actorId, actionCode: code }, [actorId]));
+        return next;
       }),
     [run, myPlayerId]
   );
@@ -427,7 +460,6 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (!player || player.placedTrapThisTurn || state.turnPhase !== 'trap_placement') return state;
         if (state.turnOrder[state.currentTurnIndex] !== pid) return state;
         if (!player.hand.includes(code)) return state;
-        if (!isTrapImplemented(code)) return state;
         return enginePlaceTrap(state, pid, code);
       }),
     [run, myPlayerId]
@@ -445,13 +477,53 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId]
   );
 
+  const resolveCompletedStackFrames = useCallback((state: RoomState): RoomState => {
+    let next = state;
+    let currentTop = getTopFrame(next);
+
+    while (currentTop && areAllResponsesComplete(currentTop)) {
+      if (currentTop.status !== 'cancelled') {
+        if (currentTop.sourceType === 'trap') {
+          next = executeTrapFrameEffect(next, currentTop);
+        } else {
+          next = executeActionFrameEffect(next, currentTop);
+        }
+      }
+
+      next = checkAndTriggerAutomaticTraps(next);
+
+      const { state: poppedState, poppedFrame } = popStackFrame(next);
+      const wasActionBase =
+        poppedFrame?.sourceType === 'action' &&
+        (!poppedState.reactionStack || poppedState.reactionStack.length === 0);
+      let finalState = poppedState;
+      if (wasActionBase && poppedFrame?.actorId && poppedFrame.actorId.startsWith('bot-')) {
+        let botNext = draw(poppedState, poppedFrame.actorId, 1);
+        if (botNext.players[poppedFrame.actorId]) {
+          botNext.players[poppedFrame.actorId].hasDrawnThisTurn = true;
+        }
+        botNext = checkAndTriggerAutomaticTraps(botNext);
+        finalState = advanceAndCheckWin(botNext);
+      }
+
+      next = finalState;
+      const newTop = getTopFrame(next);
+      if (newTop === currentTop) break;
+      currentTop = newTop;
+    }
+
+    return next;
+  }, []);
+
   const openTrapCard = useCallback(
     (code: CardCode, targetId?: PlayerId | PlayerId[]) =>
       run((state) => {
         const ownerId = myPlayerId!;
-        return activateManualTrap(state, ownerId, code, targetId ? (Array.isArray(targetId) ? targetId : [targetId]) : []);
+        let next = activateManualTrap(state, ownerId, code, targetId ? (Array.isArray(targetId) ? targetId : [targetId]) : []);
+        next = resolveCompletedStackFrames(next);
+        return next;
       }),
-    [run, myPlayerId]
+    [run, myPlayerId, resolveCompletedStackFrames]
   );
 
   const initiateTrapInteraction = useCallback(
@@ -467,9 +539,11 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     (interactionId: string, decision: 'accept' | 'refuse') =>
       run((state) => {
         const responderId = myPlayerId!;
-        return engineRespondToTrapInteraction(state, interactionId, responderId, decision);
+        let next = engineRespondToTrapInteraction(state, interactionId, responderId, decision);
+        next = resolveCompletedStackFrames(next);
+        return next;
       }),
-    [run, myPlayerId]
+    [run, myPlayerId, resolveCompletedStackFrames]
   );
 
   const playCounter = useCallback(
@@ -499,34 +573,23 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           affectedTargetIds: [counterActorId],
         });
 
-        // Check if all responses are complete for this frame
-        const currentTop = getTopFrame(next);
-        if (currentTop && areAllResponsesComplete(currentTop)) {
-          const { state: poppedState, poppedFrame } = popStackFrame(next);
-          const wasActionBase =
-            poppedFrame?.sourceType === 'action' &&
-            (!poppedState.reactionStack || poppedState.reactionStack.length === 0);
-          let finalState = wasActionBase ? advanceAndCheckWin(poppedState) : poppedState;
-          finalState = checkAndTriggerAutomaticTraps(finalState);
+        next = resolveCompletedStackFrames(next);
 
-          return {
-            ...finalState,
-            lastResult: {
-              responseId,
-              kind: poppedFrame?.sourceType === 'trap' ? 'trap' : 'action',
-              code: poppedFrame?.sourceCode ?? code,
-              actorId: poppedFrame?.actorId ?? counterActorId,
-              targetId: poppedFrame?.targetIds[0],
-              countered: true,
-              counteredBy: counterActorId,
-              counterCode: code,
-            },
-          };
-        }
-
-        return next;
+        return {
+          ...next,
+          lastResult: {
+            responseId,
+            kind: top.sourceType === 'trap' ? 'trap' : 'action',
+            code: top.sourceCode,
+            actorId: top.actorId,
+            targetId: top.targetIds[0],
+            countered: true,
+            counteredBy: counterActorId,
+            counterCode: code,
+          },
+        };
       }),
-    [run, myPlayerId]
+    [run, myPlayerId, resolveCompletedStackFrames]
   );
 
   const skipCounter = useCallback(
@@ -541,45 +604,24 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           status: 'skipped',
         });
 
-        const currentTop = getTopFrame(next);
-        if (currentTop && areAllResponsesComplete(currentTop)) {
-          // All responses complete: execute frame effect if not cancelled
-          if (currentTop.status !== 'cancelled') {
-            if (currentTop.sourceType === 'trap') {
-              next = executeTrapFrameEffect(next, currentTop);
-            } else {
-              next = executeActionFrameEffect(next, currentTop);
-            }
-          }
+        next = resolveCompletedStackFrames(next);
 
-          // Check if the resolved effect triggered an automatic trap (e.g. forced discard T02/T03, steal T04/T05, overflow T09)
-          next = checkAndTriggerAutomaticTraps(next);
-
-          const { state: poppedState, poppedFrame } = popStackFrame(next);
-          const wasActionBase =
-            poppedFrame?.sourceType === 'action' &&
-            (!poppedState.reactionStack || poppedState.reactionStack.length === 0);
-          const finalState = wasActionBase ? advanceAndCheckWin(poppedState) : poppedState;
-
-          return {
-            ...finalState,
-            lastResult:
-              poppedFrame?.sourceType === 'trap'
-                ? {
-                    responseId,
-                    kind: 'trap',
-                    code: poppedFrame.sourceCode,
-                    actorId: poppedFrame.actorId,
-                    targetId: poppedFrame.targetIds[0],
-                    countered: false,
-                  }
-                : null,
-          };
-        }
-
-        return next;
+        return {
+          ...next,
+          lastResult:
+            top.sourceType === 'trap'
+              ? {
+                  responseId,
+                  kind: 'trap',
+                  code: top.sourceCode,
+                  actorId: top.actorId,
+                  targetId: top.targetIds[0],
+                  countered: false,
+                }
+              : null,
+        };
       }),
-    [run, myPlayerId]
+    [run, myPlayerId, resolveCompletedStackFrames]
   );
 
   const declareMuffinTimeFn = useCallback(
@@ -809,9 +851,11 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const manualTrapDecision = decideBotManualTrapActivation(state, currentBotId);
         if (manualTrapDecision) {
           if (manualTrapDecision.code === 'T10' && manualTrapDecision.targetId) {
-            return engineInitiateTrapInteraction(state, currentBotId, 'T10', manualTrapDecision.targetId);
+            let next = engineInitiateTrapInteraction(state, currentBotId, 'T10', manualTrapDecision.targetId);
+            return resolveCompletedStackFrames(next);
           } else if (manualTrapDecision.targetId) {
-            return activateManualTrap(state, currentBotId, manualTrapDecision.code, [manualTrapDecision.targetId]);
+            let next = activateManualTrap(state, currentBotId, manualTrapDecision.code, [manualTrapDecision.targetId]);
+            return resolveCompletedStackFrames(next);
           }
         }
 
@@ -885,6 +929,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     setPlayDirection: setPlayDirectionFn,
     confirmTurnOrder: confirmTurnOrderFn,
     drawCard,
+    endTurn,
     hostSkipTurn,
     playAction,
     placeTrapCard,

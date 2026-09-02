@@ -104,6 +104,8 @@ describe('startGame', () => {
     const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
     const next = startGame(room, allCodes, () => 0);
     expect(next.status).toBe('playing');
+    expect(next.turnPhase).toBe('trap_placement');
+    expect(next.players.host1.placedTrapThisTurn).toBe(false);
     expect(next.turnOrder.length).toBe(3);
     expect(next.players.host1.hand.length).toBe(3);
     expect(next.players.p2.hand.length).toBe(3);

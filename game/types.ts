@@ -114,6 +114,8 @@ export interface PlayerState {
   hasCalledMuffinTime: boolean;
   skipNextTurn: boolean;
   placedTrapThisTurn?: boolean;
+  hasDrawnThisTurn?: boolean;
+  hasPlayedActionThisTurn?: boolean;
 }
 
 export interface PendingInteraction {
@@ -153,10 +155,15 @@ export interface RoomState {
   maxPlayers?: number;
   winnerId?: PlayerId;
   finishReason?: 'normal' | 'manual';
+  gameEndReason?: 'deck_exhausted' | 'muffin_time' | 'manual';
+  winnerPlayerIds?: PlayerId[];
+  finalHandCounts?: Record<PlayerId, number>;
   isShufflingDrawPile?: boolean;
   shuffleSequence?: number;
   roundNumber?: number;
   sequenceNumber?: number;
+  gameEvents?: import('./events').GameEvent[];
+  pendingForcedDiscards?: Record<string, import('./forcedDiscard').ForcedDiscardOperation>;
 
   // Reaction Stack and Turn Phase
   turnPhase?: TurnPhase;
@@ -164,6 +171,7 @@ export interface RoomState {
 
   // Interactive Trap / Event State (e.g. T10 date invite)
   pendingInteraction?: PendingInteraction | null;
+  placedTrapMeta?: Record<string, { ownerId: PlayerId; placedSequence: number; placedRound: number; placedByPlayerTurnIndex: number }>;
 
   // Temporary table-wide rule suspensions (e.g. A019/A072/A085)
   globalRestrictions?: GlobalRestriction[];

@@ -4,9 +4,14 @@ import {
   executeAllDiscard,
   executeDiscardDownTo,
   executeRandomSteal,
+  executeDraw,
+  executeAllRandomSteal,
 } from '../primitives';
 import { GAME_EVENT_TYPES, type ForcedDiscardPayload, type CardStolenPayload } from '../events';
 import { getCardByCode } from '../../data/cards/index';
+import type { CardCode } from '../types';
+import { resolveActionEffect } from '../actionRules/registry';
+import { cloneState } from '../util';
 
 /**
  * Reusable steal trigger evaluator for T04 and T05.
@@ -53,7 +58,24 @@ function checkBabyPlayTrigger(event?: { type: string; payload: unknown }): TrapT
   return { triggered: true, triggerPlayerIds: [payload.actorId], note: `Card title matched baby: ${title}` };
 }
 
+function manualStealRule(code: CardCode, name_en: string, name_th: string, description_th: string, count = 3): TrapRuleDefinition {
+  return { code, name_en, name_th, mode: 'manual_honor', description_th, needsTargetSelection: true,
+    targetPrompt: 'เลือกผู้เล่นที่ทำเงื่อนไขกับดัก',
+    resolveAffectedPlayers: (_state, _ownerId, ids) => ids,
+    executeEffect: (state, frame) => executeRandomSteal(state, frame.affectedPlayerIds?.[0] ?? frame.targetIds[0] ?? '', frame.actorId, count).state };
+}
+
+const TRAP_RULES_BATCH_3_MANUAL: Record<string, TrapRuleDefinition> = {
+  T22: manualStealRule('T22', 'Bad Direction', 'บอกผิดแล้ว', 'หากผู้เล่นคนอื่นเข้าใจกฎผิด ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ'),
+  T24: manualStealRule('T24', 'Best Sarcasm', 'ประชดเก่ง', 'หากผู้เล่นคนอื่นพูดประชด ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ'),
+  T25: manualStealRule('T25', 'Comedy', 'ตลกดีนะ', 'หากผู้เล่นคนอื่นหัวเราะออกมาดัง ๆ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ'),
+  T26: manualStealRule('T26', 'Goodbye, World', 'ลาก่อน โลกนี้', 'หากผู้เล่นคนอื่นออกจากห้อง ขโมยไพ่จากผู้เล่นคนนั้น 5 ใบ', 5),
+  T27: { ...manualStealRule('T27', "Don't Think About Cats", 'อย่าคิดถึงแมว', 'หากผู้เล่นคนอื่นพูดถึงแมว ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ'), executeEffect: (state, frame) => executeDiscard(state, frame.affectedPlayerIds?.[0] ?? frame.targetIds[0] ?? '', 3).state },
+  T28: manualStealRule('T28', 'Friends', 'เพื่อน', 'หากผู้เล่นคนอื่นพูดถึงเพื่อนที่ไม่ได้กำลังเล่นเกมอยู่ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ'),
+};
+
 export const TRAP_RULES_BATCH_1: Record<string, TrapRuleDefinition> = {
+  ...TRAP_RULES_BATCH_3_MANUAL,
   // T01 — Where Is It? (มันอยู่ไหน?)
   T01: {
     code: 'T01',
@@ -310,5 +332,266 @@ export const TRAP_RULES_BATCH_1: Record<string, TrapRuleDefinition> = {
     checkTrigger: (_state, _ownerId, event) => checkBabyPlayTrigger(event),
     resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
     executeEffect: (state, frame) => executeDiscard(state, frame.affectedPlayerIds?.[0] ?? '', 3).state,
+  },
+};
+
+const MANUAL_DISCARD_TRAPS: [string, string, string, string, number, string][] = [
+  ['T33', 'Backstories', 'เรื่องเก่าเล่าใหม่', 'หากผู้เล่นคนอื่นพูดถึงเหตุการณ์ที่เกิดขึ้นนานกว่า 1 ปีที่แล้ว ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่พูดถึงเหตุการณ์เกิน 1 ปีที่แล้ว'],
+  ['T34', 'Inanimate Object', 'วัตถุไร้ชีวิต', 'หากผู้เล่นคนอื่นปฏิเสธที่จะตอบคำถามของคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่ปฏิเสธที่จะตอบคำถาม'],
+  ['T35', 'LOL Out Loud', 'หัวเราะออกมาดังๆ', 'หากผู้เล่นคนอื่นพูดว่า “Muffin Time” ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่พูดว่า Muffin Time'],
+  ['T36', 'Magic Word', 'คำวิเศษ', 'หากผู้เล่นคนอื่นพูดว่า “please” ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่พูดว่า please'],
+  ['T37', 'Named This Way', 'ชื่อนี้ที่เธอเรียก', 'หากผู้เล่นคนอื่นเรียกชื่อจริงของคุณ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่เรียกชื่อจริงของคุณ'],
+  ['T40', 'Tired?', 'เหนื่อยไหม?', 'หากผู้เล่นคนอื่นหาว ผู้เล่นคนนั้นต้องทิ้งไพ่ 4 ใบ', 4, 'เลือกผู้เล่นที่หาว'],
+  ['T41', 'Countdown', 'นับถอยหลัง', 'หากผู้เล่นคนอื่นถามว่าคุณมีไพ่กี่ใบ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่ถามจำนวนไพ่ของคุณ'],
+  ['T44', 'Do An Internet', 'เล่นเน็ตซะหน่อย', 'หากคุณจับได้ว่าผู้เล่นคนอื่นกำลังใช้อินเทอร์เน็ต ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่กำลังใช้อินเทอร์เน็ต'],
+  ['T47', 'High Five', 'ไฮไฟว์!', 'หากคุณไฮไฟว์กับผู้เล่นคนอื่นได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 5 ใบ', 5, 'เลือกผู้เล่นที่ไฮไฟว์กับคุณ'],
+  ['T48', 'Made Ya Jump', 'สะดุ้งเลยดิ', 'หากคุณทำให้ผู้เล่นคนอื่นตกใจได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่ตกใจ'],
+  ['T49', 'What?!', 'อะไรนะ?!', 'หากคุณหลอกให้ผู้เล่นคนอื่นพูดว่า “what” ได้สำเร็จ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่พูดว่า what'],
+  ['T50', "Don't Touch", 'อย่าแตะนะ!', 'วางไพ่ใบนี้คว่ำหน้าไว้ที่ใดก็ได้ หากผู้เล่นคนอื่นหยิบไพ่ใบนี้ขึ้นมา ผู้เล่นคนนั้นต้องทิ้งไพ่ 5 ใบ', 5, 'เลือกผู้เล่นที่หยิบหรือจับการ์ดใบนี้'],
+  ['T55', 'Spill It', 'ทำหกซะแล้ว', 'หากผู้เล่นคนอื่นทำเครื่องดื่มหกแม้แต่หยดเดียว ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่ทำเครื่องดื่มหก'],
+  ['T58', 'Leaning Tower', 'หอเอน', 'หากผู้เล่นคนอื่นเอนตัวหรือล้มลงกับที่นั่ง ผู้เล่นคนนั้นทิ้งไพ่ 4 ใบ', 4, 'เลือกผู้เล่นที่เอนตัวหรือล้มลง'],
+  ['T60', 'Giggle Fit', 'หลุดขำ', 'หากผู้เล่นคนอื่นหัวเราะโดยไม่มีเหตุผลชัดเจน ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่หัวเราะโดยไม่มีเหตุผล'],
+  ['T63', 'Solo Dance', 'เต้นคนเดียว', 'หากผู้เล่นคนอื่นเริ่มเต้นโดยไม่มีใครขอ ผู้เล่นคนนั้นทิ้งไพ่ 3 ใบ', 3, 'เลือกผู้เล่นที่เริ่มเต้น'],
+  ['T64', 'Too Loud', 'เสียงดังเกินไป', 'หากผู้เล่นคนอื่นพูดเสียงดังผิดปกติ ผู้เล่นคนนั้นทิ้งไพ่ 2 ใบ', 2, 'เลือกผู้เล่นที่พูดเสียงดังผิดปกติ'],
+  ['T65', 'Wobbly Legs', 'ขาเปลี้ย', 'หากผู้เล่นคนอื่นลุกขึ้นยืนแล้วเซ ผู้เล่นคนนั้นทิ้งไพ่ 4 ใบ', 4, 'เลือกผู้เล่นที่ลุกขึ้นยืนแล้วเซ'],
+];
+
+const MANUAL_STEAL_TRAPS: [string, string, string, string, number, string][] = [
+  ['T38', "If You're Happy", 'ถ้ารู้สึกมีความสุข', 'หากผู้เล่นคนอื่นร้องเพลงออกมาดัง ๆ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ', 3, 'เลือกผู้เล่นที่ร้องเพลงออกมาดัง ๆ'],
+  ['T51', 'Hello There', 'สวัสดีทักทาย', 'พูด “hello” กับผู้เล่นคนอื่น หากเขาพูด “hello” ตอบกลับมา ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่พูด hello ตอบกลับมา'],
+  ['T54', 'Slurred Speech', 'พูดไม่ชัด', 'หากผู้เล่นคนอื่นพูดคำผิดเพราะเมา ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่พูดคำผิด'],
+  ['T56', 'Drunk Texting', 'ส่งข้อความตอนเมา', 'หากผู้เล่นคนอื่นหยิบโทรศัพท์ขึ้นมาระหว่างเกม ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่หยิบโทรศัพท์ขึ้นมา'],
+  ['T57', 'Forgot My Turn', 'ลืมเทิร์น', 'หากผู้เล่นคนอื่นสับสนว่าถึงตาใคร ขโมยไพ่จากเขา 2 ใบ', 2, 'เลือกผู้เล่นที่สับสนว่าถึงตาใคร'],
+  ['T59', 'Say That Again?', 'พูดอีกทีสิ', 'หากผู้เล่นคนอื่นถามคำถามเดิมซ้ำภายในไม่กี่นาที ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่ถามคำถามเดิมซ้ำ'],
+  ['T61', 'Sloppy Hugs', 'กอดกันหน่อย', 'หากผู้เล่นคนอื่นกอดใครก็ตามระหว่างเกม ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่กอดใครก็ตาม'],
+  ['T62', 'Wrong Glass', 'หยิบแก้วผิด', 'หากผู้เล่นคนอื่นหยิบแก้วของคนอื่นมาดื่มโดยไม่ตั้งใจ ขโมยไพ่จากเขา 4 ใบ', 4, 'เลือกผู้เล่นที่หยิบแก้วของคนอื่นมาดื่ม'],
+  ['T66', 'Sorry Spam', 'ขอโทษซ้ำๆ', 'หากผู้เล่นคนอื่นพูดคำว่า "ขอโทษ" เกิน 1 ครั้งในรอบเดียว ขโมยไพ่จากเขา 3 ใบ', 3, 'เลือกผู้เล่นที่พูดคำว่า ขอโทษ เกิน 1 ครั้ง'],
+];
+
+export const TRAP_RULES_BATCH_2: Record<string, TrapRuleDefinition> = {
+  ...MANUAL_DISCARD_TRAPS.reduce((acc, [code, name_en, name_th, description_th, count, targetPrompt]) => {
+    acc[code] = {
+      code, name_en, name_th, mode: 'manual_honor', description_th,
+      needsTargetSelection: true, targetPrompt,
+      resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+      executeEffect: (state, frame) => {
+        const targetId = frame.affectedPlayerIds?.[0] ?? frame.targetIds[0];
+        if (!targetId) return state;
+        return executeDiscard(state, targetId, count).state;
+      },
+    };
+    return acc;
+  }, {} as Record<string, TrapRuleDefinition>),
+
+  ...MANUAL_STEAL_TRAPS.reduce((acc, [code, name_en, name_th, description_th, count, targetPrompt]) => {
+    acc[code] = {
+      code, name_en, name_th, mode: 'manual_honor', description_th,
+      needsTargetSelection: true, targetPrompt,
+      resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+      executeEffect: (state, frame) => {
+        const targetId = frame.affectedPlayerIds?.[0] ?? frame.targetIds[0];
+        if (!targetId) return state;
+        return executeRandomSteal(state, targetId, frame.actorId, count).state;
+      },
+    };
+    return acc;
+  }, {} as Record<string, TrapRuleDefinition>),
+
+  // T31 — What Have You Done? (นายทำอะไรลงไป?!)
+  T31: {
+    code: 'T31', name_en: 'What Have You Done?', name_th: 'นายทำอะไรลงไป?!', mode: 'automatic_event',
+    description_th: 'หากผู้เล่นคนอื่นเล่นไพ่ Action โดยเจาะจงใส่คุณ Effect เดียวกันนั้นจะมีผลกับผู้เล่นคนนั้นด้วย',
+    checkTrigger: (_state, ownerId, event) => {
+      if (event?.type !== GAME_EVENT_TYPES.ACTION_PLAYED) return { triggered: false };
+      const payload = event.payload as { actorId?: string; actionCode?: string; targetId?: string };
+      if (payload.targetId === ownerId && payload.actorId && payload.actorId !== ownerId) {
+        return {
+          triggered: true,
+          triggerPlayerIds: [payload.actorId],
+          customPayload: { actionCode: payload.actionCode, actorId: payload.actorId },
+          note: `Action ${payload.actionCode} played by ${payload.actorId} targeting ${ownerId}`,
+        };
+      }
+      return { triggered: false };
+    },
+    resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+    executeEffect: (state, frame) => {
+      const actorId = frame.triggerPlayerIds?.[0] ?? frame.affectedPlayerIds?.[0];
+      const actionCode = frame.customPayload?.actionCode as CardCode;
+      if (!actorId || !actionCode) return state;
+      return resolveActionEffect(state, actionCode, actorId, actorId);
+    },
+  },
+
+  // T32 — Gonna Eat That? (จะกินนั่นไหม?)
+  T32: {
+    code: 'T32', name_en: 'Gonna Eat That?', name_th: 'จะกินนั่นไหม?', mode: 'manual_honor',
+    description_th: 'หากผู้เล่นคนอื่นวางไพ่ในมือของตัวเองลง ให้ขโมยไพ่ในมือนั้นทั้งหมด',
+    needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่วางไพ่ในมือลง',
+    resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+    executeEffect: (state, frame) => {
+      const targetId = frame.affectedPlayerIds?.[0] ?? frame.targetIds[0];
+      if (!targetId || !state.players[targetId] || !state.players[frame.actorId]) return state;
+      const next = cloneState(state);
+      const targetHand = next.players[targetId].hand;
+      const stolen = targetHand.splice(0, targetHand.length);
+      next.players[frame.actorId].hand.push(...stolen);
+      return next;
+    },
+  },
+
+  // T39 — Super Guy (ยอดชาย)
+  T39: {
+    code: 'T39', name_en: 'Super Guy', name_th: 'ยอดชาย', mode: 'automatic_event',
+    description_th: 'หากผู้เล่นคนอื่นใช้ไพ่ Counter กับคุณ ไพ่ Counter ใบนั้นจะไม่มีผล',
+    checkTrigger: (state, ownerId, event) => {
+      if (event?.type !== GAME_EVENT_TYPES.COUNTER_PLAYED) return { triggered: false };
+      const payload = event.payload as { actorId?: string; counterCode?: string; targetFrameId?: string };
+      if (!payload.actorId || payload.actorId === ownerId) return { triggered: false };
+      const targetFrame = state.reactionStack?.find((f) => f.frameId === payload.targetFrameId);
+      const isTargetingOwner = Boolean(
+        targetFrame && (targetFrame.actorId === ownerId || targetFrame.targetIds?.includes(ownerId))
+      );
+      if (isTargetingOwner) {
+        return {
+          triggered: true,
+          triggerPlayerIds: [payload.actorId],
+          customPayload: { targetFrameId: payload.targetFrameId, counterCode: payload.counterCode },
+          note: `Counter played by ${payload.actorId} against ${ownerId}`,
+        };
+      }
+      return { triggered: false };
+    },
+    resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      const targetFrameId = frame.customPayload?.targetFrameId as string;
+      const targetFrame = next.reactionStack?.find((f) => f.frameId === targetFrameId) ?? (next.reactionStack?.length ? next.reactionStack[next.reactionStack.length - 1] : undefined);
+      if (targetFrame) {
+        targetFrame.status = 'cancelled';
+      }
+      return next;
+    },
+  },
+
+  // T42 — Jack in the Box (แจ็คในกล่อง)
+  T42: {
+    code: 'T42', name_en: 'Jack in the Box', name_th: 'แจ็คในกล่อง', mode: 'automatic_event',
+    description_th: 'หากไพ่ Trap ที่คุณวางไว้ใบใดก็ตามถูกใช้งาน ขโมยไพ่ 1 ใบจากผู้เล่นคนอื่นทุกคน',
+    checkTrigger: (_state, ownerId, event) => {
+      if (event?.type !== GAME_EVENT_TYPES.TRAP_ACTIVATED) return { triggered: false };
+      const payload = event.payload as { ownerId?: string; trapCode?: string };
+      if (payload.ownerId === ownerId && payload.trapCode !== 'T42') {
+        return {
+          triggered: true,
+          triggerPlayerIds: [ownerId],
+          note: `Trap ${payload.trapCode} owned by ${ownerId} activated`,
+        };
+      }
+      return { triggered: false };
+    },
+    resolveAffectedPlayers: (state, ownerId) => Object.keys(state.players).filter((id) => id !== ownerId),
+    executeEffect: (state, frame) => {
+      return executeAllRandomSteal(state, frame.actorId, 1);
+    },
+  },
+
+  // T43 — Upside Down (กลับหัวกลับหาง)
+  T43: {
+    code: 'T43', name_en: 'Upside Down', name_th: 'กลับหัวกลับหาง', mode: 'automatic_event',
+    description_th: 'หากคุณเป็นคนทำให้ Trap ของผู้เล่นคนอื่นทำงาน Effect ของ Trap นั้นจะมีผลกับเจ้าของ Trap แทน',
+    checkTrigger: (state, ownerId, event) => {
+      if (event?.type !== GAME_EVENT_TYPES.TRAP_ACTIVATED) return { triggered: false };
+      const payload = event.payload as { ownerId?: string; triggerPlayerIds?: string[] };
+      if (payload.ownerId && payload.ownerId !== ownerId && payload.triggerPlayerIds?.includes(ownerId)) {
+        const topFrame = state.reactionStack?.length ? state.reactionStack[state.reactionStack.length - 1] : undefined;
+        return {
+          triggered: true,
+          triggerPlayerIds: [payload.ownerId],
+          customPayload: { trapOwnerId: payload.ownerId, trapFrameId: topFrame?.frameId },
+          note: `Owner ${ownerId} triggered ${payload.ownerId}'s trap`,
+        };
+      }
+      return { triggered: false };
+    },
+    resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      const trapOwnerId = frame.customPayload?.trapOwnerId as string;
+      const trapFrameId = frame.customPayload?.trapFrameId as string;
+      if (trapOwnerId && next.reactionStack && next.reactionStack.length > 0) {
+        const targetFrame = next.reactionStack.find((f) => f.frameId === trapFrameId) ?? next.reactionStack[next.reactionStack.length - 1];
+        if (targetFrame) {
+          targetFrame.affectedPlayerIds = [trapOwnerId];
+          targetFrame.targetIds = [trapOwnerId];
+        }
+      }
+      return next;
+    },
+  },
+
+  // T45 — What a Twist (หักมุมซะงั้น!)
+  T45: {
+    code: 'T45', name_en: 'What a Twist', name_th: 'หักมุมซะงั้น!', mode: 'automatic_state',
+    description_th: 'หากคุณไม่มีไพ่เหลือเลย ให้จั่วไพ่ 10 ใบ',
+    checkTrigger: (state, ownerId) => {
+      const player = state.players[ownerId];
+      if (player && player.hand.length === 0) {
+        return { triggered: true, triggerPlayerIds: [ownerId], note: `${ownerId} has 0 cards` };
+      }
+      return { triggered: false };
+    },
+    resolveAffectedPlayers: (_state, ownerId) => [ownerId],
+    executeEffect: (state, frame) => {
+      return executeDraw(state, frame.actorId, 10);
+    },
+  },
+
+  // T46 — Don't Beat Me (อย่าชนะฉันนะ)
+  T46: {
+    code: 'T46', name_en: "Don't Beat Me", name_th: 'อย่าชนะฉันนะ', mode: 'automatic_state',
+    description_th: 'หากคุณไม่มีไพ่เหลือเลย ขโมยไพ่ในมือทั้งหมดของผู้เล่นคนใดก็ได้ 1 คน',
+    needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่คุณต้องการขโมยไพ่ทั้งหมด',
+    checkTrigger: (state, ownerId) => {
+      const player = state.players[ownerId];
+      if (player && player.hand.length === 0) {
+        return { triggered: true, triggerPlayerIds: [ownerId], note: `${ownerId} has 0 cards` };
+      }
+      return { triggered: false };
+    },
+    resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
+    executeEffect: (state, frame) => {
+      const targetId = frame.affectedPlayerIds?.[0] ?? frame.targetIds[0];
+      if (!targetId || !state.players[targetId] || !state.players[frame.actorId]) return state;
+      const next = cloneState(state);
+      const targetHand = next.players[targetId].hand;
+      const stolen = targetHand.splice(0, targetHand.length);
+      next.players[frame.actorId].hand.push(...stolen);
+      return next;
+    },
+  },
+
+  // T52 — On Your Face (ติดอยู่บนหน้า)
+  T52: {
+    code: 'T52', name_en: 'On Your Face', name_th: 'ติดอยู่บนหน้า', mode: 'manual_honor',
+    description_th: 'แปะไพ่ใบนี้ไว้ที่หน้าผากของคุณ หากไม่มีใครพูดถึงมันจนถึงเทิร์นถัดไปของคุณ ผู้เล่นคนอื่นทั้งหมดต้องทิ้งไพ่คนละ 3 ใบ',
+    resolveAffectedPlayers: (state, ownerId) => Object.keys(state.players).filter((id) => id !== ownerId),
+    executeEffect: (state, frame) => {
+      return executeAllDiscard(state, 3, [frame.actorId]);
+    },
+  },
+
+  // T53 — Face in a Face (หน้าซ้อนหน้า)
+  T53: {
+    code: 'T53', name_en: 'Face in a Face', name_th: 'หน้าซ้อนหน้า', mode: 'manual_honor',
+    description_th: 'แปะไพ่ใบนี้ไว้ที่หน้าผากของคุณ หากไม่มีใครพูดถึงมันจนถึงเทิร์นถัดไปของคุณ ผู้เล่นทุกคนจั่วไพ่คนละ 2 ใบ',
+    resolveAffectedPlayers: (state) => Object.keys(state.players),
+    executeEffect: (state) => {
+      let next = cloneState(state);
+      for (const playerId of Object.keys(next.players)) {
+        next = executeDraw(next, playerId, 2);
+      }
+      return next;
+    },
   },
 };

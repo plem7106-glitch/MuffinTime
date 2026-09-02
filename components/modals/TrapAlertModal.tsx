@@ -182,7 +182,11 @@ export function TrapAlertModal({
                 {/* 2. Decline / Do Not Use Button */}
                 <button
                   type="button"
-                  onClick={onDecline}
+                  onClick={() => {
+                    setIsSelectingCounter(false);
+                    setStage('alert');
+                    onDecline();
+                  }}
                   className="flex-1 flex min-h-[44px] items-center justify-center gap-1 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-xs sm:text-sm font-bold text-ink-secondary hover:bg-gray-100 active:scale-[0.98] transition-all"
                 >
                   <CloseIcon className="h-3.5 w-3.5" />
@@ -193,7 +197,11 @@ export function TrapAlertModal({
               /* No Counters in hand -> Clear Accept Trap Effect Button */
               <button
                 type="button"
-                onClick={onDecline}
+                onClick={() => {
+                  setIsSelectingCounter(false);
+                  setStage('alert');
+                  onDecline();
+                }}
                 className="w-full flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 px-4 py-2.5 text-xs sm:text-sm font-black text-white shadow-md shadow-red-500/25 transition-all hover:opacity-95 active:scale-[0.98]"
               >
                 <span>รับผลกับดัก</span>

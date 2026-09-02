@@ -10,6 +10,7 @@ import type {
   UnderCountPolicy,
   CardCountEvaluation,
 } from './types';
+import { resolveForcedDiscard } from './forcedDiscard';
 
 /**
  * Evaluates how an effect handles situations where available cards differ from requested count.
@@ -94,8 +95,10 @@ export function executeDiscard(
   playerId: PlayerId,
   count: number,
   specificCardCodes?: CardCode[],
-  policy: UnderCountPolicy = 'clamp_to_available'
+  policy: UnderCountPolicy = 'clamp_to_available',
+  sourcePlayerId?: PlayerId
 ): { state: RoomState; evaluation: CardCountEvaluation; discardedCards: CardCode[] } {
+  if (specificCardCodes) return { state: resolveForcedDiscard(state, playerId, count, sourcePlayerId, specificCardCodes), evaluation: evaluateCardCount(count, state.players[playerId]?.hand.length ?? 0, policy), discardedCards: specificCardCodes.slice(0, count) };
   const next = cloneState(state);
   const player = next.players[playerId];
   if (!player) {
@@ -106,18 +109,6 @@ export function executeDiscard(
   const evaluation = evaluateCardCount(count, player.hand.length, policy);
   const discarded: CardCode[] = [];
 
-  if (specificCardCodes && specificCardCodes.length > 0) {
-    for (const code of specificCardCodes) {
-      if (discarded.length >= evaluation.resolvedCount) break;
-      const idx = player.hand.indexOf(code);
-      if (idx !== -1) {
-        player.hand.splice(idx, 1);
-        discarded.push(code);
-        next.discardPile.push(code);
-      }
-    }
-  }
-
   while (discarded.length < evaluation.resolvedCount && player.hand.length > 0) {
     const card = player.hand.shift();
     if (card) {
@@ -126,7 +117,7 @@ export function executeDiscard(
     }
   }
 
-  return { state: next, evaluation, discardedCards: discarded };
+  return { state: resolveForcedDiscard(state, playerId, count, sourcePlayerId, discarded), evaluation, discardedCards: discarded };
 }
 
 /**

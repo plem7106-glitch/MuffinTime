@@ -6,6 +6,7 @@ import {
   checkWinnerAtTurnStart,
   clearMuffinTimeDeclaration,
   emergencyForceSkipTurn,
+  finishByDeckExhaustion,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -151,6 +152,30 @@ describe('isMuffinTimeEligible', () => {
   it('is false otherwise', () => {
     const state = { muffinTimeTarget: 10, players: { p1: { hand: Array(9).fill('A01') } } } as unknown as RoomState;
     expect(isMuffinTimeEligible(state, 'p1')).toBe(false);
+  });
+});
+
+describe('finishByDeckExhaustion', () => {
+  it('selects every player tied closest to ten cards and records final counts', () => {
+    const state = {
+      status: 'playing', drawPile: [], seatOrder: ['p1', 'p2', 'p3'], turnOrder: ['p1', 'p2', 'p3'],
+      players: {
+        p1: { hand: Array(8).fill('A001'), traps: ['T01'] },
+        p2: { hand: Array(12).fill('A002'), traps: [] },
+        p3: { hand: Array(5).fill('A003'), traps: ['T02', 'T03'] },
+      },
+    } as unknown as RoomState;
+    const next = finishByDeckExhaustion(state);
+    expect(next.status).toBe('finished');
+    expect(next.gameEndReason).toBe('deck_exhausted');
+    expect(next.winnerPlayerIds).toEqual(['p1', 'p2']);
+    expect(next.finalHandCounts).toEqual({ p1: 8, p2: 12, p3: 5 });
+    expect(next.players.p1.traps).toEqual(['T01']);
+  });
+
+  it('does not end a game while drawable cards remain', () => {
+    const state = { status: 'playing', drawPile: ['A001'], seatOrder: ['p1'], turnOrder: ['p1'], players: { p1: { hand: [] } } } as unknown as RoomState;
+    expect(finishByDeckExhaustion(state).status).toBe('playing');
   });
 });
 

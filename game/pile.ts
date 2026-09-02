@@ -13,13 +13,10 @@ export function reshuffleDiscardIntoDraw(state: RoomState, rng: Rng = Math.rando
   return next;
 }
 
-export function draw(state: RoomState, playerId: PlayerId, n: number, rng: Rng = Math.random): RoomState {
-  let next = cloneState(state);
+export function draw(state: RoomState, playerId: PlayerId, n: number, _rng?: Rng): RoomState {
+  const next = cloneState(state);
   for (let i = 0; i < n; i++) {
-    if (next.drawPile.length === 0) {
-      next = reshuffleDiscardIntoDraw(next, rng);
-      if (next.drawPile.length === 0) break;
-    }
+    if (next.drawPile.length === 0) break;
     const card = next.drawPile.pop()!;
     next.players[playerId].hand.push(card);
   }

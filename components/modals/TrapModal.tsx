@@ -22,7 +22,7 @@ export function TrapModal({
           <h2 className="text-lg font-bold text-ink">{card.th}</h2>
           <p className="text-sm text-ink-secondary">{card.effect}</p>
           <PrimaryButton tone="trap" onClick={onConfirm}>
-            {mode === 'place' ? 'วางกับดักนี้' : 'เปิดกับดักนี้'}
+            {mode === 'place' ? 'วางกับดักนี้' : 'เปิดกับดักนี้ / ประกาศเงื่อนไขทำงาน'}
           </PrimaryButton>
           <SecondaryButton onClick={onCancel}>ยกเลิก</SecondaryButton>
         </div>

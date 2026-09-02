@@ -16,10 +16,18 @@ export const GAME_EVENT_TYPES = {
 export type GameEventType = (typeof GAME_EVENT_TYPES)[keyof typeof GAME_EVENT_TYPES];
 
 export interface ForcedDiscardPayload {
+  operationId?: string;
+  sourcePlayerId?: PlayerId;
   victimId: PlayerId;
   actorId: PlayerId;
   count: number;
+  targetPlayerId?: PlayerId;
+  requestedCount?: number;
+  actualCount?: number;
   cardCodes?: CardCode[];
+  originalDestination?: unknown;
+  finalDestination?: unknown;
+  intercepted?: boolean;
 }
 
 export interface CardStolenPayload {
@@ -107,4 +115,8 @@ export function createGameEvent<K extends GameEventType>(
     payload,
     timestamp,
   };
+}
+
+export function appendGameEvent(state: { gameEvents?: GameEvent[] }, event: GameEvent): void {
+  state.gameEvents = [...(state.gameEvents ?? []), event];
 }

@@ -12,6 +12,9 @@ export function HandTrayModal({
   hand,
   isMyTurn,
   canAct,
+  hasDrawnThisTurn,
+  hasPlayedActionThisTurn,
+  isTrapPlacementPhase,
   trapsCount,
   onClose,
   onPlayAction,
@@ -22,6 +25,9 @@ export function HandTrayModal({
   hand: CardCode[];
   isMyTurn: boolean;
   canAct: boolean;
+  hasDrawnThisTurn?: boolean;
+  hasPlayedActionThisTurn?: boolean;
+  isTrapPlacementPhase?: boolean;
   trapsCount: number;
   onClose: () => void;
   onPlayAction: (code: CardCode) => void;
@@ -287,16 +293,26 @@ export function HandTrayModal({
             <div className="mt-1 flex items-center gap-2">
               {isMyTurn && canAct ? (
                 selectedCardInfo.type === 'action' ? (
-                  <button
-                    type="button"
-                    onClick={handleActionConfirm}
-                    className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-action px-4 text-xs sm:text-sm font-black text-white shadow-md shadow-action/25 transition-all hover:opacity-95 active:scale-[0.98]"
-                  >
-                    <CheckIcon className="h-4 w-4 stroke-[3]" />
-                    <span>
-                      {selectedCardInfo.needsTarget ? 'เลือกเป้าหมาย' : 'ใช้ไพ่ใบนี้'}
-                    </span>
-                  </button>
+                  hasDrawnThisTurn ? (
+                    <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
+                      คุณจั่วไพ่ประจำเทิร์นแล้ว (กด จบเทิร์น เพื่อเปลี่ยนตา)
+                    </div>
+                  ) : hasPlayedActionThisTurn ? (
+                    <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
+                      คุณใช้แอ็กชันประจำเทิร์นไปแล้ว (แตะกองจั่วเพื่อจั่วไพ่)
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleActionConfirm}
+                      className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-action px-4 text-xs sm:text-sm font-black text-white shadow-md shadow-action/25 transition-all hover:opacity-95 active:scale-[0.98]"
+                    >
+                      <CheckIcon className="h-4 w-4 stroke-[3]" />
+                      <span>
+                        {selectedCardInfo.needsTarget ? 'เลือกเป้าหมาย' : 'ใช้ไพ่ใบนี้'}
+                      </span>
+                    </button>
+                  )
                 ) : selectedCardInfo.type === 'trap' ? (
                   <button
                     type="button"
