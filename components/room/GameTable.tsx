@@ -195,6 +195,19 @@ export function GameTable() {
       .map((id) => ({ id, player: state.players[id] }));
   }, [seatOrder, myPlayerId, state.players]);
 
+  // Clear a stale delegated-pick selection if the interaction it belongs to
+  // is no longer the active one (e.g. host-unstick force-clears
+  // pendingInteraction mid-choice) -- otherwise a later, unrelated
+  // delegated_target_pick could reopen pre-selected with this leftover value.
+  useEffect(() => {
+    const isMyDelegatedPick =
+      state.pendingInteraction?.type === 'delegated_target_pick' &&
+      state.pendingInteraction.targetPlayerId === myPlayerId;
+    if (!isMyDelegatedPick && delegatedPickChoice !== null) {
+      setDelegatedPickChoice(null);
+    }
+  }, [state.pendingInteraction, myPlayerId, delegatedPickChoice]);
+
   // Handlers for Hand Tray Actions
   const handlePlayActionDirect = (cardCode: CardCode) => {
     if (!canAct) return;
