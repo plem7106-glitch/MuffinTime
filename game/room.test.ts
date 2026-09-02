@@ -113,6 +113,18 @@ describe('startGame', () => {
     expect(next.drawPile.length).toBe(20 - 9);
   });
 
+  it('resets actionRedirect and pendingActionObligations left over from a prior game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    room.actionRedirect = { toPlayerId: 'p2', remaining: 2 };
+    room.pendingActionObligations = ['p3'];
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const next = startGame(room, allCodes, () => 0);
+    expect(next.actionRedirect).toBeFalsy();
+    expect(next.pendingActionObligations ?? []).toEqual([]);
+  });
+
   it('can start with 3 players even when maxPlayers is 15', () => {
     let room = createRoom('host1', 'P1', 15);
     room = addPlayer(room, 'p2', 'P2');
@@ -162,6 +174,20 @@ describe('resetForPlayAgain', () => {
     started.status = 'finished';
     const next = resetForPlayAgain(started);
     expect(next.players.host1.bonusActionPlaysRemaining).toBe(0);
+  });
+
+  it('resets actionRedirect and pendingActionObligations left over from the finished game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.actionRedirect = { toPlayerId: 'p2', remaining: 2 };
+    started.pendingActionObligations = ['p3'];
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.actionRedirect).toBeFalsy();
+    expect(next.pendingActionObligations ?? []).toEqual([]);
   });
 });
 

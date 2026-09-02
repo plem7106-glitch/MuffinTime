@@ -165,6 +165,8 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
     next.players[pid].hasPlayedActionThisTurn = false;
     next.players[pid].bonusActionPlaysRemaining = 0;
   }
+  next.actionRedirect = null;
+  next.pendingActionObligations = undefined;
   next.roundNumber = 1;
   next.gameEndReason = undefined;
   next.winnerPlayerIds = undefined;
@@ -250,6 +252,8 @@ export function resetForPlayAgain(state: RoomState): RoomState {
       bonusActionPlaysRemaining: 0,
     };
   }
+  next.actionRedirect = null;
+  next.pendingActionObligations = undefined;
 
   next.status = 'lobby';
   next.winnerId = undefined;

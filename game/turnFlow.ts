@@ -24,10 +24,18 @@ export function changeMuffinTarget(state: RoomState, n: number): RoomState {
  * the discard pile, but redirected into actionRedirect.toPlayerId's hand for
  * A040's "next 3 played Actions enter my hand" effect (any player's play
  * counts, decremented here). Falls back to a normal discard once the
- * redirect is inactive or exhausted. Called from lib/session.tsx's
- * playAction at the exact point the played card leaves the actor's hand. */
+ * redirect is inactive, exhausted, or its target has left the room (in
+ * which case the stale redirect is cleared too, so the room doesn't keep
+ * re-checking a departed player's absence forever). Called from
+ * lib/session.tsx's playAction at the exact point the played card leaves
+ * the actor's hand. */
 export function applyActionRedirect(state: RoomState, actorId: PlayerId, code: CardCode): RoomState {
   const redirect = state.actionRedirect;
+  if (redirect && redirect.remaining > 0 && !state.players[redirect.toPlayerId]) {
+    const afterDiscard = discard(state, actorId, 1, [code]);
+    afterDiscard.actionRedirect = null;
+    return afterDiscard;
+  }
   if (!redirect || redirect.remaining <= 0) {
     return discard(state, actorId, 1, [code]);
   }

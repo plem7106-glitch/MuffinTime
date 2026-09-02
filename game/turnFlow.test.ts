@@ -68,4 +68,19 @@ describe('applyActionRedirect', () => {
     const next = applyActionRedirect(state, 'p1', 'A001');
     expect(next.discardPile).toEqual(['A001']);
   });
+
+  it('falls back to a normal discard (without throwing) when the redirect target has left the room', () => {
+    const state = {
+      players: { p1: { hand: ['A001'] } },
+      discardPile: [],
+      actionRedirect: { toPlayerId: 'p2', remaining: 3 },
+    } as unknown as RoomState;
+    let next: RoomState | undefined;
+    expect(() => {
+      next = applyActionRedirect(state, 'p1', 'A001');
+    }).not.toThrow();
+    expect(next!.players.p1.hand).toEqual([]);
+    expect(next!.discardPile).toEqual(['A001']);
+    expect(next!.actionRedirect).toBeNull();
+  });
 });
