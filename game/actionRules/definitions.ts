@@ -1729,11 +1729,26 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
-  // A166 ("Speed Chug Bonus") intentionally NOT included: checked both
-  // description_en and description_th in data/cards.json directly -- neither
-  // names who draws the 3 cards (the chooser or the chosen). Genuinely
-  // ambiguous, not a same-shape gap; needs a rulebook check with the group,
-  // not a guessed default.
+  // A166 "Speed Chug Bonus": both description_en and description_th are
+  // silent on who draws the 3 cards -- a genuine rules ambiguity, not a
+  // same-shape gap. Ruling confirmed directly with the user rather than
+  // guessed: the target draws on success (beats the actor's slow count of
+  // 5), the actor draws on failure. Needs needsTargetThenOutcome's two-step
+  // flow since each outcome has a *different* recipient -- see its doc
+  // comment in ./types.ts.
+  A166: {
+    code: 'A166', name_en: 'Speed Chug Bonus', name_th: 'หมดแก้วเร็วก็รวย', kind: 'auto',
+    needsTargetThenOutcome: true,
+    targetPrompt: 'เลือกผู้เล่นที่จะให้ดื่มให้เร็วที่สุด',
+    outcomePrompt: 'เร็วกว่าที่คุณนับ 5 หรือไม่?', outcomeYesLabel: 'เร็วกว่า (ผู้เล่นที่เลือกชนะ)', outcomeNoLabel: 'ช้ากว่า (คุณชนะ)',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ดื่มให้เร็วที่สุด ถ้าเร็วกว่าที่คุณนับ 5 จั่วไพ่ 3 ใบ',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      const outcome = outcomeFromFrame(frame);
+      if (!targetId || outcome === undefined) return state;
+      return draw(state, outcome ? targetId : frame.actorId, 3);
+    },
+  },
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so

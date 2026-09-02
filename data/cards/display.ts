@@ -33,7 +33,8 @@ export function getCardDisplay(code: CardCode): CardDisplay {
         getActionRule(card.id)?.needsOutcomeEntry ||
         getActionRule(card.id)?.needsDualTargetSelection ||
         getActionRule(card.id)?.needsNumberInput ||
-        getActionRule(card.id)?.needsDrinkCheck
+        getActionRule(card.id)?.needsDrinkCheck ||
+        getActionRule(card.id)?.needsTargetThenOutcome
     ),
   };
 }

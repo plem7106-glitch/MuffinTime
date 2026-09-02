@@ -17,6 +17,23 @@ function frameWithPayload(
   };
 }
 
+/** Builds a StackFrame carrying both a single targetId and customPayload --
+ * for needsTargetThenOutcome rules (A166), where neither the legacy
+ * (code, actorId, targetId) adapter nor frameWithPayload alone can express
+ * "a target AND an outcome" together. */
+function frameWithTargetAndPayload(
+  code: string,
+  actorId: PlayerId,
+  targetId: PlayerId,
+  customPayload: Record<string, unknown>
+): StackFrame {
+  return {
+    frameId: 'test', parentFrameId: null, sourceType: 'action', sourceCode: code, actorId,
+    targetIds: [targetId], targetScope: 'single', eligibleResponderIds: [], responses: {}, modifiers: [],
+    status: 'resolving', turnContext: { turnIndex: 0, phase: 'main', roundNumber: 0 }, customPayload,
+  };
+}
+
 function baseState(): RoomState {
   return {
     status: 'playing',
@@ -1167,5 +1184,31 @@ describe('A158 (honor-system: ask live, no persistent drink tracking)', () => {
   it('is a no-op when no target was picked (actor already drunk this round)', () => {
     const state = threePlayerState();
     expect(resolveActionEffect(state, 'A158', 'me')).toEqual(state);
+  });
+});
+
+describe('A166 (chugging challenge: target draws on success, actor draws on failure -- ruling confirmed with the user)', () => {
+  it('the target draws 3 when they beat the count (outcome: true)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', { outcome: true }));
+    expect(next.players.p2.hand.length).toBe(6); // 3 + 3 drawn
+    expect(next.players.me.hand.length).toBe(1); // unchanged
+  });
+
+  it('the actor draws 3 when the target fails to beat the count (outcome: false)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', { outcome: false }));
+    expect(next.players.me.hand.length).toBe(4); // 1 + 3 drawn
+    expect(next.players.p2.hand.length).toBe(3); // unchanged
+  });
+
+  it('is a no-op when no target was picked (challenge cancelled)', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A166', 'me', { outcome: true }))).toEqual(state);
+  });
+
+  it('is a no-op when a target was picked but no outcome was ever recorded', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', {}))).toEqual(state);
   });
 });

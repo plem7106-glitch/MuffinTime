@@ -52,6 +52,18 @@ export interface ActionRuleDefinition {
    * no new customPayload accessor needed, executeEffect just reads
    * frame.targetIds[0] the same way plain needsTargetSelection cards do. */
   needsDrinkCheck?: boolean;
+  /** Pick a single target, then report a binary outcome for that specific
+   * target -- unlike needsOutcomeEntry's `kind: 'outcome_entry'` +
+   * needsTargetSelection cards (where picking a target *is* the outcome,
+   * e.g. "who won?", and skipping the pick means no-op), this is for a
+   * card where BOTH outcomes have a recipient and they differ (A166: the
+   * target draws on success, the actor draws on failure) -- so the target
+   * and the outcome must be captured as two separate pieces of input.
+   * Reuses targetPrompt for step 1 and outcomePrompt/outcomeYesLabel/
+   * outcomeNoLabel for step 2. executeEffect reads frame.targetIds[0] (the
+   * target, positional, same as plain needsTargetSelection) and
+   * outcomeFromFrame(frame) (from customPayload). */
+  needsTargetThenOutcome?: boolean;
   executeEffect: (state: RoomState, frame: StackFrame) => RoomState;
 }
 

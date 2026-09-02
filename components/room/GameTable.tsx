@@ -92,6 +92,11 @@ export function GameTable() {
   // tracking anywhere; resolved live at play time.)
   const [drinkCheckPhase, setDrinkCheckPhase] = useState<'outcome' | 'target' | null>(null);
 
+  // Target-then-outcome flow (A166: pick a target, then report a binary
+  // outcome for that specific target -- each outcome has a different
+  // recipient, so both pieces of input are needed before the frame is pushed)
+  const [targetThenOutcomePhase, setTargetThenOutcomePhase] = useState<'target' | 'outcome' | null>(null);
+
   // Trap Open Flow State
   const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
   const [trapTargetPrompt, setTrapTargetPrompt] = useState<string>('เลือกผู้เล่นเป้าหมาย');
@@ -207,6 +212,7 @@ export function GameTable() {
     setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
     setDualPickFirstId(null);
     setDrinkCheckPhase(rule?.needsDrinkCheck ? 'outcome' : null);
+    setTargetThenOutcomePhase(rule?.needsTargetThenOutcome ? 'target' : null);
   };
 
   const pendingActionRule = pendingTargetCard ? getActionRule(pendingTargetCard.code) : undefined;
@@ -281,6 +287,23 @@ export function GameTable() {
     if (!pendingTargetCard || !chosenTarget) return;
     playAction(pendingTargetCard.code, chosenTarget);
     handleDrinkCheckCancel();
+  };
+
+  const handleTargetThenOutcomeCancel = () => {
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setTargetThenOutcomePhase(null);
+  };
+
+  const handleTargetThenOutcomeTargetConfirm = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    setTargetThenOutcomePhase('outcome');
+  };
+
+  const handleTargetThenOutcomeSelect = (outcome: boolean) => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    playAction(pendingTargetCard.code, chosenTarget, { outcome });
+    handleTargetThenOutcomeCancel();
   };
 
   // Handlers for Opening Active Traps
@@ -485,7 +508,7 @@ export function GameTable() {
           when the card's rule needs a roster_select -- e.g. "who matches this
           condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
-        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput && !pendingActionRule?.needsDrinkCheck}
+        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput && !pendingActionRule?.needsDrinkCheck && !pendingActionRule?.needsTargetThenOutcome}
         candidates={opponentCandidates}
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
@@ -573,6 +596,27 @@ export function GameTable() {
         onConfirm={handleDrinkTargetConfirm}
         onCancel={handleDrinkCheckCancel}
         prompt={pendingActionRule?.targetPrompt ?? pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+
+      {/* 10.8 Action Card Target-Then-Outcome (A166: pick a target, then
+          report a binary outcome for that specific target -- each outcome
+          has a different recipient) */}
+      <TargetSelector
+        open={pendingTargetCard !== null && pendingActionRule?.needsTargetThenOutcome === true && targetThenOutcomePhase === 'target'}
+        candidates={opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={(id) => setChosenTarget(id)}
+        onConfirm={handleTargetThenOutcomeTargetConfirm}
+        onCancel={handleTargetThenOutcomeCancel}
+        prompt={pendingActionRule?.targetPrompt ?? pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+      <OutcomeToggle
+        open={pendingTargetCard !== null && pendingActionRule?.needsTargetThenOutcome === true && targetThenOutcomePhase === 'outcome'}
+        prompt={pendingActionRule?.outcomePrompt ?? pendingTargetCard?.effect ?? ''}
+        yesLabel={pendingActionRule?.outcomeYesLabel}
+        noLabel={pendingActionRule?.outcomeNoLabel}
+        onSelect={handleTargetThenOutcomeSelect}
+        onCancel={handleTargetThenOutcomeCancel}
       />
 
       {/* 11. Trap Card Open Modal */}
