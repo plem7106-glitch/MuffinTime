@@ -125,6 +125,16 @@ describe('startGame', () => {
     expect(next.pendingActionObligations ?? []).toEqual([]);
   });
 
+  it('resets a leftover mustPlayActionThisTurn flag from a prior game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    room.players.p3.mustPlayActionThisTurn = true;
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const next = startGame(room, allCodes, () => 0);
+    expect(next.players.p3.mustPlayActionThisTurn).toBeFalsy();
+  });
+
   it('can start with 3 players even when maxPlayers is 15', () => {
     let room = createRoom('host1', 'P1', 15);
     room = addPlayer(room, 'p2', 'P2');
@@ -188,6 +198,18 @@ describe('resetForPlayAgain', () => {
     const next = resetForPlayAgain(started);
     expect(next.actionRedirect).toBeFalsy();
     expect(next.pendingActionObligations ?? []).toEqual([]);
+  });
+
+  it('resets a leftover mustPlayActionThisTurn flag from the finished game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.players.p3.mustPlayActionThisTurn = true;
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.players.p3.mustPlayActionThisTurn).toBeFalsy();
   });
 });
 

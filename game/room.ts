@@ -164,6 +164,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
     next.players[pid].hasDrawnThisTurn = false;
     next.players[pid].hasPlayedActionThisTurn = false;
     next.players[pid].bonusActionPlaysRemaining = 0;
+    next.players[pid].mustPlayActionThisTurn = false;
   }
   next.actionRedirect = null;
   next.pendingActionObligations = undefined;
@@ -250,6 +251,7 @@ export function resetForPlayAgain(state: RoomState): RoomState {
       hasDrawnThisTurn: false,
       hasPlayedActionThisTurn: false,
       bonusActionPlaysRemaining: 0,
+      mustPlayActionThisTurn: false,
     };
   }
   next.actionRedirect = null;
