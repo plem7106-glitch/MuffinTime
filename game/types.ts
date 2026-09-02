@@ -133,7 +133,11 @@ export interface PlayerState {
 
 export interface PendingInteraction {
   interactionId: string;
-  type: 'date_invite' | string;
+  /** date_invite: T10's accept/refuse trap prompt. delegated_target_pick:
+   * Cluster C's "the chosen player picks one further player, excluding
+   * themselves" step (A126, A130) -- see
+   * game/actionRules/delegatedTargetPick.ts. */
+  type: 'date_invite' | 'delegated_target_pick' | string;
   sourceCardCode: CardCode;
   initiatorId: PlayerId;
   targetPlayerId: PlayerId;

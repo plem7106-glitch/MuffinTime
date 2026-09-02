@@ -48,6 +48,7 @@ import {
   checkAndTriggerAutomaticTraps,
   executeTrapFrameEffect,
 } from '../game/trapRules/engine';
+import { resolveDelegatedTargetPick as engineResolveDelegatedTargetPick } from '../game/actionRules/delegatedTargetPick';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getCounterContextForActiveFrame, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds } from '../game/counterRules/registry';
 import { applyDevReactionScenario, createDevReactionScenario, createDevScenarioRoomCode, type DevReactionScenario } from './devReactionScenarios';
@@ -119,6 +120,7 @@ export interface GameSessionValue {
   openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
   initiateTrapInteraction: (code: CardCode, targetId: PlayerId) => void;
   respondToTrapInteraction: (interactionId: string, decision: 'accept' | 'refuse') => void;
+  respondToDelegatedTargetPick: (interactionId: string, chosenTargetId: PlayerId) => void;
   playCounter: (code: CardCode, responseId: string, actorIdOverride?: PlayerId, customPayloadOverride?: Record<string, unknown>) => void;
   skipCounter: (responseId: string, responderIdOverride?: PlayerId) => void;
   declareMuffinTime: () => void;
@@ -702,6 +704,15 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId, resolveCompletedStackFrames]
   );
 
+  const respondToDelegatedTargetPick = useCallback(
+    (interactionId: string, chosenTargetId: PlayerId) =>
+      run((state) => {
+        const responderId = myPlayerId!;
+        return engineResolveDelegatedTargetPick(state, interactionId, responderId, chosenTargetId);
+      }),
+    [run, myPlayerId]
+  );
+
   const playCounter = useCallback(
     (code: CardCode, responseId: string, actorIdOverride?: PlayerId, customPayloadOverride?: Record<string, unknown>) =>
       run((state) => {
@@ -1076,6 +1087,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const interaction = roomState?.pendingInteraction;
     if (!interaction || !myPlayerId || myPlayerId !== roomState?.hostId) return;
+    if (interaction.type !== 'date_invite') return;
 
     const targetId = interaction.targetPlayerId;
     if (!targetId || !targetId.startsWith('bot-')) return;
@@ -1126,6 +1138,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     openTrapCard,
     initiateTrapInteraction,
     respondToTrapInteraction,
+    respondToDelegatedTargetPick,
     playCounter,
     skipCounter,
     declareMuffinTime: declareMuffinTimeFn,

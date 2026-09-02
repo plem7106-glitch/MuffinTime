@@ -1341,3 +1341,25 @@ describe('A092 (put all cards back, reshuffle, and restart the entire game)', ()
     expect(resolveActionEffect(state, 'A092', 'me')).toEqual(state);
   });
 });
+
+describe('A126 and A130 (Group 1 Cluster C -- 2-hop delegated targeting)', () => {
+  it('A126: sets up a delegated_target_pick interaction naming the chosen player and the right prompt', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A126', 'me', 'p2');
+    expect(next.pendingInteraction?.type).toBe('delegated_target_pick');
+    expect(next.pendingInteraction?.sourceCardCode).toBe('A126');
+    expect(next.pendingInteraction?.initiatorId).toBe('me');
+    expect(next.pendingInteraction?.targetPlayerId).toBe('p2');
+    expect(next.pendingInteraction?.prompt).toBe('คุณคือมือปืน! เลือกผู้เล่นให้ทิ้งไพ่ทั้งหมดในมือ');
+  });
+
+  it('A130: sets up a delegated_target_pick interaction naming the chosen player and the right prompt', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A130', 'me', 'p3');
+    expect(next.pendingInteraction?.type).toBe('delegated_target_pick');
+    expect(next.pendingInteraction?.sourceCardCode).toBe('A130');
+    expect(next.pendingInteraction?.initiatorId).toBe('me');
+    expect(next.pendingInteraction?.targetPlayerId).toBe('p3');
+    expect(next.pendingInteraction?.prompt).toBe('คุณได้รับเลื่อนตำแหน่ง! เลือกผู้เล่นที่จะได้รับไพ่ 1 ใบจากคุณ (สุ่มเลือกให้)');
+  });
+});

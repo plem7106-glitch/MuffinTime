@@ -242,6 +242,21 @@ describe('Trap Batch 1 (T01 - T10) Declarative Rules', () => {
       expect(state.players.p2.hand.length).toBe(2); // 5 - 3 = 2
       expect(state.players.p1.hand.length).toBe(6); // 3 + 3 = 6
     });
+
+    it('does not overwrite an already-pending interaction (single-slot occupancy guard)', () => {
+      let state = createMockRoom();
+      state.players.p1.traps = ['T10'];
+      state.players.p3.traps = ['T10'];
+
+      // P1 initiates T10 asking P2 on a date
+      state = initiateTrapInteraction(state, 'p1', 'T10', 'p2');
+      const firstInteractionId = state.pendingInteraction!.interactionId;
+
+      // While that's still pending, P3 tries to initiate a second T10 -- should no-op
+      // and leave the first interaction (same interactionId) untouched.
+      state = initiateTrapInteraction(state, 'p3', 'T10', 'p2');
+      expect(state.pendingInteraction?.interactionId).toBe(firstInteractionId);
+    });
   });
 
   describe('Nested Traps Execution', () => {

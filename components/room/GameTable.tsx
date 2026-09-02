@@ -64,6 +64,7 @@ export function GameTable() {
     openTrapCard,
     initiateTrapInteraction,
     respondToTrapInteraction,
+    respondToDelegatedTargetPick,
     pendingResponse,
     playCounter,
     skipCounter,
@@ -121,6 +122,7 @@ export function GameTable() {
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
   const [chosenTrapTargets, setChosenTrapTargets] = useState<PlayerId[]>([]);
+  const [delegatedPick, setDelegatedPick] = useState<{ interactionId: string; targetId: PlayerId } | null>(null);
 
   // Generic digital Counter target flow state. Selection is local until Confirm.
   const [pendingCounterCode, setPendingCounterCode] = useState<CardCode | null>(null);
@@ -336,7 +338,7 @@ export function GameTable() {
 
   // Handlers for Opening Active Traps
   const handleOpenTrapTap = (trapCode: CardCode) => {
-    if (pendingResponse) return;
+    if (pendingResponse || state.pendingInteraction) return;
     if (!canActivateManualTrap(state, myPlayerId, trapCode)) return;
     const card = getCardDisplay(trapCode);
     setPendingTrapOpen(card);
@@ -460,7 +462,7 @@ export function GameTable() {
           traps={me.traps}
           onOpenTrap={handleOpenTrapTap}
           onAddTrapSlotClick={() => setIsHandTrayOpen(true)}
-          disabled={pendingResponse !== null || isShuffling || isRoundTransitionActive}
+          disabled={pendingResponse !== null || Boolean(state.pendingInteraction) || isShuffling || isRoundTransitionActive}
         />
 
         {/* Live Gameplay Status Pill (Directly below Active Traps, above Bottom Action Bar) */}
@@ -717,6 +719,30 @@ export function GameTable() {
             respondToTrapInteraction(state.pendingInteraction.interactionId, 'refuse');
           }
         }}
+      />
+
+      {/* 12.6 Delegated Target Pick Modal (Group 1 Cluster C: A126, A130 --
+          the player the actor chose must now pick one further player,
+          excluding themselves, before the card's effect resolves) */}
+      <TargetSelector
+        open={Boolean(
+          state.pendingInteraction?.type === 'delegated_target_pick' &&
+          state.pendingInteraction.targetPlayerId === myPlayerId
+        )}
+        candidates={opponentCandidates}
+        selectedId={delegatedPick !== null && delegatedPick.interactionId === state.pendingInteraction?.interactionId ? delegatedPick.targetId : null}
+        onSelect={(id) => {
+          if (state.pendingInteraction) {
+            setDelegatedPick({ interactionId: state.pendingInteraction.interactionId, targetId: id });
+          }
+        }}
+        onConfirm={() => {
+          if (state.pendingInteraction && delegatedPick?.interactionId === state.pendingInteraction.interactionId) {
+            respondToDelegatedTargetPick(state.pendingInteraction.interactionId, delegatedPick.targetId);
+            setDelegatedPick(null);
+          }
+        }}
+        prompt={state.pendingInteraction?.prompt ?? ''}
       />
 
       {/* 13. Trap Alert & Counter Decision Modal (When local player is hit by a Trap) */}
