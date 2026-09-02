@@ -1099,6 +1099,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const interaction = roomState?.pendingInteraction;
     if (!interaction || !myPlayerId || myPlayerId !== roomState?.hostId) return;
+    if (interaction.type !== 'date_invite') return;
 
     const targetId = interaction.targetPlayerId;
     if (!targetId || !targetId.startsWith('bot-')) return;

@@ -177,6 +177,9 @@ export function initiateTrapInteraction(
   if (!player || !player.traps.includes(trapCode)) {
     throw new Error('trap not found in owner active traps');
   }
+  if (state.pendingInteraction) {
+    return cloneState(state);
+  }
 
   const next = cloneState(state);
   const interactionId = `interact-${trapCode}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;

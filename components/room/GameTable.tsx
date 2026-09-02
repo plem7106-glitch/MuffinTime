@@ -118,7 +118,7 @@ export function GameTable() {
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
   const [chosenTrapTargets, setChosenTrapTargets] = useState<PlayerId[]>([]);
-  const [delegatedPickChoice, setDelegatedPickChoice] = useState<PlayerId | null>(null);
+  const [delegatedPick, setDelegatedPick] = useState<{ interactionId: string; targetId: PlayerId } | null>(null);
 
   // C04 Counter Target Flow State
   const [pendingC04Code, setPendingC04Code] = useState<CardCode | null>(null);
@@ -208,19 +208,6 @@ export function GameTable() {
       .filter((id) => id !== myPlayerId && state.players[id] !== undefined)
       .map((id) => ({ id, player: state.players[id] }));
   }, [seatOrder, myPlayerId, state.players]);
-
-  // Clear a stale delegated-pick selection if the interaction it belongs to
-  // is no longer the active one (e.g. host-unstick force-clears
-  // pendingInteraction mid-choice) -- otherwise a later, unrelated
-  // delegated_target_pick could reopen pre-selected with this leftover value.
-  useEffect(() => {
-    const isMyDelegatedPick =
-      state.pendingInteraction?.type === 'delegated_target_pick' &&
-      state.pendingInteraction.targetPlayerId === myPlayerId;
-    if (!isMyDelegatedPick && delegatedPickChoice !== null) {
-      setDelegatedPickChoice(null);
-    }
-  }, [state.pendingInteraction, myPlayerId, delegatedPickChoice]);
 
   // Handlers for Hand Tray Actions
   const handlePlayActionDirect = (cardCode: CardCode) => {
@@ -346,7 +333,7 @@ export function GameTable() {
 
   // Handlers for Opening Active Traps
   const handleOpenTrapTap = (trapCode: CardCode) => {
-    if (pendingResponse) return;
+    if (pendingResponse || state.pendingInteraction) return;
     if (!canActivateManualTrap(state, myPlayerId, trapCode)) return;
     const card = getCardDisplay(trapCode);
     setPendingTrapOpen(card);
@@ -466,7 +453,7 @@ export function GameTable() {
           traps={me.traps}
           onOpenTrap={handleOpenTrapTap}
           onAddTrapSlotClick={() => setIsHandTrayOpen(true)}
-          disabled={pendingResponse !== null || isShuffling || isRoundTransitionActive}
+          disabled={pendingResponse !== null || Boolean(state.pendingInteraction) || isShuffling || isRoundTransitionActive}
         />
 
         {/* Live Gameplay Status Pill (Directly below Active Traps, above Bottom Action Bar) */}
@@ -726,12 +713,16 @@ export function GameTable() {
           state.pendingInteraction.targetPlayerId === myPlayerId
         )}
         candidates={opponentCandidates}
-        selectedId={delegatedPickChoice}
-        onSelect={setDelegatedPickChoice}
+        selectedId={delegatedPick !== null && delegatedPick.interactionId === state.pendingInteraction?.interactionId ? delegatedPick.targetId : null}
+        onSelect={(id) => {
+          if (state.pendingInteraction) {
+            setDelegatedPick({ interactionId: state.pendingInteraction.interactionId, targetId: id });
+          }
+        }}
         onConfirm={() => {
-          if (state.pendingInteraction && delegatedPickChoice) {
-            respondToDelegatedTargetPick(state.pendingInteraction.interactionId, delegatedPickChoice);
-            setDelegatedPickChoice(null);
+          if (state.pendingInteraction && delegatedPick?.interactionId === state.pendingInteraction.interactionId) {
+            respondToDelegatedTargetPick(state.pendingInteraction.interactionId, delegatedPick.targetId);
+            setDelegatedPick(null);
           }
         }}
         prompt={state.pendingInteraction?.prompt ?? ''}
