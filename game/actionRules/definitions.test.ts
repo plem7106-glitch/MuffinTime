@@ -1260,3 +1260,16 @@ describe("A040 (redirects the next 3 played Actions into the actor's hand)", () 
     expect(next.actionRedirect).toEqual({ toPlayerId: 'me', remaining: 3 });
   });
 });
+
+describe('A119 (skip play forward to a chosen player\'s next turn)', () => {
+  it('jumps the current turn to the chosen target', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'p3', {}));
+    expect(next.turnOrder[next.currentTurnIndex]).toBe('p3');
+  });
+
+  it('is a no-op when no target was picked', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A119', 'me')).toEqual(state);
+  });
+});

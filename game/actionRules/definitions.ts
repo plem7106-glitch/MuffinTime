@@ -3,7 +3,7 @@ import { draw, discard } from '../pile';
 import { stealRandom, swapHands } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
 import { skipTurn, reverseDirection, changeMuffinTarget } from '../turnFlow';
-import { getNextPlayerId } from '../turn';
+import { getNextPlayerId, jumpToPlayerTurn, resolveTurnArrival } from '../turn';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
@@ -1783,6 +1783,20 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       const next = cloneState(state);
       next.actionRedirect = { toPlayerId: frame.actorId, remaining: 3 };
       return next;
+    },
+  },
+
+  A119: {
+    code: 'A119', name_en: 'Why Wait?', name_th: 'จะรอทำไม?', kind: 'auto',
+    needsTargetSelection: true,
+    targetPrompt: 'เลือกผู้เล่นที่จะข้ามไปยังเทิร์นของเขา',
+    description_th: 'เลือกผู้เล่นอีก 1 คน แล้วข้ามการเล่นไปยังเทิร์นถัดไปของผู้เล่นคนนั้น',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      if (!targetId) return state;
+      const jumped = jumpToPlayerTurn(state, targetId);
+      const currentId = jumped.turnOrder[jumped.currentTurnIndex];
+      return resolveTurnArrival(jumped, currentId);
     },
   },
 
