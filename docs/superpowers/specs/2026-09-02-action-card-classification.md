@@ -152,13 +152,29 @@ A128, A154, A161, A169
 A172 needed its own primitive (`swapSeats`, exact-2 permutation, vs. `rotateSeatOrder`'s
 whole-table shift) plus a `rosterSelectionCount` UI constraint (§types.ts) since it swaps
 exactly 2 specific players rather than everyone.
-**Bug found and fixed while adding A172:** `rotateSeatOrder` (used by A010/A156, both already
-shipped) rewrote `seatOrder` without moving `currentTurnIndex` along with it — after a
-rotation, `currentTurnIndex` pointed at whoever now sat in the *old* numeric slot, silently
-handing the active turn to a different player than the one who'd actually been mid-turn. Fixed
-by advancing `currentTurnIndex` by the same rotation `steps`; `swapSeats` applies the same
-same-active-player-follows fix for its 2-player case. Covered by regression tests in
-`game/actionRules/definitions.test.ts` (`A010`/`A156` "keeps the same player active" cases).
+**False alarm caught during review, corrected before shipping:** while adding A172, briefly
+suspected `rotateSeatOrder` (used by A010/A156, both already shipped) needed `currentTurnIndex`
+moved along with `seatOrder` after a rotation, and shipped that change in one commit. A second
+review pass traced every actual reader of "whose turn is it" — `GameTable.tsx`'s
+`currentTurnPlayerId` and every gameplay gate in `lib/session.tsx` (`playAction`, `drawCard`,
+`placeTrapCard`, etc.) — and found they all read `turnOrder[currentTurnIndex]`, **never**
+`seatOrder[currentTurnIndex]`. `turnOrder` is fixed at game start and neither
+`rotateSeatOrder` nor `swapSeats` touches it, so the *original* (pre-session) behavior — leaving
+`currentTurnIndex` untouched — was already correct: it keeps indexing the same player in the
+untouched `turnOrder`. The "fix" that moved `currentTurnIndex` to follow `seatOrder` was itself
+the bug: it desynced `currentTurnIndex` from the array everything else trusts, which would have
+handed the active turn to the wrong player immediately after any of these 3 cards was played.
+Reverted in the same session before merging. `rotateSeatOrder`/`swapSeats` now deliberately
+leave `currentTurnIndex` alone; regression tests in `game/actionRules/definitions.test.ts`
+assert `turnOrder[currentTurnIndex]` stays pointed at the actor across all 3 cards.
+
+**Real, narrower, still-open issue (not fixed, low severity):** `advanceTurn` (`game/turn.ts`)
+prefers `seatOrder` over `turnOrder` when walking to find the next non-skipped player, and reads
+`skipNextTurn` by seat position. Once `seatOrder` and `turnOrder` diverge (exactly the 3 cards
+above), that walk can check the wrong player's `skipNextTurn` flag for one turn — a narrow edge
+case (needs a seat-shuffle card played the same round as someone's `skipNextTurn` flag being
+set) that predates this session and is out of scope here; `advanceTurn` itself would need to
+walk `turnOrder` instead of preferring `seatOrder` to close it.
 
 **F2. All players' hands normalized to a fixed size** — 2 cards: A044, A129
 

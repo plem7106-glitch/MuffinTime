@@ -332,13 +332,16 @@ describe('Family F batch (via resolveActionEffect)', () => {
     expect(next.players.p1.hand).toEqual(['a1']);
   });
 
-  it('A010 keeps the same player active after the rotation, not whoever now sits in the old slot', () => {
-    // p1 was active at index 0. After rotating right, p1 now sits at index 1
-    // (seatOrder becomes ['p3','p1','p2']) -- currentTurnIndex must follow
-    // p1, not stay frozen at 0 (which would silently hand the turn to p3).
-    const next = resolveActionEffect(seatedState(), 'A010', 'p1');
-    expect(next.currentTurnIndex).toBe(1);
-    expect(next.seatOrder![next.currentTurnIndex]).toBe('p1');
+  it('A010 leaves currentTurnIndex untouched -- turnOrder, not seatOrder, decides whose turn it is', () => {
+    // Every gameplay gate in lib/session.tsx and GameTable's currentTurnPlayerId
+    // read turnOrder[currentTurnIndex], never seatOrder[currentTurnIndex].
+    // rotateSeatOrder doesn't touch turnOrder, so currentTurnIndex must not
+    // move either -- otherwise the still-mid-turn player (p1) would find
+    // their own next action rejected because the index now names someone else.
+    const state = seatedState();
+    const next = resolveActionEffect(state, 'A010', 'p1');
+    expect(next.currentTurnIndex).toBe(state.currentTurnIndex);
+    expect(next.turnOrder[next.currentTurnIndex]).toBe('p1');
   });
 
   it('A156 rotates the seat order one step left', () => {
@@ -346,9 +349,11 @@ describe('Family F batch (via resolveActionEffect)', () => {
     expect(next.seatOrder).toEqual(['p2', 'p3', 'p1']);
   });
 
-  it('A156 also keeps the same player active after the rotation', () => {
-    const next = resolveActionEffect(seatedState(), 'A156', 'p1');
-    expect(next.seatOrder![next.currentTurnIndex]).toBe('p1');
+  it('A156 also leaves currentTurnIndex/turnOrder untouched', () => {
+    const state = seatedState();
+    const next = resolveActionEffect(state, 'A156', 'p1');
+    expect(next.currentTurnIndex).toBe(state.currentTurnIndex);
+    expect(next.turnOrder[next.currentTurnIndex]).toBe('p1');
   });
 
   it('A080 makes every player steal 1 card from their right-seat neighbor', () => {
@@ -966,13 +971,14 @@ describe('A172 (forced seat swap, exactly 2 players, via executeActionFrameEffec
     expect(next.seatOrder).toEqual(['p3', 'p2', 'p1']);
   });
 
-  it('keeps the same player active when the active player is one of the two swapped', () => {
-    // p1 (active, index 0) swaps with p3 (index 2) -- turn must stay with p1.
-    const next = executeActionFrameEffect(
-      seatedState(),
-      frameWithPayload('A172', 'p1', { rosterIds: ['p1', 'p3'] })
-    );
-    expect(next.seatOrder![next.currentTurnIndex]).toBe('p1');
+  it('leaves currentTurnIndex/turnOrder untouched even when the active player is one of the two swapped', () => {
+    // p1 (active) swaps seats with p3 -- turnOrder (what gameplay gates
+    // actually read) must still say it's p1's turn, matching real-world
+    // rules that swapping seats doesn't hand your turn to someone else.
+    const state = seatedState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A172', 'p1', { rosterIds: ['p1', 'p3'] }));
+    expect(next.currentTurnIndex).toBe(state.currentTurnIndex);
+    expect(next.turnOrder[next.currentTurnIndex]).toBe('p1');
   });
 
   it('is a no-op when fewer than 2 players are chosen', () => {

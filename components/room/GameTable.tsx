@@ -445,6 +445,7 @@ export function GameTable() {
         candidates={opponentCandidates}
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
+        requiredCount={rosterSelectionCount}
         selectedIds={chosenTargets}
         onSelect={(id) => {
           if (!pendingActionRule?.needsRosterSelection) {

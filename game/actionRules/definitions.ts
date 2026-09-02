@@ -103,19 +103,26 @@ function rotateSeatOrder(state: RoomState, steps: number): RoomState {
   const count = order.length;
   if (count === 0) return state;
   const rotated = order.map((_, i) => order[((i - steps) % count + count) % count]);
-  // currentTurnIndex is a numeric slot in this same array (advanceTurn reads
-  // it against seatOrder once seatOrder exists) -- rotating the array without
-  // moving the index would silently hand the active turn to whoever now
-  // occupies that old slot, instead of following the player whose turn it
-  // actually is. The active player moves the same `steps` as everyone else.
-  const currentTurnIndex = ((state.currentTurnIndex + steps) % count + count) % count;
-  return { ...state, seatOrder: rotated, currentTurnIndex };
+  // Deliberately leaves currentTurnIndex untouched. Whose turn it is is
+  // decided everywhere in the app (GameTable.tsx's currentTurnPlayerId,
+  // every gameplay gate in lib/session.tsx) by turnOrder[currentTurnIndex]
+  // -- never by seatOrder. turnOrder is fixed at game start and this
+  // primitive doesn't touch it, so leaving currentTurnIndex alone is what
+  // keeps the *actual* active player unchanged, matching the real-world
+  // rule that shuffling seats mid-turn doesn't hand your turn to someone
+  // else. (An earlier version of this function nudged currentTurnIndex to
+  // keep tracking the active player *within seatOrder* -- that was wrong:
+  // nothing reads seatOrder[currentTurnIndex] for turn-taking, so it just
+  // desynced currentTurnIndex from the turnOrder index everything else
+  // trusts, handing the turn to the wrong player mid-play. Caught by
+  // review before shipping; see the regression test below.)
+  return { ...state, seatOrder: rotated };
 }
 
 /** Swaps exactly two players' seats in place, leaving everyone else's
- * position untouched (unlike rotateSeatOrder's whole-table shift). Keeps
- * currentTurnIndex tracking the same active player if they're one of the
- * two being swapped. */
+ * position untouched (unlike rotateSeatOrder's whole-table shift).
+ * currentTurnIndex is intentionally left alone -- see rotateSeatOrder's
+ * comment on why seatOrder and currentTurnIndex are independent. */
 function swapSeats(state: RoomState, idA: PlayerId, idB: PlayerId): RoomState {
   const order = getSeatOrder(state);
   const posA = order.indexOf(idA);
@@ -124,9 +131,7 @@ function swapSeats(state: RoomState, idA: PlayerId, idB: PlayerId): RoomState {
   const swapped = [...order];
   swapped[posA] = idB;
   swapped[posB] = idA;
-  const activeId = order[state.currentTurnIndex];
-  const currentTurnIndex = activeId === idA ? posB : activeId === idB ? posA : state.currentTurnIndex;
-  return { ...state, seatOrder: swapped, currentTurnIndex };
+  return { ...state, seatOrder: swapped };
 }
 
 /** Everyone simultaneously steals 1 card from their right-seat neighbor,
