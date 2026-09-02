@@ -23,12 +23,34 @@ independently).
 ## Branch state — start here, don't branch from `main`
 
 - Work so far is on `feature/birthday-cards`, forked from `main`. **PR #3 is open into
-  `main`** (https://github.com/plem7106-glitch/MuffinTime/pull/3) as of the 157/173
-  checkpoint — check `gh pr view 3` (or the URL) for its current state before assuming it's
-  still open/unmerged, and `git log` for whether later commits landed on this branch after
-  it was opened (Group 2's last two cards, A118/A158, were pushed after PR #3 was created —
-  they'll show up in the PR automatically since it tracks the branch, but re-check before
-  merging).
+  `main`** (https://github.com/plem7106-glitch/MuffinTime/pull/3) — check `gh pr view 3`
+  (or the URL) for its current state before assuming it's still open/unmerged.
+- **`main` had diverged**: a different author (`Patyz-Hack`) pushed two large commits
+  directly to `main` outside PR review — `96103b9` "Trap Fix" and `ff09a4a` "Trap and
+  card" — touching the exact same core files this branch's Action-card work builds on
+  (`game/turn.ts`, `lib/session.tsx`, `components/room/GameTable.tsx`), plus a large new
+  sound/presentation subsystem (`lib/presentation/`) and trap-engine work. This was
+  reconciled via merge commit `ec9e517` (not a rebase — avoids a force-push and resolves
+  each conflict once). Key things that commit changed, now folded into this branch:
+  - **The turn rule was corrected**: each turn is draw **XOR** play one Action, not both
+    — restoring the original v1 design spec
+    (`docs/superpowers/specs/2026-08-31-muffin-time-web-design.md`'s "ระบบเทิร์น" section),
+    which this branch's engine had never actually enforced. `game/turn.ts`'s
+    `hasCompletedMainChoice`/`canEndTurn` is now the single authority for end-turn
+    eligibility (replacing duplicated inline checks in `lib/session.tsx`/`GameTable.tsx`),
+    and `game/turn.ts`'s `beginTurn(state, activePlayerId)` is now the single place that
+    resets per-turn `PlayerState` flags (replacing the duplicated reset blocks
+    `advanceTurn`/`emergencyForceSkipTurn` used to each carry — see the reset-checklist
+    note below, now much lower-risk since there's only one call site to remember).
+  - A035's `mustPlayActionThisTurn` check is folded into `canEndTurn`. A new guard was
+    added to `lib/session.tsx`'s `drawCard`: under the corrected draw-XOR-play rule,
+    drawing would otherwise permanently foreclose ever satisfying an A035 obligation
+    (`playAction` is unconditionally blocked once `hasDrawnThisTurn` is set) — so drawing
+    itself is now blocked while `mustPlayActionThisTurn` is true and unsatisfied, funneling
+    an obligated player toward playing an Action as their only legal choice that turn.
+  - If you're picking up Group 1 Cluster C or later and haven't seen this reconciliation,
+    read `game/turn.ts` and `lib/session.tsx`'s `playAction`/`drawCard`/`endTurn` fresh —
+    don't assume they still look like what an earlier Cluster's spec doc described.
 - `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
   `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
   `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
@@ -45,15 +67,19 @@ independently).
   status` yourself rather than assuming either way.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (at the 163/173 checkpoint): `npx vitest run` → 556
-  passed, `npx tsc --noEmit` → clean. Run both again before you start — confirm your baseline.
-- **If you add a new per-turn or per-game `PlayerState`/`RoomState` field, reset it in ALL
-  FOUR places**, not just the ones that seem obvious: `game/turn.ts`'s `advanceTurn` and
-  `emergencyForceSkipTurn` (per-turn resets), and `game/room.ts`'s `startGame` and
-  `resetForPlayAgain` (per-game resets). Cluster A's implementation (below) hit this exact
-  gap **four separate times** — once per new field — each caught only by code review, not
-  by the original implementation. Treat this as a checklist, not a one-off pattern to
-  rediscover per card.
+- Last known-good check on this branch (post-merge-with-main): `npx vitest run` → 587
+  passed (43 files, up from 37 pre-merge — the extra files are `main`'s new trap/
+  presentation test suites), `npx tsc --noEmit` → clean. Run both again before you start —
+  confirm your baseline.
+- **If you add a new per-turn `PlayerState` field, reset it in `game/turn.ts`'s
+  `beginTurn`** — as of the merge above, this is the *one* place `advanceTurn` and
+  `emergencyForceSkipTurn` both funnel through, so there's only one call site to remember
+  now (previously two, duplicated). **If you add a new per-game `RoomState`/`PlayerState`
+  field, still reset it in BOTH `game/room.ts`'s `startGame` and `resetForPlayAgain`** —
+  those two remain separate (a different reset category — per-game, not per-turn — and
+  `beginTurn`'s consolidation doesn't cover them). Cluster A's implementation hit this
+  reset-checklist gap **four separate times** before `beginTurn` existed, each caught only
+  by code review, not by the original implementation — don't rediscover it per card.
 
 ## How to implement a card (the pattern)
 
