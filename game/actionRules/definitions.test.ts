@@ -986,3 +986,96 @@ describe('A172 (forced seat swap, exactly 2 players, via executeActionFrameEffec
     expect(executeActionFrameEffect(state, frameWithPayload('A172', 'p1', { rosterIds: ['p2'] }))).toEqual(state);
   });
 });
+
+describe('Birthday cards (A037/A066/A137, via executeActionFrameEffect)', () => {
+  it('A037 wins the game when today matches the actor\'s birthday', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    const next = executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }));
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('me');
+  });
+
+  it('A037 is a no-op when today does not match', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    expect(executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '01-01' }))).toEqual(state);
+  });
+
+  it('A037 is a no-op when the actor never set a birthday', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }))).toEqual(state);
+  });
+
+  it('A037 respects the A085 no_win restriction even on a birthday match', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    state.globalRestrictions = [{ type: 'no_win', sourcePlayerId: 'p2' }];
+    const next = executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }));
+    expect(next.status).not.toBe('finished');
+  });
+
+  it('A037 does not throw when the game is already finished (no-ops instead)', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    state.status = 'finished';
+    state.winnerId = 'p2';
+    expect(() => executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }))).not.toThrow();
+    const next = executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }));
+    expect(next.winnerId).toBe('p2'); // doesn't clobber the earlier winner
+  });
+
+  it('A066 makes everyone give 1 card to the single soonest-birthday player', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '01-01'; // far from today
+    state.players.p2.birthdayMMDD = '09-03'; // tomorrow -- soonest
+    state.players.p3.birthdayMMDD = '06-15';
+    const next = executeActionFrameEffect(state, frameWithPayload('A066', 'me', { today: '09-02' }));
+    expect(next.players.me.hand.length).toBe(0); // gave its only card
+    expect(next.players.p3.hand.length).toBe(2); // gave 1 of 3
+    expect(next.players.p2.hand.length).toBe(5); // received from both
+  });
+
+  it('A066 is a no-op when nobody has set a birthday', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A066', 'me', { today: '09-02' }))).toEqual(state);
+  });
+
+  it('A066 splits giving across tied recipients, never making a recipient give to itself', () => {
+    const state = threePlayerState();
+    state.players.p2.birthdayMMDD = '09-03';
+    state.players.p3.birthdayMMDD = '09-03'; // tied with p2, both 1 day away
+    const next = executeActionFrameEffect(state, frameWithPayload('A066', 'me', { today: '09-02' }));
+    // Only `me` is a non-recipient giver; total cards conserved, and p2/p3
+    // (both recipients) keep their own hands intact toward each other.
+    const totalBefore = state.players.me.hand.length + state.players.p2.hand.length + state.players.p3.hand.length;
+    const totalAfter = next.players.me.hand.length + next.players.p2.hand.length + next.players.p3.hand.length;
+    expect(totalAfter).toBe(totalBefore);
+    expect(next.players.me.hand.length).toBe(0);
+  });
+
+  it('A137 makes everyone steal 1 card from the soonest-birthday player', () => {
+    const state = threePlayerState();
+    state.players.p2.birthdayMMDD = '09-03'; // tomorrow -- soonest
+    state.players.p3.birthdayMMDD = '06-15';
+    const next = executeActionFrameEffect(state, frameWithPayload('A137', 'me', { today: '09-02' }));
+    expect(next.players.p2.hand.length).toBe(1); // lost 2 of 3, to me and p3
+    expect(next.players.me.hand.length).toBe(2);
+    expect(next.players.p3.hand.length).toBe(4);
+  });
+
+  it('A137 is a no-op when nobody has set a birthday', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A137', 'me', { today: '09-02' }))).toEqual(state);
+  });
+
+  it('birthday comparison wraps year-end correctly (Dec 31 beats Jan 5 when today is Dec 30)', () => {
+    const state = threePlayerState();
+    state.players.p2.birthdayMMDD = '01-05'; // 6 days away
+    state.players.p3.birthdayMMDD = '12-31'; // 1 day away -- soonest
+    const next = executeActionFrameEffect(state, frameWithPayload('A137', 'me', { today: '12-30' }));
+    expect(next.players.p3.hand.length).toBe(1); // target -- lost 1 to each of me and p2
+    expect(next.players.me.hand.length).toBe(2); // stealer -- gained 1
+    expect(next.players.p2.hand.length).toBe(4); // stealer -- gained 1
+  });
+});

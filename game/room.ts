@@ -7,7 +7,8 @@ export const GLOBAL_MAX_PLAYERS = 15;
 export function createRoom(
   hostId: PlayerId,
   hostName: string,
-  maxPlayers: number = GLOBAL_MAX_PLAYERS
+  maxPlayers: number = GLOBAL_MAX_PLAYERS,
+  hostBirthdayMMDD?: string
 ): RoomState {
   const validatedMax = Math.max(
     GLOBAL_MIN_PLAYERS,
@@ -35,6 +36,7 @@ export function createRoom(
         connected: true,
         hasCalledMuffinTime: false,
         skipNextTurn: false,
+        ...(hostBirthdayMMDD ? { birthdayMMDD: hostBirthdayMMDD } : {}),
       },
     },
   };
@@ -44,7 +46,8 @@ export function addPlayer(
   state: RoomState,
   playerId: PlayerId,
   name: string,
-  maxPlayers?: number
+  maxPlayers?: number,
+  birthdayMMDD?: string
 ): RoomState {
   if (state.status !== 'lobby') {
     throw new Error('cannot join a room that has already started');
@@ -64,6 +67,7 @@ export function addPlayer(
     connected: true,
     hasCalledMuffinTime: false,
     skipNextTurn: false,
+    ...(birthdayMMDD ? { birthdayMMDD } : {}),
   };
   const existingJoinOrder = next.joinOrder ?? Object.keys(state.players);
   next.joinOrder = [...existingJoinOrder, playerId];

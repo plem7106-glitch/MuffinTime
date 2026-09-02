@@ -27,6 +27,13 @@ export interface ActionRuleDefinition {
    * as { firstId, secondId }. */
   needsDualTargetSelection?: boolean;
   dualTargetPrompts?: { first: string; second: string };
+  /** Needs "today" as MM-DD in the frame's customPayload (A037/A066/A137's
+   * birthday comparisons). executeEffect must stay a pure function of
+   * (state, frame) -- it never calls `new Date()` itself, since that would
+   * make resolution depend on whichever client's clock/timezone happens to
+   * resolve the frame. The caller (GameTable) stamps the date in before
+   * pushing the frame, the same way a picker stamps rosterIds/outcome/etc. */
+  needsTodayDate?: boolean;
   executeEffect: (state: RoomState, frame: StackFrame) => RoomState;
 }
 
@@ -47,4 +54,10 @@ export function dualTargetIdsFromFrame(frame: StackFrame): { firstId?: PlayerId;
     firstId: frame.customPayload?.firstId as PlayerId | undefined,
     secondId: frame.customPayload?.secondId as PlayerId | undefined,
   };
+}
+
+/** MM-DD, as stamped by the caller before pushing the frame -- see
+ * needsTodayDate. */
+export function todayFromFrame(frame: StackFrame): string | undefined {
+  return frame.customPayload?.today as string | undefined;
 }

@@ -87,9 +87,9 @@ export interface GameSessionValue {
   lastResult: LastResult | null;
   error: string | null;
   clearLastResult: () => void;
-  createRoom: (maxPlayers: number, hostName: string) => Promise<string>;
-  createBotRoom: (maxPlayers: number, hostName?: string) => string;
-  joinRoom: (code: string, playerName: string) => Promise<void>;
+  createRoom: (maxPlayers: number, hostName: string, hostBirthdayMMDD?: string) => Promise<string>;
+  createBotRoom: (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string) => string;
+  joinRoom: (code: string, playerName: string, playerBirthdayMMDD?: string) => Promise<void>;
   previewRoom: (code: string) => Promise<RoomState | null>;
   resumeRoom: (code: string) => Promise<void>;
   leaveRoom: () => void;
@@ -200,10 +200,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const createRoomFn = useCallback(
-    async (maxPlayers: number, hostName: string) => {
+    async (maxPlayers: number, hostName: string, hostBirthdayMMDD?: string) => {
       if (!playerId) throw new Error('ระบบยังไม่พร้อม ลองใหม่อีกครั้ง');
       const finalName = hostName.trim() || 'ผู้เล่น';
-      const { code } = await createRoomWithRetry(supabase, playerId, finalName, maxPlayers);
+      const { code } = await createRoomWithRetry(supabase, playerId, finalName, maxPlayers, 5, Math.random, hostBirthdayMMDD);
       await enterRoom(code);
       return code;
     },
@@ -211,7 +211,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const createBotRoomFn = useCallback(
-    (maxPlayers: number, hostName?: string) => {
+    (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string) => {
       if (channelRef.current) {
         unsubscribeFromRoom(channelRef.current);
         channelRef.current = null;
@@ -220,7 +220,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       const actualHostName = hostName?.trim() || playerName || 'ผู้เล่น';
       const boundedMax = Math.min(Math.max(maxPlayers, 3), 15);
 
-      let state = engineCreateRoom(hostId, actualHostName, boundedMax);
+      // Bots deliberately get no birthdayMMDD -- there's no real person to
+      // self-report one, and fabricating a date would silently skew A037/
+      // A066/A137's "closest birthday" comparisons.
+      let state = engineCreateRoom(hostId, actualHostName, boundedMax, hostBirthdayMMDD);
       for (let i = 1; i <= boundedMax - 1; i++) {
         const botId = `bot-${i}`;
         const botName = BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length];
@@ -249,12 +252,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const joinRoomFn = useCallback(
-    async (code: string, name: string) => {
+    async (code: string, name: string, playerBirthdayMMDD?: string) => {
       if (!playerId) throw new Error('ระบบยังไม่พร้อม ลองใหม่อีกครั้ง');
       const finalName = name.trim() || 'ผู้เล่น';
       await updateRoomWithRetry(supabase, code, (state) => {
         if (state.players[playerId]) return state; // already a member — resume, don't re-add
-        return addPlayer(state, playerId, finalName);
+        return addPlayer(state, playerId, finalName, undefined, playerBirthdayMMDD);
       });
       await enterRoom(code);
     },

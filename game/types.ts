@@ -116,6 +116,10 @@ export interface PlayerState {
   placedTrapThisTurn?: boolean;
   hasDrawnThisTurn?: boolean;
   hasPlayedActionThisTurn?: boolean;
+  /** Optional, self-reported, month-and-day only ("MM-DD") -- deliberately
+   * never a full date. Used only by A037/A066/A137. A player who never sets
+   * this is simply excluded from those cards' birthday comparisons. */
+  birthdayMMDD?: string;
 }
 
 export interface PendingInteraction {

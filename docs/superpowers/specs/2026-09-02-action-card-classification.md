@@ -227,8 +227,13 @@ existing `reverseDirection`), A135 (change Muffin Time win-condition target — 
 `auto` (hooks into `turn.ts`'s win-check) — 2 cards: A024, A027
 
 **I4. Special win condition unrelated to hand-size ranking** — kind: `auto` — 2 cards: A023
-(self hand non-empty at next turn), A037 (today == stored birthdate — needs a birthdate field
-per player, not currently stored)
+(self hand non-empty at next turn, still deferred — see Phase 2 list), A037 — **implemented**
+(2026-09-02): added `PlayerState.birthdayMMDD` (optional, self-reported, month+day only, never
+a year — see `game/types.ts`), an optional date input on the create/join screens, and
+`needsTodayDate` on `ActionRuleDefinition` so `GameTable` stamps the actor's local "today" into
+the frame before pushing it (`executeEffect` itself stays a pure function of state+frame, never
+calls the clock). Respects A085's `no_win` restriction and no-ops instead of throwing if the
+game already finished in the same resolution pass.
 
 **I5. Effect references another specific NAMED card elsewhere in deck/discard** — kind:
 `auto` — 3 cards: A021, A048, A073 (hardcoded name→code lookups against "Magical Pony", "My
@@ -251,8 +256,13 @@ jewelry)
 hand — objectively computable, unlike J1).
 
 **J4. Effect resolves against a player determined by a stored/computed fact** — kind: `auto`
-— 4 cards: A066 (closest birthday), A118 (who suggested playing this game — a one-time
-room-setup fact), A137, A158 (a live drink-count tally — needs a per-player counter).
+— 4 cards: A118 (who suggested playing this game — a one-time room-setup fact, still deferred)
+and A158 (a live drink-count tally, still deferred — both see Phase 2/remaining-work list).
+A066 and A137 — **implemented** (2026-09-02), same `birthdayMMDD`/`needsTodayDate`
+infrastructure as A037 (see §I4). Shared `soonestBirthdayPlayers` helper (ties → all tied, same
+convention as J1/J2) plus `everyoneGivesOneTo`/`everyoneStealsOneFrom` for the give/steal
+direction each card needs. Players who never set a birthday are simply excluded from the
+comparison, not treated as tied at 0.
 
 ---
 

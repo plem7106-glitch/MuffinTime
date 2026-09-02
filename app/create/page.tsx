@@ -21,13 +21,21 @@ function CreateRoomContent() {
   const initialMode = searchParams.get('mode') === 'bots' ? 'bots' : 'friends';
   const [mode, setMode] = useState<CreateMode>(initialMode);
 
-  const { playerName, setPlayerName } = usePlayer();
+  const { playerName, setPlayerName, playerBirthday, setPlayerBirthday } = usePlayer();
   const { createRoom, createBotRoom } = useGameSession();
 
   const [nameInput, setNameInput] = useState('');
   useEffect(() => {
     setNameInput(playerName);
   }, [playerName]);
+
+  // "YYYY-MM-DD" for the native date input; only the MM-DD part is ever
+  // persisted or sent anywhere (see usePlayer's playerBirthday).
+  const [birthdayInput, setBirthdayInput] = useState('');
+  useEffect(() => {
+    setBirthdayInput(playerBirthday ? `2000-${playerBirthday}` : '');
+  }, [playerBirthday]);
+  const birthdayMMDD = birthdayInput ? birthdayInput.slice(5) : undefined;
 
   // Friends room state
   const [friendsMaxPlayers, setFriendsMaxPlayers] = useState(3);
@@ -44,10 +52,11 @@ function CreateRoomContent() {
     if (isCreatingFriends) return;
     const finalName = nameInput.trim() || 'ผู้เล่น';
     setPlayerName(finalName);
+    if (birthdayMMDD) setPlayerBirthday(birthdayMMDD);
     setIsCreatingFriends(true);
     setFriendsError('');
     try {
-      const code = await createRoom(friendsMaxPlayers, finalName);
+      const code = await createRoom(friendsMaxPlayers, finalName, birthdayMMDD);
       router.push(`/room/${code}`);
     } catch (err) {
       setFriendsError(err instanceof Error ? err.message : 'สร้างห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
@@ -61,9 +70,10 @@ function CreateRoomContent() {
     if (isCreatingBots) return;
     const finalName = nameInput.trim() || 'ผู้เล่น';
     setPlayerName(finalName);
+    if (birthdayMMDD) setPlayerBirthday(birthdayMMDD);
     setIsCreatingBots(true);
     try {
-      const code = createBotRoom(botMaxPlayers, finalName);
+      const code = createBotRoom(botMaxPlayers, finalName, birthdayMMDD);
       router.push(`/room/${code}`);
     } catch {
       setIsCreatingBots(false);
@@ -162,6 +172,23 @@ function CreateRoomContent() {
                   placeholder="กรอกชื่อของคุณ"
                   maxLength={20}
                   className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 text-primary">
+                  <span>🎂</span>
+                  <label htmlFor="friendsBirthday" className="text-sm font-bold text-ink">
+                    วันเกิด (ไม่บังคับ)
+                  </label>
+                </div>
+                <p className="text-xs text-ink-secondary">ใช้กับการ์ดบางใบที่เกี่ยวกับวันเกิดเท่านั้น เก็บแค่วัน-เดือน ไม่เก็บปี</p>
+                <input
+                  id="friendsBirthday"
+                  type="date"
+                  value={birthdayInput}
+                  onChange={(e) => setBirthdayInput(e.target.value)}
+                  className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
                 />
               </div>
 
@@ -274,6 +301,24 @@ function CreateRoomContent() {
               placeholder="กรอกชื่อของคุณ"
               maxLength={20}
               className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
+            />
+          </div>
+
+          {/* Player Birthday Input (optional) */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 text-primary">
+              <span>🎂</span>
+              <label htmlFor="botBirthday" className="text-sm font-bold text-ink">
+                วันเกิด (ไม่บังคับ)
+              </label>
+            </div>
+            <p className="text-xs text-ink-secondary">ใช้กับการ์ดบางใบที่เกี่ยวกับวันเกิดเท่านั้น เก็บแค่วัน-เดือน ไม่เก็บปี</p>
+            <input
+              id="botBirthday"
+              type="date"
+              value={birthdayInput}
+              onChange={(e) => setBirthdayInput(e.target.value)}
+              className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
             />
           </div>
 

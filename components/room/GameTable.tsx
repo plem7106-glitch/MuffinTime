@@ -176,6 +176,15 @@ export function GameTable() {
   // Handlers for Hand Tray Actions
   const handlePlayActionDirect = (cardCode: CardCode) => {
     if (!canAct) return;
+    // A037/A066/A137 need "today" to resolve their birthday comparison.
+    // Stamped here (the actor's own device clock) rather than read inside
+    // executeEffect, which must stay a pure function of (state, frame).
+    if (getActionRule(cardCode)?.needsTodayDate) {
+      const now = new Date();
+      const today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      playAction(cardCode, undefined, { today });
+      return;
+    }
     playAction(cardCode);
   };
 
