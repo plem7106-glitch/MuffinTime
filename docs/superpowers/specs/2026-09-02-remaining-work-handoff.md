@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 157/173 Action cards implemented
+## Status: 159/173 Action cards implemented -- Group 2 is fully done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -22,23 +22,27 @@ independently).
 
 ## Branch state — start here, don't branch from `main`
 
-- Work so far is on `feature/birthday-cards`, forked from `main`. **Not merged, no PR opened
-  yet as of the 153/173 checkpoint (tip `a4a6d5f`)** — a later commit on this same branch
-  added A135/A023/A024/A027 (157/173) plus `RoomState.pendingWinChecks` (see Group 2 below);
-  check `git log` for the current tip before assuming this file is fully in sync with it.
+- Work so far is on `feature/birthday-cards`, forked from `main`. **PR #3 is open into
+  `main`** (https://github.com/plem7106-glitch/MuffinTime/pull/3) as of the 157/173
+  checkpoint — check `gh pr view 3` (or the URL) for its current state before assuming it's
+  still open/unmerged, and `git log` for whether later commits landed on this branch after
+  it was opened (Group 2's last two cards, A118/A158, were pushed after PR #3 was created —
+  they'll show up in the PR automatically since it tracks the branch, but re-check before
+  merging).
 - `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
-  `PlayerState.birthdayMMDD`) and A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
-  `ActionRuleDefinition.needsNumberInput`). **Branch your next work off `feature/birthday-cards`,
-  not `main`**, or you'll be missing that infrastructure and these 7 extra cards.
-- When your work is done and tests pass: open a PR from your branch **into `main`**
-  (not into `feature/birthday-cards` — that one should get its own PR/merge first, or get
-  merged as part of yours if you fold it in). Use `git push` and the PR-creation URL GitHub
-  prints, or `gh pr create` if the `gh` CLI is available in your environment (it wasn't in
-  the session that wrote this doc — no `GITHUB_TOKEN` either, so PR status was checked via
-  raw `curl` against `https://api.github.com/repos/plem7106-glitch/MuffinTime/pulls`).
+  `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
+  `ActionRuleDefinition.needsNumberInput`), and A118/A158 (`RoomState.gameSuggesterId`,
+  `ActionRuleDefinition.needsDrinkCheck`). **Branch your next work off `feature/birthday-cards`,
+  not `main`**, or you'll be missing that infrastructure and these 9 extra cards.
+- When your work is done and tests pass: push to this same branch if PR #3 is still open
+  (it'll pick up the new commits automatically), or open a fresh PR **into `main`** if #3
+  already merged. Use `git push` and `gh pr create`/`gh pr view` — `gh` is authenticated in
+  this environment (account `plem7106-glitch`); a prior session that wrote part of this doc
+  didn't have it and used raw `curl` against `api.github.com` instead, but check `gh auth
+  status` yourself rather than assuming either way.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (at the 157/173 checkpoint): `npx vitest run` → 520
+- Last known-good check on this branch (at the 159/173 checkpoint): `npx vitest run` → 529
   passed, `npx tsc --noEmit` → clean. Run both again before you start — confirm your baseline.
 
 ## How to implement a card (the pattern)
@@ -66,61 +70,50 @@ independently).
    (stamping real-world input into the frame from `components/room/GameTable.tsx`'s
    `handlePlayActionDirect`), a shared helper (`soonestBirthdayPlayers`) reused across
    multiple cards, and respecting `GlobalRestriction`'s `no_win` type.
-6. UI wiring already exists for every kind currently in use — you should not need new
-   modal components for Group 2 below, except A135 (see its entry). Reference:
-   `components/room/GameTable.tsx` reads `getActionRule(cardCode)` and branches on
-   `needsRosterSelection` / `needsOutcomeEntry` / `needsTargetSelection` /
-   `needsDualTargetSelection` / `needsTodayDate` before pushing the frame.
+6. UI wiring already exists for most kinds in use, and a new flag + a small local state
+   machine in `GameTable.tsx` (mirroring `dualPickPhase`/`drinkCheckPhase`) covers anything
+   that needs a multi-step manual flow (see A115's `needsDualTargetSelection`, A158's
+   `needsDrinkCheck`). Reference: `components/room/GameTable.tsx` reads
+   `getActionRule(cardCode)` and branches on `needsRosterSelection` / `needsOutcomeEntry` /
+   `needsTargetSelection` / `needsDualTargetSelection` / `needsTodayDate` /
+   `needsNumberInput` / `needsDrinkCheck` before pushing the frame.
    `components/modals/TargetSelector.tsx` handles both single-select (`needsTargetSelection`)
    and multi-select (`needsRosterSelection`, pass `multiSelect` + optional `requiredCount`).
    `components/modals/OutcomeToggle.tsx` handles binary `needsOutcomeEntry` cases.
+   `components/modals/NumberInputModal.tsx` handles `needsNumberInput`.
 7. Add unit tests in `game/actionRules/definitions.test.ts` (there's a `describe` block per
    card family already — follow that structure) covering the happy path, the no-op/edge
    case, and (if relevant) the `GlobalRestriction` gate.
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 16 cards left, 3 groups
+## What's next — 14 cards left, 2 groups (Group 2 is done)
 
-### Group 2 (4 cards left, data-collection, no deep engine work) — do these next
+### Group 2 — DONE (159/173 checkpoint)
 
-**Done (157/173 checkpoint):** A135, A023, A024, A027. See `game/actionRules/definitions.ts`
-(search "A135", "A023/A024/A027"), `game/types.ts`'s `PendingWinCheck`, `game/turn.ts`'s
-`resolvePendingWinChecks` (wired into `lib/session.tsx`'s `advanceAndCheckWin`), and
-`components/modals/NumberInputModal.tsx`. A135 added `ActionRuleDefinition.needsNumberInput`
-(mirrors `needsTodayDate`). A023/A024/A027 added `RoomState.pendingWinChecks`, consumed
-exactly once — on the actor's own next turn — by `resolvePendingWinChecks`; A024/A027 ties
-resolve as a one-shot no-op (not the physical game's "try again" redraw) — a deliberate scope
-simplification, not a silent assumption, flagged here for whoever reviews the PR.
+All 6 cards implemented: A135, A023, A024, A027, A118, A158. See
+`game/actionRules/definitions.ts` (search each code), `game/types.ts`'s `PendingWinCheck` /
+`gameSuggesterId`, `game/turn.ts`'s `resolvePendingWinChecks` (wired into
+`lib/session.tsx`'s `advanceAndCheckWin`), `game/room.ts`'s `setGameSuggester`, and
+`components/modals/NumberInputModal.tsx`.
 
-Relevant schema today: `RoomState` (`game/types.ts:146`) has `muffinTimeTarget: number`,
-`globalRestrictions?: GlobalRestriction[]`, `pendingWinChecks?: PendingWinCheck[]`,
-`players: Record<PlayerId, PlayerState>`. `PlayerState` (`game/types.ts:109`) has `hand`,
-`traps`, `birthdayMMDD?`. Neither has anything for "who suggested this game" or "drink
-count" yet — you'll add fields for the two cards below.
-
-- **`A118` "ไอเดียใครเนี่ย?"**: "ขโมยไพ่ 3 ใบจากผู้เล่นที่เป็นคนเสนอให้เล่นเกมนี้" — steal 3
-  cards from whoever suggested playing this game. Needs a one-time fact captured somewhere
-  before/at game start (no players exist yet at room-creation time, so it can't be collected
-  the same way as birthday — the natural point is the host's "start game" action in
-  `components/room/WaitingRoom.tsx`'s `handleStartGame`, once the roster is full, asking the
-  host to pick who suggested the game from the joined players). Add
-  `RoomState.gameSuggesterId?: PlayerId`. Effect itself is trivial once that field exists:
-  `stealRandom(state, state.gameSuggesterId, frame.actorId, 3)` guarded by
-  `state.gameSuggesterId` being set and a valid player.
-
-- **`A158` "ตาสว่างยามเมา"**: "ถ้าคุณยังไม่ได้ดื่มเลยในรอบนี้ ขโมยไพ่ 3 ใบจากผู้เล่นที่ดื่มมาก
-  ที่สุด" — if you haven't drunk this round, steal 3 from whoever has drunk the most. Needs a
-  live per-player drink counter that does not exist anywhere in `RoomState`/`PlayerState`
-  today, and — more importantly — **no existing mechanism increments a drink count at all**
-  (several other cards' text mentions drinking, e.g. A139/A145, but none of them track it
-  numerically; they're currently implemented as pure card-draw/discard effects with the
-  drinking treated as unmodeled flavor text). Adding real tracking here means deciding: does
-  *every* card that mentions drinking now need to increment this counter too (bigger,
-  cross-cutting change), or does this one card get its own narrow self-contained counter
-  that only it reads/writes? The narrow option is far less work and matches how the rest of
-  the "drinking" flavor text has been treated so far — recommended, but flag the tradeoff
-  to whoever's directing this work rather than silently picking.
+- A135 added `ActionRuleDefinition.needsNumberInput` (mirrors `needsTodayDate`).
+- A023/A024/A027 added `RoomState.pendingWinChecks`, consumed exactly once — on the actor's
+  own next turn — by `resolvePendingWinChecks`. A024/A027 ties resolve as a one-shot no-op
+  (not the physical game's "try again" redraw) — a deliberate scope simplification, flagged
+  for whoever reviews the PR.
+- A118 added `RoomState.gameSuggesterId` (host-picked, optional, during the
+  `TurnOrderSetup.tsx` setup screen via a new `setGameSuggester` session callback) — steals
+  3 from that player, guarded against missing/stale/self-referential values.
+- A158 was a genuine design fork with no clear default: "who has drunk the most" needs some
+  notion of a drink count, but nothing in this codebase tracks one, even for other
+  drinking-flavor cards (A139/A145). Asked the user directly rather than picking silently;
+  they chose **no persistent state at all** — a new `ActionRuleDefinition.needsDrinkCheck`
+  flag drives a two-step honor-system UI (outcome toggle "already drunk?", then only if
+  "not yet" a single target pick "who has drunk the most?"), resolved live at play time.
+  `RoomState`/`PlayerState` gained zero new fields for this card. If a later card needs real
+  drink tracking, this precedent doesn't preclude adding it then — it was scoped to what
+  A158 alone needed.
 
 ### Group 1 (13 cards, needs core turn/engine changes — untouched)
 
