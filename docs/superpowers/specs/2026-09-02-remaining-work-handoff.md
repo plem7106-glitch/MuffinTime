@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 164/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B are done
+## Status: 166/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/G are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -56,10 +56,12 @@ independently).
   `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
   `ActionRuleDefinition.needsDrinkCheck`), A166 (`ActionRuleDefinition.needsTargetThenOutcome`),
   A100/A035/A040 (`PlayerState.bonusActionPlaysRemaining`/`mustPlayActionThisTurn`,
-  `RoomState.pendingActionObligations`/`actionRedirect`), and A119 (`game/turn.ts`'s
-  `jumpToPlayerTurn`/`resolveTurnArrival` — no new `PlayerState`/`RoomState` fields).
-  **Branch your next work off `feature/birthday-cards`, not `main`**, or you'll be missing
-  that infrastructure and these 14 extra cards.
+  `RoomState.pendingActionObligations`/`actionRedirect`), A119 (`game/turn.ts`'s
+  `jumpToPlayerTurn`/`resolveTurnArrival` — no new `PlayerState`/`RoomState` fields), and A092
+  (`game/turn.ts`'s `resetPlayerPerTurnFlags` and `game/room.ts`'s `restartGame` — again no new
+  `PlayerState`/`RoomState` fields, both are pure refactors/new functions over the existing
+  shape). **Branch your next work off `feature/birthday-cards`, not `main`**, or you'll be
+  missing that infrastructure and these 16 extra cards.
 - When your work is done and tests pass: push to this same branch if PR #3 is still open
   (it'll pick up the new commits automatically), or open a fresh PR **into `main`** if #3
   already merged. Use `git push` and `gh pr create`/`gh pr view` — `gh` is authenticated in
@@ -68,7 +70,7 @@ independently).
   status` yourself rather than assuming either way.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (post-Cluster-B checkpoint): `npx vitest run` → 609
+- Last known-good check on this branch (post-Cluster-G checkpoint): `npx vitest run` → 618
   passed (43 files), `npx tsc --noEmit` → clean. Run both again before you start — confirm
   your baseline.
 - **A card whose `executeEffect` triggers a turn transition (calling `resolveTurnArrival`
@@ -177,7 +179,7 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 — Clusters A & B DONE (164/173 checkpoint), 5 clusters / 9 cards remain
+### Group 1 — Clusters A, B & G DONE (166/173 checkpoint), 4 clusters / 8 cards remain
 
 Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
 decomposed into 7 clusters by shared mechanism during brainstorming — see
@@ -247,23 +249,57 @@ are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
   (recursive/forced card resolution) — that cluster's engine surface area is bigger than
   Cluster B's, so budget for a similar or greater number of review-fix cycles.
 
-**Remaining: 5 clusters, 9 cards** — `A017, A028, A064, A091, A092, A094, A108, A126, A130`.
+**Cluster G (A092, mid-game full reset, standalone) is done.** Its own plan/spec docs are
+`docs/superpowers/specs/2026-09-02-group1-cluster-g-design.md` and
+`docs/superpowers/plans/2026-09-02-group1-cluster-g.md`.
+
+- **A092** "ฉันบ้าไปแล้ว!" (I'm Crazy!) — put all cards back into the deck, shuffle, and
+  restart the entire game, mid-match. `game/turn.ts` gained `resetPlayerPerTurnFlags(player)`
+  (the 5-field per-turn reset checklist, previously duplicated in `beginTurn` and, inline, in
+  `game/room.ts`'s `startGame`/`resetForPlayAgain` — now a single shared helper all four call
+  sites use). `game/room.ts` gained `restartGame(state, rng)`: unlike `resetForPlayAgain`
+  (which requires `status === 'finished'/'ended'` and detours through `'lobby'`), this fires
+  while `status` stays `'playing'` — it pools every card currently anywhere in the game (every
+  hand, every placed trap, the discard pile, the remaining draw pile — not a fresh canonical
+  deck, per the card's own text), reshuffles, deals 3 fresh cards per player, and resets turn
+  order/win state/reaction-stack state, while leaving room/social identity fields untouched.
+  A092's card definition (`game/actionRules/definitions.ts`) is a thin one-line delegate to
+  `restartGame`, `kind: 'auto'`, no target, no new UI wiring. Zero new `PlayerState`/`RoomState`
+  fields.
+- Three rulings confirmed with the user (none resolved by the card text alone): turn order
+  after restart goes back to `seatOrder[0]`, not the actor who played A092; `muffinTimeTarget`
+  resets to the default 10 even if A135 "Time of Death" had changed it earlier in the game;
+  `gameSuggesterId` (A118's target) is preserved, not cleared — it's a real-world fact ("who
+  suggested playing this physical game session"), not in-game state, and a mid-game card
+  shouldn't change who actually suggested playing.
+- Code review caught one real bug: `restartGame`'s deal loop (`next.drawPile.pop()!`) used a
+  non-null assertion with no guard, so if the pooled card count were ever under-provisioned
+  relative to `playerIds.length * 3` (3 cards per player), it would silently deal `undefined`
+  into a player's hand instead of failing loudly. Fixed by adding an explicit check
+  (`if (pool.length < playerIds.length * 3) throw new Error(...)`) before the deal loop runs.
+  Currently unreachable with the real 231-card deck at any supported player count, but a test
+  fixture in `game/room.test.ts` was already silently tripping this exact case before the fix
+  — the fix's guard turned that into a loud, assertable failure instead of a latent one.
+
+**Remaining: 4 clusters, 8 cards** — `A017, A028, A064, A091, A094, A108, A126, A130`.
 Each needs its own spec (and likely its own plan) before implementation, following the
 same brainstorming → writing-plans → subagent-driven-development flow used for Clusters
-A and B. Per the original decomposition:
+A, B, and G. Per the original decomposition:
 
 - **Cluster C** (2-hop delegated targeting): `A126`, `A130`
 - **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
   system directly): `A017`, `A028`, `A094`, `A108`
 - **Cluster E** (draw-pile hook): `A064`
 - **Cluster F** (forced-vs-voluntary loss tracking): `A091`
-- **Cluster G** (mid-game full reset, standalone): `A092`
+
+Cluster G was the last standalone "engine-level" cluster with no dependency on the others;
+Clusters C, D, E, F all remain.
 
 Full per-card reasoning for all of these is in the classification doc's "Phase 2" table
 (`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
 these casually inside a small-batch PR — each wants its own
 `superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
-surface area, the same way Clusters A and B got one.
+surface area, the same way Clusters A, B, and G got one.
 
 ## Known gap, not yet built (unrelated to the above)
 
