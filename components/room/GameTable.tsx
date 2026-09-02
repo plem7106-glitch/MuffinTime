@@ -61,6 +61,7 @@ export function GameTable() {
     openTrapCard,
     initiateTrapInteraction,
     respondToTrapInteraction,
+    respondToDelegatedTargetPick,
     pendingResponse,
     playCounter,
     skipCounter,
@@ -111,6 +112,7 @@ export function GameTable() {
   const [awaitingTrapTarget, setAwaitingTrapTarget] = useState(false);
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
   const [chosenTrapTargets, setChosenTrapTargets] = useState<PlayerId[]>([]);
+  const [delegatedPickChoice, setDelegatedPickChoice] = useState<PlayerId | null>(null);
 
   // Auto-close trap open flow if a counter response window opens
   useEffect(() => {
@@ -686,6 +688,26 @@ export function GameTable() {
             respondToTrapInteraction(state.pendingInteraction.interactionId, 'refuse');
           }
         }}
+      />
+
+      {/* 12.6 Delegated Target Pick Modal (Group 1 Cluster C: A126, A130 --
+          the player the actor chose must now pick one further player,
+          excluding themselves, before the card's effect resolves) */}
+      <TargetSelector
+        open={Boolean(
+          state.pendingInteraction?.type === 'delegated_target_pick' &&
+          state.pendingInteraction.targetPlayerId === myPlayerId
+        )}
+        candidates={opponentCandidates}
+        selectedId={delegatedPickChoice}
+        onSelect={setDelegatedPickChoice}
+        onConfirm={() => {
+          if (state.pendingInteraction && delegatedPickChoice) {
+            respondToDelegatedTargetPick(state.pendingInteraction.interactionId, delegatedPickChoice);
+            setDelegatedPickChoice(null);
+          }
+        }}
+        prompt={state.pendingInteraction?.prompt ?? ''}
       />
 
       {/* 13. Trap Alert & Counter Decision Modal (When local player is hit by a Trap) */}

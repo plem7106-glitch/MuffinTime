@@ -47,6 +47,7 @@ import {
   checkAndTriggerAutomaticTraps,
   executeTrapFrameEffect,
 } from '../game/trapRules/engine';
+import { resolveDelegatedTargetPick as engineResolveDelegatedTargetPick } from '../game/actionRules/delegatedTargetPick';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getPlayableCounters } from '../game/counterRules/registry';
 import { resolveCounterEffect } from '../game/counterRules/engine';
@@ -113,6 +114,7 @@ export interface GameSessionValue {
   openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
   initiateTrapInteraction: (code: CardCode, targetId: PlayerId) => void;
   respondToTrapInteraction: (interactionId: string, decision: 'accept' | 'refuse') => void;
+  respondToDelegatedTargetPick: (interactionId: string, chosenTargetId: PlayerId) => void;
   playCounter: (code: CardCode, responseId: string) => void;
   skipCounter: (responseId: string) => void;
   declareMuffinTime: () => void;
@@ -589,6 +591,15 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId, resolveCompletedStackFrames]
   );
 
+  const respondToDelegatedTargetPick = useCallback(
+    (interactionId: string, chosenTargetId: PlayerId) =>
+      run((state) => {
+        const responderId = myPlayerId!;
+        return engineResolveDelegatedTargetPick(state, interactionId, responderId, chosenTargetId);
+      }),
+    [run, myPlayerId]
+  );
+
   const playCounter = useCallback(
     (code: CardCode, responseId: string) =>
       run((state) => {
@@ -1002,6 +1013,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     openTrapCard,
     initiateTrapInteraction,
     respondToTrapInteraction,
+    respondToDelegatedTargetPick,
     playCounter,
     skipCounter,
     declareMuffinTime: declareMuffinTimeFn,

@@ -27,11 +27,14 @@ export function TargetSelector({
   requiredCount?: number;
   onSelect: (id: PlayerId) => void;
   onConfirm: () => void;
-  onCancel: () => void;
+  /** Omit when there is no valid "cancel" for this flow (e.g. a delegated
+   * choice that must be resolved to unstick the game) -- the Cancel button
+   * and scrim-dismiss are both suppressed. */
+  onCancel?: () => void;
   prompt: string;
 }) {
   return (
-    <BottomSheet open={open} onClose={onCancel}>
+    <BottomSheet open={open} onClose={onCancel ?? (() => {})}>
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-bold text-ink">เลือกผู้เล่นเป้าหมาย</h2>
         <p className="text-sm text-ink-secondary">{prompt}</p>
@@ -68,7 +71,7 @@ export function TargetSelector({
         >
           ยืนยัน
         </PrimaryButton>
-        <SecondaryButton onClick={onCancel}>ยกเลิก</SecondaryButton>
+        {onCancel && <SecondaryButton onClick={onCancel}>ยกเลิก</SecondaryButton>}
       </div>
     </BottomSheet>
   );
