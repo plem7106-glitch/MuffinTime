@@ -1,5 +1,5 @@
 import { cloneState } from './util';
-import type { RoomState, PlayerId, PlayDirection, PendingWinCheck } from './types';
+import type { RoomState, PlayerId, PlayerState, PlayDirection, PendingWinCheck } from './types';
 import { getCardById } from '../data/cards/index';
 
 export function getNextPlayerIndex(
@@ -82,14 +82,24 @@ export function canEndTurn(state: RoomState, playerId: PlayerId): boolean {
  * - hasPlayedActionThisTurn = false
  * - Lifts global restrictions created by activePlayerId that were defined to expire on their next turn.
  */
+/**
+ * The 5-field per-turn PlayerState reset checklist, shared by beginTurn,
+ * game/room.ts's startGame/resetForPlayAgain, and restartGame (A092) --
+ * extracted so a future caller of "start this player's turn fresh" doesn't
+ * need a fifth copy of this list.
+ */
+export function resetPlayerPerTurnFlags(player: PlayerState): void {
+  player.placedTrapThisTurn = false;
+  player.hasDrawnThisTurn = false;
+  player.hasPlayedActionThisTurn = false;
+  player.bonusActionPlaysRemaining = 0;
+  player.mustPlayActionThisTurn = false;
+}
+
 export function beginTurn(state: RoomState, activePlayerId: PlayerId): RoomState {
   const next = cloneState(state);
   if (next.players[activePlayerId]) {
-    next.players[activePlayerId].placedTrapThisTurn = false;
-    next.players[activePlayerId].hasDrawnThisTurn = false;
-    next.players[activePlayerId].hasPlayedActionThisTurn = false;
-    next.players[activePlayerId].bonusActionPlaysRemaining = 0;
-    next.players[activePlayerId].mustPlayActionThisTurn = false;
+    resetPlayerPerTurnFlags(next.players[activePlayerId]);
   }
   next.turnPhase = 'trap_placement';
 

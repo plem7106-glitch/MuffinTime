@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   advanceTurn,
+  resetPlayerPerTurnFlags,
   isMuffinTimeEligible,
   declareMuffinTime,
   checkWinnerAtTurnStart,
@@ -13,7 +14,23 @@ import {
   resolveTurnArrival,
   jumpToPlayerTurn,
 } from './turn';
-import type { RoomState } from './types';
+import type { RoomState, PlayerState } from './types';
+
+describe('resetPlayerPerTurnFlags', () => {
+  it('resets all five per-turn fields on the given player object, in place', () => {
+    const player: PlayerState = {
+      name: 'P', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false,
+      placedTrapThisTurn: true, hasDrawnThisTurn: true, hasPlayedActionThisTurn: true,
+      bonusActionPlaysRemaining: 2, mustPlayActionThisTurn: true,
+    };
+    resetPlayerPerTurnFlags(player);
+    expect(player.placedTrapThisTurn).toBe(false);
+    expect(player.hasDrawnThisTurn).toBe(false);
+    expect(player.hasPlayedActionThisTurn).toBe(false);
+    expect(player.bonusActionPlaysRemaining).toBe(0);
+    expect(player.mustPlayActionThisTurn).toBe(false);
+  });
+});
 
 describe('advanceTurn', () => {
   it('moves to the next player in turn order', () => {
