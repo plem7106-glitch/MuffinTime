@@ -17,6 +17,23 @@ function frameWithPayload(
   };
 }
 
+/** Builds a StackFrame carrying both a single targetId and customPayload --
+ * for needsTargetThenOutcome rules (A166), where neither the legacy
+ * (code, actorId, targetId) adapter nor frameWithPayload alone can express
+ * "a target AND an outcome" together. */
+function frameWithTargetAndPayload(
+  code: string,
+  actorId: PlayerId,
+  targetId: PlayerId,
+  customPayload: Record<string, unknown>
+): StackFrame {
+  return {
+    frameId: 'test', parentFrameId: null, sourceType: 'action', sourceCode: code, actorId,
+    targetIds: [targetId], targetScope: 'single', eligibleResponderIds: [], responses: {}, modifiers: [],
+    status: 'resolving', turnContext: { turnIndex: 0, phase: 'main', roundNumber: 0 }, customPayload,
+  };
+}
+
 function baseState(): RoomState {
   return {
     status: 'playing',
@@ -984,5 +1001,343 @@ describe('A172 (forced seat swap, exactly 2 players, via executeActionFrameEffec
   it('is a no-op when fewer than 2 players are chosen', () => {
     const state = seatedState();
     expect(executeActionFrameEffect(state, frameWithPayload('A172', 'p1', { rosterIds: ['p2'] }))).toEqual(state);
+  });
+});
+
+describe('Birthday cards (A037/A066/A137, via executeActionFrameEffect)', () => {
+  it('A037 wins the game when today matches the actor\'s birthday', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    const next = executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }));
+    expect(next.status).toBe('finished');
+    expect(next.winnerId).toBe('me');
+  });
+
+  it('A037 is a no-op when today does not match', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    expect(executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '01-01' }))).toEqual(state);
+  });
+
+  it('A037 is a no-op when the actor never set a birthday', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }))).toEqual(state);
+  });
+
+  it('A037 respects the A085 no_win restriction even on a birthday match', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    state.globalRestrictions = [{ type: 'no_win', sourcePlayerId: 'p2' }];
+    const next = executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }));
+    expect(next.status).not.toBe('finished');
+  });
+
+  it('A037 does not throw when the game is already finished (no-ops instead)', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '09-02';
+    state.status = 'finished';
+    state.winnerId = 'p2';
+    expect(() => executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }))).not.toThrow();
+    const next = executeActionFrameEffect(state, frameWithPayload('A037', 'me', { today: '09-02' }));
+    expect(next.winnerId).toBe('p2'); // doesn't clobber the earlier winner
+  });
+
+  it('A066 makes everyone give 1 card to the single soonest-birthday player', () => {
+    const state = threePlayerState();
+    state.players.me.birthdayMMDD = '01-01'; // far from today
+    state.players.p2.birthdayMMDD = '09-03'; // tomorrow -- soonest
+    state.players.p3.birthdayMMDD = '06-15';
+    const next = executeActionFrameEffect(state, frameWithPayload('A066', 'me', { today: '09-02' }));
+    expect(next.players.me.hand.length).toBe(0); // gave its only card
+    expect(next.players.p3.hand.length).toBe(2); // gave 1 of 3
+    expect(next.players.p2.hand.length).toBe(5); // received from both
+  });
+
+  it('A066 is a no-op when nobody has set a birthday', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A066', 'me', { today: '09-02' }))).toEqual(state);
+  });
+
+  it('A066 splits giving across tied recipients, never making a recipient give to itself', () => {
+    const state = threePlayerState();
+    state.players.p2.birthdayMMDD = '09-03';
+    state.players.p3.birthdayMMDD = '09-03'; // tied with p2, both 1 day away
+    const next = executeActionFrameEffect(state, frameWithPayload('A066', 'me', { today: '09-02' }));
+    // Only `me` is a non-recipient giver; total cards conserved, and p2/p3
+    // (both recipients) keep their own hands intact toward each other.
+    const totalBefore = state.players.me.hand.length + state.players.p2.hand.length + state.players.p3.hand.length;
+    const totalAfter = next.players.me.hand.length + next.players.p2.hand.length + next.players.p3.hand.length;
+    expect(totalAfter).toBe(totalBefore);
+    expect(next.players.me.hand.length).toBe(0);
+  });
+
+  it('A137 makes everyone steal 1 card from the soonest-birthday player', () => {
+    const state = threePlayerState();
+    state.players.p2.birthdayMMDD = '09-03'; // tomorrow -- soonest
+    state.players.p3.birthdayMMDD = '06-15';
+    const next = executeActionFrameEffect(state, frameWithPayload('A137', 'me', { today: '09-02' }));
+    expect(next.players.p2.hand.length).toBe(1); // lost 2 of 3, to me and p3
+    expect(next.players.me.hand.length).toBe(2);
+    expect(next.players.p3.hand.length).toBe(4);
+  });
+
+  it('A137 is a no-op when nobody has set a birthday', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A137', 'me', { today: '09-02' }))).toEqual(state);
+  });
+
+  it('birthday comparison wraps year-end correctly (Dec 31 beats Jan 5 when today is Dec 30)', () => {
+    const state = threePlayerState();
+    state.players.p2.birthdayMMDD = '01-05'; // 6 days away
+    state.players.p3.birthdayMMDD = '12-31'; // 1 day away -- soonest
+    const next = executeActionFrameEffect(state, frameWithPayload('A137', 'me', { today: '12-30' }));
+    expect(next.players.p3.hand.length).toBe(1); // target -- lost 1 to each of me and p2
+    expect(next.players.me.hand.length).toBe(2); // stealer -- gained 1
+    expect(next.players.p2.hand.length).toBe(4); // stealer -- gained 1
+  });
+});
+
+describe('A135 (needs a free-form number input)', () => {
+  it('changes muffinTimeTarget to the chosen number', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A135', 'me', { numberInput: 7 }));
+    expect(next.muffinTimeTarget).toBe(7);
+  });
+
+  it('is a no-op when no number was provided', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A135', 'me', {}))).toEqual(state);
+  });
+
+  it('is a no-op when the provided number is zero or negative', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A135', 'me', { numberInput: 0 }))).toEqual(state);
+    expect(executeActionFrameEffect(state, frameWithPayload('A135', 'me', { numberInput: -3 }))).toEqual(state);
+  });
+});
+
+describe('A023/A024/A027 (deferred win checks at the actor\'s own next turn)', () => {
+  it('A023 pushes a hand_nonempty pendingWinCheck for the actor', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A023', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'me', type: 'hand_nonempty' }]);
+  });
+
+  it('A024 pushes a fewest_hand pendingWinCheck for the actor', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A024', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'me', type: 'fewest_hand' }]);
+  });
+
+  it('A027 pushes a most_hand pendingWinCheck for the actor', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithPayload('A027', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'me', type: 'most_hand' }]);
+  });
+
+  it('appends to any pre-existing pendingWinChecks instead of clobbering them', () => {
+    const state = threePlayerState();
+    state.pendingWinChecks = [{ sourcePlayerId: 'p2', type: 'most_hand' }];
+    const next = executeActionFrameEffect(state, frameWithPayload('A023', 'me', {}));
+    expect(next.pendingWinChecks).toEqual([
+      { sourcePlayerId: 'p2', type: 'most_hand' },
+      { sourcePlayerId: 'me', type: 'hand_nonempty' },
+    ]);
+  });
+});
+
+describe('A118 (steals 3 from whoever suggested this game)', () => {
+  it('steals up to 3 cards from gameSuggesterId to the actor', () => {
+    const state = threePlayerState();
+    state.gameSuggesterId = 'p2';
+    const next = resolveActionEffect(state, 'A118', 'me');
+    expect(next.players.p2.hand.length).toBe(0); // only had 3
+    expect(next.players.me.hand.length).toBe(4); // 1 + 3 stolen
+  });
+
+  it('is a no-op when no gameSuggesterId was ever set', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
+  });
+
+  it('is a no-op when gameSuggesterId names a player no longer in the room', () => {
+    const state = threePlayerState();
+    state.gameSuggesterId = 'someone-who-left';
+    expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
+  });
+
+  it('is a no-op when the actor is the one who suggested the game (nothing to steal from itself)', () => {
+    const state = threePlayerState();
+    state.gameSuggesterId = 'me';
+    expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
+  });
+});
+
+describe('A158 (honor-system: ask live, no persistent drink tracking)', () => {
+  it('steals up to 3 cards from the chosen target when the actor picked one (has not drunk)', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A158', 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(0); // only had 3
+    expect(next.players.me.hand.length).toBe(4); // 1 + 3 stolen
+  });
+
+  it('is a no-op when no target was picked (actor already drunk this round)', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A158', 'me')).toEqual(state);
+  });
+});
+
+describe('A166 (chugging challenge: target draws on success, actor draws on failure -- ruling confirmed with the user)', () => {
+  it('the target draws 3 when they beat the count (outcome: true)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', { outcome: true }));
+    expect(next.players.p2.hand.length).toBe(6); // 3 + 3 drawn
+    expect(next.players.me.hand.length).toBe(1); // unchanged
+  });
+
+  it('the actor draws 3 when the target fails to beat the count (outcome: false)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', { outcome: false }));
+    expect(next.players.me.hand.length).toBe(4); // 1 + 3 drawn
+    expect(next.players.p2.hand.length).toBe(3); // unchanged
+  });
+
+  it('is a no-op when no target was picked (challenge cancelled)', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A166', 'me', { outcome: true }))).toEqual(state);
+  });
+
+  it('is a no-op when a target was picked but no outcome was ever recorded', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', {}))).toEqual(state);
+  });
+});
+
+describe('A100 (grants 2 bonus Action plays this turn)', () => {
+  it('adds 2 to bonusActionPlaysRemaining for the actor', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A100', 'me');
+    expect(next.players.me.bonusActionPlaysRemaining).toBe(2);
+  });
+
+  it('stacks on top of an existing bonus if played again', () => {
+    const state = threePlayerState();
+    state.players.me.bonusActionPlaysRemaining = 1;
+    const next = resolveActionEffect(state, 'A100', 'me');
+    expect(next.players.me.bonusActionPlaysRemaining).toBe(3);
+  });
+});
+
+describe('A035 (obligates every player to play an Action on their own next turn)', () => {
+  it('adds every current player to pendingActionObligations', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A035', 'me');
+    expect(next.pendingActionObligations).toEqual(expect.arrayContaining(['me', 'p2', 'p3']));
+    expect(next.pendingActionObligations).toHaveLength(3);
+  });
+
+  it('does not duplicate a player already queued', () => {
+    const state = threePlayerState();
+    state.pendingActionObligations = ['p2'];
+    const next = resolveActionEffect(state, 'A035', 'me');
+    expect(next.pendingActionObligations?.filter((id) => id === 'p2')).toHaveLength(1);
+    expect(next.pendingActionObligations).toEqual(expect.arrayContaining(['me', 'p2', 'p3']));
+    expect(next.pendingActionObligations).toHaveLength(3);
+  });
+});
+
+describe("A040 (redirects the next 3 played Actions into the actor's hand)", () => {
+  it('activates a 3-count redirect targeting the actor', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A040', 'me');
+    expect(next.actionRedirect).toEqual({ toPlayerId: 'me', remaining: 3 });
+  });
+
+  it('overwrites (does not stack with) an existing active redirect', () => {
+    const state = threePlayerState();
+    state.actionRedirect = { toPlayerId: 'p2', remaining: 1 };
+    const next = resolveActionEffect(state, 'A040', 'me');
+    expect(next.actionRedirect).toEqual({ toPlayerId: 'me', remaining: 3 });
+  });
+});
+
+describe('A119 (skip play forward to a chosen player\'s next turn)', () => {
+  it('jumps the current turn to the chosen target', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'p3', {}));
+    expect(next.turnOrder[next.currentTurnIndex]).toBe('p3');
+  });
+
+  it('is a no-op when no target was picked', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A119', 'me')).toEqual(state);
+  });
+
+  it('resolves a pending action obligation for the player it lands on', () => {
+    const state = threePlayerState();
+    state.players.p3.hand = ['A001', 'H6', 'H7'];
+    state.pendingActionObligations = ['p3'];
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'p3', {}));
+    expect(next.players.p3.mustPlayActionThisTurn).toBe(true);
+    expect(next.pendingActionObligations).toEqual([]);
+  });
+
+  it('is a no-op when the target is the actor themselves (self-targeting, currently UI-unreachable but worth pinning down)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'me', {}));
+    expect(next).toEqual(state);
+  });
+
+  it('does not trigger a premature win when self-targeting while muffin time is already declared', () => {
+    // Confirms the executeEffect-level guard (targetId === frame.actorId ->
+    // return state unchanged), not jumpToPlayerTurn's own internal guard.
+    // Before that guard existed, this exact scenario DID end the game
+    // early: jumpToPlayerTurn's self-target no-op still leaves the actor as
+    // jumped.turnOrder[jumped.currentTurnIndex], so resolveTurnArrival ran
+    // for them mid-turn and checkWinnerAtTurnStart (a live predicate, not
+    // consume-once) declared them the winner right there -- observed via a
+    // console.log probe: status: 'finished', winnerId: 'me'.
+    const state = threePlayerState();
+    state.muffinTimeTarget = state.players.me.hand.length; // make 'me' currently eligible
+    state.players.me.hasCalledMuffinTime = true;
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'me', {}));
+    expect(next).toEqual(state);
+  });
+
+  it('is a no-op when targetId does not exist in turnOrder (through the full A119 -> resolveTurnArrival chain)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'ghost-player', {}));
+    expect(next).toEqual(state);
+  });
+
+  it('does not trigger a premature win when the target is invalid while muffin time is already declared', () => {
+    // Sibling bug to the self-target premature win above, same failure
+    // mode: jumpToPlayerTurn also no-ops (skips beginTurn) when targetId
+    // isn't found in turnOrder/seatOrder at all, but still returns a state
+    // whose current player is the actor -- so without an up-front target
+    // validity check, resolveTurnArrival would run for the actor mid-turn
+    // and re-declare a win via the live checkWinnerAtTurnStart check.
+    const state = threePlayerState();
+    state.muffinTimeTarget = state.players.me.hand.length; // make 'me' currently eligible
+    state.players.me.hasCalledMuffinTime = true;
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'ghost-player', {}));
+    expect(next).toEqual(state);
+  });
+});
+
+describe('A092 (put all cards back, reshuffle, and restart the entire game)', () => {
+  it('delegates to restartGame', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A092', 'me');
+    expect(next.status).toBe('playing');
+    expect(next.muffinTimeTarget).toBe(10);
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it('is a no-op when the game is not currently playing', () => {
+    const state = { ...threePlayerState(), status: 'finished' } as RoomState;
+    expect(resolveActionEffect(state, 'A092', 'me')).toEqual(state);
   });
 });

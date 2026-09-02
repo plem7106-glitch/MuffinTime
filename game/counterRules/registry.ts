@@ -5,7 +5,7 @@ import type { StealOperation } from '../steal';
 
 export type CounterStatus = 'implemented' | 'not_implemented';
 const IMPLEMENTED_COUNTERS = new Set<CardCode>([
-  'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27', 'C28', 'C29', 'C30', 'C31', 'C32', 'C33', 'C34', 'C35', 'C36', 'C37', 'C38', 'C39', 'C40', 'C45', 'C47'
+  'C01', 'C02', 'C03', 'C04', 'C05', 'C06', 'C07', 'C08', 'C09', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21', 'C22', 'C23', 'C24', 'C25', 'C26', 'C27', 'C28', 'C29', 'C30', 'C31', 'C32', 'C33', 'C34', 'C35', 'C36', 'C37', 'C38', 'C39', 'C40', 'C41', 'C42', 'C43', 'C44', 'C45', 'C46', 'C47', 'C48', 'C49', 'C50'
 ]);
 
 export function isCounterImplemented(code: CardCode): boolean { return IMPLEMENTED_COUNTERS.has(code); }
@@ -130,6 +130,17 @@ export function isCounterEligible(
     return true;
   }
   if (code === 'C47') return pending.kind === 'action' && pending.code !== 'FORCED_DISCARD' && pending.code !== 'STEAL' && pending.code !== 'FORCED_DRAW';
+
+  // Social Counters — these use the manual social counter flow, not the ReactionStack.
+  // They return false here because they are player-declared, not triggered by a digital pending frame.
+  if (code === 'C41') return false; // "Stop an action card that forces you to drink."
+  if (code === 'C42') return false; // "Stop a card forcing you to drink, then choose another player to drink instead."
+  if (code === 'C43') return false; // "Stop another player from ordering you to do an embarrassing task."
+  if (code === 'C44') return false; // "You are not affected by the current drunk-behavior trap card."
+  if (code === 'C46') return false; // "If forced to drink, split it with another player of your choice."
+  if (code === 'C48') return false; // "Stop being forced to drink and draw 1 card instead."
+  if (code === 'C49') return false; // "Stop the current drunk-behavior trap card from triggering."
+  if (code === 'C50') return false; // "Stop another player from controlling you, then steal 1 card from them."
 
   // Forced Discard Counters (C02, C03, C30)
   if (context?.operationKind === 'forced_discard' && context.forcedDiscardOp) {

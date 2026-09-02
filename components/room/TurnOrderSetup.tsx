@@ -31,6 +31,7 @@ export function TurnOrderSetup() {
     myPlayerId,
     setSeatOrder,
     setPlayDirection,
+    setGameSuggester,
     confirmTurnOrder,
     leaveRoom,
   } = useGameSession();
@@ -92,6 +93,12 @@ export function TurnOrderSetup() {
   const handleDirectionChange = (dir: 'clockwise' | 'counterclockwise') => {
     if (!isHost || isConfirming) return;
     setPlayDirection(dir);
+  };
+
+  // Host: Record who suggested playing this game (A118's steal target -- optional)
+  const handleGameSuggesterChange = (playerId: string) => {
+    if (!isHost || isConfirming || !playerId) return;
+    setGameSuggester(playerId);
   };
 
   // Host: Confirm turn order and start gameplay
@@ -291,6 +298,44 @@ export function TurnOrderSetup() {
           </div>
         )}
       </section>
+
+      {/* 4.5 Game Suggester Picker (A118's steal target -- optional, host-only) */}
+      {(isHost || state.gameSuggesterId) && (
+        <section className="flex flex-col gap-2 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-xs">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-xs font-black uppercase tracking-wider text-ink">
+              ใครเป็นคนชวนเล่นเกมนี้?
+            </h2>
+            <span className="text-[10px] font-bold text-ink-secondary bg-gray-100 px-2 py-0.5 rounded-full">
+              ไม่บังคับ
+            </span>
+          </div>
+
+          {isHost ? (
+            <select
+              value={state.gameSuggesterId ?? ''}
+              disabled={isConfirming}
+              onChange={(e) => handleGameSuggesterChange(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs sm:text-sm font-bold text-ink disabled:opacity-50"
+            >
+              <option value="">ไม่ระบุ</option>
+              {seatOrder.map((id) => {
+                const player = state.players[id];
+                if (!player) return null;
+                return (
+                  <option key={id} value={id}>
+                    {player.name}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-100 bg-gray-50/70 py-2 text-xs font-bold text-ink">
+              {state.players[state.gameSuggesterId ?? '']?.name ?? 'ยังไม่ระบุ'}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 5. Turn Preview Section */}
       <section className="flex flex-col gap-2 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-xs">

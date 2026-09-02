@@ -27,6 +27,43 @@ export interface ActionRuleDefinition {
    * as { firstId, secondId }. */
   needsDualTargetSelection?: boolean;
   dualTargetPrompts?: { first: string; second: string };
+  /** Needs "today" as MM-DD in the frame's customPayload (A037/A066/A137's
+   * birthday comparisons). executeEffect must stay a pure function of
+   * (state, frame) -- it never calls `new Date()` itself, since that would
+   * make resolution depend on whichever client's clock/timezone happens to
+   * resolve the frame. The caller (GameTable) stamps the date in before
+   * pushing the frame, the same way a picker stamps rosterIds/outcome/etc. */
+  needsTodayDate?: boolean;
+  /** Needs a free-form number chosen by the actor before this resolves
+   * (A135's "pick a new Muffin Time target"). Bounds are advisory for the UI
+   * picker only -- executeEffect trusts whatever numberInputFromFrame
+   * returns and simply no-ops on a missing/non-positive value. */
+  needsNumberInput?: boolean;
+  numberInputPrompt?: string;
+  numberInputMin?: number;
+  numberInputMax?: number;
+  /** Honor-system "have you drunk this round?" gate (A158) -- there is no
+   * persistent drink-count tracking anywhere in this codebase, and this
+   * card deliberately does not add any. The UI asks live, at play time: an
+   * outcome toggle first ("already drunk?" -- if yes, resolves with no
+   * target and executeEffect no-ops), then, only if "not yet", a single
+   * target pick ("who has drunk the most?"). Reuses outcomePrompt/
+   * outcomeYesLabel/outcomeNoLabel for step 1 and targetPrompt for step 2 --
+   * no new customPayload accessor needed, executeEffect just reads
+   * frame.targetIds[0] the same way plain needsTargetSelection cards do. */
+  needsDrinkCheck?: boolean;
+  /** Pick a single target, then report a binary outcome for that specific
+   * target -- unlike needsOutcomeEntry's `kind: 'outcome_entry'` +
+   * needsTargetSelection cards (where picking a target *is* the outcome,
+   * e.g. "who won?", and skipping the pick means no-op), this is for a
+   * card where BOTH outcomes have a recipient and they differ (A166: the
+   * target draws on success, the actor draws on failure) -- so the target
+   * and the outcome must be captured as two separate pieces of input.
+   * Reuses targetPrompt for step 1 and outcomePrompt/outcomeYesLabel/
+   * outcomeNoLabel for step 2. executeEffect reads frame.targetIds[0] (the
+   * target, positional, same as plain needsTargetSelection) and
+   * outcomeFromFrame(frame) (from customPayload). */
+  needsTargetThenOutcome?: boolean;
   executeEffect: (state: RoomState, frame: StackFrame) => RoomState;
 }
 
@@ -47,4 +84,16 @@ export function dualTargetIdsFromFrame(frame: StackFrame): { firstId?: PlayerId;
     firstId: frame.customPayload?.firstId as PlayerId | undefined,
     secondId: frame.customPayload?.secondId as PlayerId | undefined,
   };
+}
+
+/** MM-DD, as stamped by the caller before pushing the frame -- see
+ * needsTodayDate. */
+export function todayFromFrame(frame: StackFrame): string | undefined {
+  return frame.customPayload?.today as string | undefined;
+}
+
+/** The number the actor chose, as stamped by the caller before pushing the
+ * frame -- see needsNumberInput. */
+export function numberInputFromFrame(frame: StackFrame): number | undefined {
+  return frame.customPayload?.numberInput as number | undefined;
 }

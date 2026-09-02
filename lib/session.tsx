@@ -12,16 +12,18 @@ import {
   startSetup as engineStartSetup,
   updateSeatOrder as engineUpdateSeatOrder,
   updatePlayDirection as engineUpdatePlayDirection,
+  setGameSuggester as engineSetGameSuggester,
   startGame as engineStartGame,
   finishGame as engineFinishGame,
   resetForPlayAgain as engineResetForPlayAgain,
 } from '../game/room';
 import { draw, discard, balancedShuffleDrawPile } from '../game/pile';
+import { applyActionRedirect } from '../game/turnFlow';
 import { placeTrap as enginePlaceTrap, removeTrap, skipTrapPlacement as engineSkipTrapPlacement } from '../game/trap';
 import {
   advanceTurn,
   emergencyForceSkipTurn,
-  checkWinnerAtTurnStart,
+  resolveTurnArrival,
   declareMuffinTime as engineDeclareMuffinTime,
   finishByDeckExhaustion,
   hasCompletedMainChoice,
@@ -95,15 +97,16 @@ export interface GameSessionValue {
   lastResult: LastResult | null;
   error: string | null;
   clearLastResult: () => void;
-  createRoom: (maxPlayers: number, hostName: string) => Promise<string>;
-  createBotRoom: (maxPlayers: number, hostName?: string) => string;
-  joinRoom: (code: string, playerName: string) => Promise<void>;
+  createRoom: (maxPlayers: number, hostName: string, hostBirthdayMMDD?: string) => Promise<string>;
+  createBotRoom: (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string) => string;
+  joinRoom: (code: string, playerName: string, playerBirthdayMMDD?: string) => Promise<void>;
   previewRoom: (code: string) => Promise<RoomState | null>;
   resumeRoom: (code: string) => Promise<void>;
   leaveRoom: () => void;
   startSetup: () => void;
   setSeatOrder: (seatOrder: PlayerId[]) => void;
   setPlayDirection: (direction: PlayDirection) => void;
+  setGameSuggester: (playerId: PlayerId) => void;
   confirmTurnOrder: () => void;
   drawCard: () => void;
   endTurn: () => void;
@@ -130,10 +133,7 @@ const GameSessionContext = createContext<GameSessionValue | null>(null);
 function advanceAndCheckWin(room: RoomState): RoomState {
   const advanced = advanceTurn(room);
   const currentId = advanced.turnOrder[advanced.currentTurnIndex];
-  if (checkWinnerAtTurnStart(advanced, currentId)) {
-    return { ...advanced, status: 'finished', winnerId: currentId, finishReason: 'normal' };
-  }
-  return advanced;
+  return resolveTurnArrival(advanced, currentId);
 }
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
@@ -210,10 +210,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const createRoomFn = useCallback(
-    async (maxPlayers: number, hostName: string) => {
+    async (maxPlayers: number, hostName: string, hostBirthdayMMDD?: string) => {
       if (!playerId) throw new Error('ระบบยังไม่พร้อม ลองใหม่อีกครั้ง');
       const finalName = hostName.trim() || 'ผู้เล่น';
-      const { code } = await createRoomWithRetry(supabase, playerId, finalName, maxPlayers);
+      const { code } = await createRoomWithRetry(supabase, playerId, finalName, maxPlayers, 5, Math.random, hostBirthdayMMDD);
       await enterRoom(code);
       return code;
     },
@@ -221,7 +221,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const createBotRoomFn = useCallback(
-    (maxPlayers: number, hostName?: string) => {
+    (maxPlayers: number, hostName?: string, hostBirthdayMMDD?: string) => {
       if (channelRef.current) {
         unsubscribeFromRoom(channelRef.current);
         channelRef.current = null;
@@ -230,7 +230,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       const actualHostName = hostName?.trim() || playerName || 'ผู้เล่น';
       const boundedMax = Math.min(Math.max(maxPlayers, 3), 15);
 
-      let state = engineCreateRoom(hostId, actualHostName, boundedMax);
+      // Bots deliberately get no birthdayMMDD -- there's no real person to
+      // self-report one, and fabricating a date would silently skew A037/
+      // A066/A137's "closest birthday" comparisons.
+      let state = engineCreateRoom(hostId, actualHostName, boundedMax, hostBirthdayMMDD);
       for (let i = 1; i <= boundedMax - 1; i++) {
         const botId = `bot-${i}`;
         const botName = BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length];
@@ -259,12 +262,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const joinRoomFn = useCallback(
-    async (code: string, name: string) => {
+    async (code: string, name: string, playerBirthdayMMDD?: string) => {
       if (!playerId) throw new Error('ระบบยังไม่พร้อม ลองใหม่อีกครั้ง');
       const finalName = name.trim() || 'ผู้เล่น';
       await updateRoomWithRetry(supabase, code, (state) => {
         if (state.players[playerId]) return state; // already a member — resume, don't re-add
-        return addPlayer(state, playerId, finalName);
+        return addPlayer(state, playerId, finalName, undefined, playerBirthdayMMDD);
       });
       await enterRoom(code);
     },
@@ -371,6 +374,16 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId]
   );
 
+  const setGameSuggesterFn = useCallback(
+    (playerId: PlayerId) =>
+      run((state) => {
+        if (myPlayerId !== state.hostId) return state;
+        if (!state.players[playerId]) return state;
+        return engineSetGameSuggester(state, playerId);
+      }),
+    [run, myPlayerId]
+  );
+
   const confirmTurnOrderFn = useCallback(
     () =>
       run((state) => {
@@ -389,6 +402,13 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const pid = myPlayerId!;
         const player = state.players[pid];
         if (player?.hasDrawnThisTurn || player?.hasPlayedActionThisTurn) return state;
+        // A035 "Come Out to Play": under the draw-XOR-play-Action rule above,
+        // drawing would permanently foreclose ever satisfying "must play an
+        // Action" this turn (playAction is unconditionally blocked once
+        // hasDrawnThisTurn is set) -- block the draw itself instead, funneling
+        // an obligated player toward playing an Action as their only legal
+        // Main Choice this turn.
+        if (player?.mustPlayActionThisTurn) return state;
         let next = state;
         if (next.turnPhase === 'trap_placement' || !next.turnPhase) {
           next = engineSkipTrapPlacement(next, pid);
@@ -440,7 +460,14 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
         const actorId = myPlayerId!;
         const player = state.players[actorId];
-        if (player?.hasDrawnThisTurn || player?.hasPlayedActionThisTurn) return state;
+        // "Main Choice" rule: draw XOR play an Action -- once you've drawn,
+        // no Action play is possible this turn (see game/turn.ts's
+        // hasCompletedMainChoice/canEndTurn). Bonus plays from A100 only
+        // bypass the hasPlayedActionThisTurn block below, never this one --
+        // A100 itself has to be your first play (not preceded by a draw).
+        if (player?.hasDrawnThisTurn) return state;
+        const usingBonusPlay = Boolean(player?.hasPlayedActionThisTurn) && (player?.bonusActionPlaysRemaining ?? 0) > 0;
+        if (player?.hasPlayedActionThisTurn && !usingBonusPlay) return state;
         if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
         if ((code === 'A014' || code === 'A016') && !targetId) return state;
         if (targetId && !state.players[targetId]) return state;
@@ -451,9 +478,13 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         }
         if (next.turnPhase !== 'main') return state;
 
-        const afterDiscard = discard(next, actorId, 1, [code]);
+        const afterDiscard = applyActionRedirect(next, actorId, code);
         if (afterDiscard.players[actorId]) {
-          afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+          if (usingBonusPlay) {
+            afterDiscard.players[actorId].bonusActionPlaysRemaining = (afterDiscard.players[actorId].bonusActionPlaysRemaining ?? 0) - 1;
+          } else {
+            afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+          }
           afterDiscard.players[actorId].hasDrawnThisTurn = false;
         }
         const stackState = pushStackFrame(afterDiscard, {
@@ -1096,6 +1127,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     startSetup: startSetupFn,
     setSeatOrder: setSeatOrderFn,
     setPlayDirection: setPlayDirectionFn,
+    setGameSuggester: setGameSuggesterFn,
     confirmTurnOrder: confirmTurnOrderFn,
     drawCard,
     endTurn,

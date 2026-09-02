@@ -92,6 +92,13 @@ export interface ManualRecoveryTransferPayload {
   count: number;
 }
 
+export interface SocialCounterPlayedPayload {
+  actorId: PlayerId;
+  counterCode: CardCode;
+  targetPlayerId?: PlayerId;
+  resultType: 'cancel' | 'redirect' | 'split' | 'replace_draw' | 'cancel_and_steal';
+}
+
 export type EventPayloadMap = {
   [GAME_EVENT_TYPES.FORCED_DISCARD]: ForcedDiscardPayload;
   [GAME_EVENT_TYPES.CARD_STOLEN]: CardStolenPayload;
@@ -105,6 +112,7 @@ export type EventPayloadMap = {
   [GAME_EVENT_TYPES.MANUAL_TRIGGER]: ManualTriggerPayload;
   [GAME_EVENT_TYPES.MANUAL_RECOVERY_DISCARD]: ManualRecoveryDiscardPayload;
   [GAME_EVENT_TYPES.MANUAL_RECOVERY_TRANSFER]: ManualRecoveryTransferPayload;
+  [GAME_EVENT_TYPES.SOCIAL_COUNTER_PLAYED]: SocialCounterPlayedPayload;
 };
 
 export interface GameEvent<K extends GameEventType = GameEventType> {

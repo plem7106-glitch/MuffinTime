@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createRoom, addPlayer, removePlayer, startGame, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
+import { createRoom, addPlayer, removePlayer, startGame, startSetup, setGameSuggester, resetForPlayAgain, restartGame, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
+import type { RoomState } from './types';
 
 describe('createRoom', () => {
   it('creates a lobby room with the host as the first player', () => {
@@ -113,6 +114,28 @@ describe('startGame', () => {
     expect(next.drawPile.length).toBe(20 - 9);
   });
 
+  it('resets actionRedirect and pendingActionObligations left over from a prior game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    room.actionRedirect = { toPlayerId: 'p2', remaining: 2 };
+    room.pendingActionObligations = ['p3'];
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const next = startGame(room, allCodes, () => 0);
+    expect(next.actionRedirect).toBeFalsy();
+    expect(next.pendingActionObligations ?? []).toEqual([]);
+  });
+
+  it('resets a leftover mustPlayActionThisTurn flag from a prior game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    room.players.p3.mustPlayActionThisTurn = true;
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const next = startGame(room, allCodes, () => 0);
+    expect(next.players.p3.mustPlayActionThisTurn).toBeFalsy();
+  });
+
   it('can start with 3 players even when maxPlayers is 15', () => {
     let room = createRoom('host1', 'P1', 15);
     room = addPlayer(room, 'p2', 'P2');
@@ -151,6 +174,73 @@ describe('startGame', () => {
   });
 });
 
+describe('resetForPlayAgain', () => {
+  it('resets bonusActionPlaysRemaining to 0', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.players.host1.bonusActionPlaysRemaining = 1;
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.players.host1.bonusActionPlaysRemaining).toBe(0);
+  });
+
+  it('resets actionRedirect and pendingActionObligations left over from the finished game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.actionRedirect = { toPlayerId: 'p2', remaining: 2 };
+    started.pendingActionObligations = ['p3'];
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.actionRedirect).toBeFalsy();
+    expect(next.pendingActionObligations ?? []).toEqual([]);
+  });
+
+  it('resets a leftover mustPlayActionThisTurn flag from the finished game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.players.p3.mustPlayActionThisTurn = true;
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.players.p3.mustPlayActionThisTurn).toBeFalsy();
+  });
+});
+
+describe('setGameSuggester', () => {
+  function setupRoom() {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    return startSetup(room);
+  }
+
+  it('records the chosen player as gameSuggesterId', () => {
+    const room = setupRoom();
+    const next = setGameSuggester(room, 'p2');
+    expect(next.gameSuggesterId).toBe('p2');
+  });
+
+  it('throws for a player not in the room', () => {
+    const room = setupRoom();
+    expect(() => setGameSuggester(room, 'nobody')).toThrow('player not in room');
+  });
+
+  it('throws outside of setup status', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    expect(() => setGameSuggester(room, 'p2')).toThrow('can only set the game suggester during setup');
+  });
+});
+
 describe('removePlayer', () => {
   it('removes a non-host player and leaves the host unchanged', () => {
     let room = createRoom('host1', 'Ploy', 4);
@@ -175,5 +265,153 @@ describe('removePlayer', () => {
     const room = createRoom('host1', 'Ploy', 4);
     const next = removePlayer(room, 'nobody');
     expect(next).toEqual(room);
+  });
+});
+
+describe('restartGame (A092)', () => {
+  function playingRoom() {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 15 }, (_, i) => `A${i + 1}`);
+    return startGame(room, allCodes, () => 0);
+  }
+
+  it('pools drawPile, discardPile, every hand, and every trap, then deals 3 fresh cards per player', () => {
+    const room = playingRoom();
+    // Simulate a card already in the discard pile and a placed trap before A092 fires.
+    room.discardPile = [room.drawPile.pop()!, room.drawPile.pop()!];
+    room.players.p3.traps = [room.drawPile.pop()!];
+
+    const before = new Set([
+      ...room.drawPile, ...room.discardPile,
+      ...room.players.host1.hand, ...room.players.p2.hand, ...room.players.p3.hand,
+      ...room.players.p3.traps,
+    ]);
+
+    const next = restartGame(room, () => 0);
+
+    expect(next.status).toBe('playing');
+    expect(next.discardPile).toEqual([]);
+    expect(next.players.host1.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3);
+    expect(next.players.p3.traps).toEqual([]);
+    const after = new Set([
+      ...next.drawPile,
+      ...next.players.host1.hand, ...next.players.p2.hand, ...next.players.p3.hand,
+    ]);
+    expect(after).toEqual(before);
+    expect(next.drawPile.length).toBe(before.size - 9);
+  });
+
+  it('resets turn order to seatOrder[0]-first, muffinTimeTarget to 10, and clears win/end-of-game and reaction-stack state', () => {
+    const room = {
+      status: 'playing',
+      hostId: 'host1',
+      seatOrder: ['host1', 'p2', 'p3'],
+      turnOrder: ['p2', 'p3', 'host1'],
+      currentTurnIndex: 2,
+      direction: 1,
+      muffinTimeTarget: 6,
+      drawPile: ['A01', 'A02', 'A03', 'A04', 'A05', 'A06'],
+      discardPile: ['A04'],
+      players: {
+        host1: { name: 'Host', hand: ['A05'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'P2', hand: ['A06'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'P3', hand: ['A07'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      winnerId: 'p2',
+      finishReason: 'normal',
+      gameEndReason: 'muffin_time',
+      winnerPlayerIds: ['p2'],
+      finalHandCounts: { p2: 6 },
+      globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p2' }],
+      pendingWinChecks: [{ sourcePlayerId: 'host1', type: 'hand_nonempty' }],
+      pendingActionObligations: ['p3'],
+      actionRedirect: { toPlayerId: 'p3', remaining: 2 },
+      reactionStack: [{ frameId: 'f1', sourceType: 'action' }],
+      pendingResponse: { responseId: 'r1', kind: 'action', code: 'A092', actorId: 'host1' },
+      pendingInteraction: { interactionId: 'i1', type: 'date_invite', sourceCardCode: 'T10', initiatorId: 'host1', targetPlayerId: 'p2', timestamp: 0 },
+      lastResult: { kind: 'action', code: 'A092', actorId: 'host1', countered: false },
+      isShufflingDrawPile: true,
+      shuffleSequence: 5,
+      placedTrapMeta: { fake: { ownerId: 'p3', placedSequence: 1, placedRound: 1, placedByPlayerTurnIndex: 0 } },
+      pendingForcedDiscards: { fake: { operationId: 'op1', targetPlayerId: 'p3', requestedCount: 1, cardCodes: [], originalDestination: 'discard', intercepted: false, status: 'pending' } },
+      roundNumber: 4,
+    } as unknown as RoomState;
+
+    const next = restartGame(room, () => 0);
+
+    expect(next.turnOrder).toEqual(['host1', 'p2', 'p3']);
+    expect(next.currentTurnIndex).toBe(0);
+    expect(next.muffinTimeTarget).toBe(10);
+    expect(next.winnerId).toBeUndefined();
+    expect(next.finishReason).toBeUndefined();
+    expect(next.gameEndReason).toBeUndefined();
+    expect(next.winnerPlayerIds).toBeUndefined();
+    expect(next.finalHandCounts).toBeUndefined();
+    expect(next.globalRestrictions).toEqual([]);
+    expect(next.pendingWinChecks).toEqual([]);
+    expect(next.pendingActionObligations).toBeUndefined();
+    expect(next.actionRedirect).toBeNull();
+    expect(next.reactionStack).toEqual([]);
+    expect(next.pendingResponse).toBeNull();
+    expect(next.pendingInteraction).toBeNull();
+    expect(next.lastResult).toBeNull();
+    expect(next.isShufflingDrawPile).toBe(false);
+    expect(next.shuffleSequence).toBe(0);
+    expect(next.placedTrapMeta).toEqual({});
+    expect(next.pendingForcedDiscards).toEqual({});
+    expect(next.roundNumber).toBe(1);
+    expect(next.players.host1.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3);
+    expect(next.drawPile.length).toBe(1); // 10 pooled - 9 dealt
+  });
+
+  it('preserves hostId, joinOrder, maxPlayers, gameSuggesterId, and per-player name/connected/birthdayMMDD', () => {
+    const room = playingRoom();
+    room.gameSuggesterId = 'p2';
+    room.players.p3.birthdayMMDD = '05-10';
+    room.players.p2.connected = false;
+
+    const next = restartGame(room, () => 0);
+
+    expect(next.hostId).toBe('host1');
+    expect(next.joinOrder).toEqual(room.joinOrder);
+    expect(next.maxPlayers).toBe(room.maxPlayers);
+    expect(next.gameSuggesterId).toBe('p2');
+    expect(next.players.p3.birthdayMMDD).toBe('05-10');
+    expect(next.players.p2.connected).toBe(false);
+    expect(next.players.host1.name).toBe('P1');
+  });
+
+  it('is a no-op outside "playing" status', () => {
+    const room = {
+      status: 'lobby', hostId: 'host1', turnOrder: [], currentTurnIndex: 0, direction: 1,
+      muffinTimeTarget: 10, drawPile: [], discardPile: [], players: {},
+    } as unknown as RoomState;
+    expect(restartGame(room)).toEqual(room);
+  });
+
+  it('throws if the pooled cards cannot cover a 3-card deal for every player', () => {
+    const room = {
+      status: 'playing',
+      hostId: 'host1',
+      seatOrder: ['host1', 'p2', 'p3'],
+      turnOrder: ['host1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile: ['A01'],
+      discardPile: [],
+      players: {
+        host1: { name: 'Host', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'P2', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'P3', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    expect(() => restartGame(room, () => 0)).toThrow('not enough cards');
   });
 });

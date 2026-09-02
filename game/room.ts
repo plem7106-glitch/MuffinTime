@@ -1,5 +1,5 @@
 import { cloneState, shuffle } from './util';
-import { beginTurn } from './turn';
+import { beginTurn, resetPlayerPerTurnFlags } from './turn';
 import type { RoomState, PlayerId, CardCode, Rng, PlayDirection } from './types';
 
 export const GLOBAL_MIN_PLAYERS = 3;
@@ -8,7 +8,8 @@ export const GLOBAL_MAX_PLAYERS = 15;
 export function createRoom(
   hostId: PlayerId,
   hostName: string,
-  maxPlayers: number = GLOBAL_MAX_PLAYERS
+  maxPlayers: number = GLOBAL_MAX_PLAYERS,
+  hostBirthdayMMDD?: string
 ): RoomState {
   const validatedMax = Math.max(
     GLOBAL_MIN_PLAYERS,
@@ -37,6 +38,7 @@ export function createRoom(
         connected: true,
         hasCalledMuffinTime: false,
         skipNextTurn: false,
+        ...(hostBirthdayMMDD ? { birthdayMMDD: hostBirthdayMMDD } : {}),
       },
     },
   };
@@ -46,7 +48,8 @@ export function addPlayer(
   state: RoomState,
   playerId: PlayerId,
   name: string,
-  maxPlayers?: number
+  maxPlayers?: number,
+  birthdayMMDD?: string
 ): RoomState {
   if (state.status !== 'lobby') {
     throw new Error('cannot join a room that has already started');
@@ -66,6 +69,7 @@ export function addPlayer(
     connected: true,
     hasCalledMuffinTime: false,
     skipNextTurn: false,
+    ...(birthdayMMDD ? { birthdayMMDD } : {}),
   };
   const existingJoinOrder = next.joinOrder ?? Object.keys(state.players);
   next.joinOrder = [...existingJoinOrder, playerId];
@@ -115,6 +119,21 @@ export function updatePlayDirection(state: RoomState, direction: PlayDirection):
   return next;
 }
 
+/** A118 ("steal 3 from whoever suggested this game") needs this one-time
+ * fact captured before gameplay starts -- host-only, during setup once the
+ * roster is locked (see RoomState.gameSuggesterId's doc comment). */
+export function setGameSuggester(state: RoomState, playerId: PlayerId): RoomState {
+  if (state.status !== 'setup') {
+    throw new Error('can only set the game suggester during setup');
+  }
+  if (!state.players[playerId]) {
+    throw new Error('player not in room');
+  }
+  const next = cloneState(state);
+  next.gameSuggesterId = playerId;
+  return next;
+}
+
 export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng = Math.random): RoomState {
   if (state.status !== 'lobby' && (state.status as string) !== 'setup') {
     throw new Error('game already started');
@@ -142,10 +161,10 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   next.status = 'playing';
   next.currentTurnIndex = 0;
   for (const pid of Object.keys(next.players)) {
-    next.players[pid].placedTrapThisTurn = false;
-    next.players[pid].hasDrawnThisTurn = false;
-    next.players[pid].hasPlayedActionThisTurn = false;
+    resetPlayerPerTurnFlags(next.players[pid]);
   }
+  next.actionRedirect = null;
+  next.pendingActionObligations = undefined;
   next.roundNumber = 1;
   next.sequenceNumber = 1;
   next.gameEndReason = undefined;
@@ -221,17 +240,11 @@ export function resetForPlayAgain(state: RoomState): RoomState {
 
   // Reset match-specific player state
   for (const pid of playerIds) {
-    next.players[pid] = {
-      ...next.players[pid],
-      hand: [],
-      traps: [],
-      hasCalledMuffinTime: false,
-      skipNextTurn: false,
-      placedTrapThisTurn: false,
-      hasDrawnThisTurn: false,
-      hasPlayedActionThisTurn: false,
-    };
+    next.players[pid] = { ...next.players[pid], hand: [], traps: [], hasCalledMuffinTime: false, skipNextTurn: false };
+    resetPlayerPerTurnFlags(next.players[pid]);
   }
+  next.actionRedirect = null;
+  next.pendingActionObligations = undefined;
 
   next.status = 'lobby';
   next.winnerId = undefined;
@@ -254,4 +267,80 @@ export function resetForPlayAgain(state: RoomState): RoomState {
   next.shuffleSequence = 0;
   next.roundNumber = 1;
   return next;
+}
+
+/**
+ * A092 "ฉันบ้าไปแล้ว!" (I'm Crazy!): mid-game full restart. Unlike
+ * resetForPlayAgain (which requires status 'finished'/'ended' and detours
+ * through 'lobby'), this fires while status stays 'playing' -- it pools
+ * every card currently anywhere in the game (not a fresh canonical deck,
+ * per the card's own text), reshuffles, deals 3 fresh cards per player, and
+ * resets turn order/win state/reaction-stack state. Room/social identity
+ * fields (hostId, joinOrder, maxPlayers, gameSuggesterId, playDirection,
+ * and each PlayerState's name/connected/birthdayMMDD) are deliberately left
+ * untouched -- see the design spec's rulings for why gameSuggesterId in
+ * particular is preserved rather than cleared.
+ */
+export function restartGame(state: RoomState, rng: Rng = Math.random): RoomState {
+  if (state.status !== 'playing') return cloneState(state);
+  const next = cloneState(state);
+  const playerIds = Object.keys(next.players);
+
+  // "นำไพ่ทั้งหมดกลับเข้ากอง" -- pool every card currently anywhere in the
+  // game (not a fresh canonical deck).
+  const pool: CardCode[] = [...next.drawPile, ...next.discardPile];
+  for (const pid of playerIds) {
+    pool.push(...next.players[pid].hand, ...next.players[pid].traps);
+  }
+  if (pool.length < playerIds.length * 3) {
+    throw new Error('restartGame: not enough cards in the pool to deal 3 to every player');
+  }
+  next.drawPile = shuffle(pool, rng);
+  next.discardPile = [];
+
+  const seatOrder =
+    next.seatOrder && next.seatOrder.length === playerIds.length && next.seatOrder.every((id) => next.players[id])
+      ? next.seatOrder
+      : playerIds;
+  next.seatOrder = [...seatOrder];
+  next.turnOrder = [...seatOrder];
+  next.direction = next.playDirection === 'counterclockwise' ? -1 : 1;
+
+  for (const pid of playerIds) {
+    next.players[pid].hand = [];
+    next.players[pid].traps = [];
+    next.players[pid].hasCalledMuffinTime = false;
+    next.players[pid].skipNextTurn = false;
+    resetPlayerPerTurnFlags(next.players[pid]);
+  }
+  for (const pid of next.turnOrder) {
+    for (let i = 0; i < 3; i++) {
+      next.players[pid].hand.push(next.drawPile.pop()!);
+    }
+  }
+
+  next.currentTurnIndex = 0;
+  next.muffinTimeTarget = 10;
+  next.winnerId = undefined;
+  next.finishReason = undefined;
+  next.gameEndReason = undefined;
+  next.winnerPlayerIds = undefined;
+  next.finalHandCounts = undefined;
+  next.globalRestrictions = [];
+  next.pendingWinChecks = [];
+  next.pendingActionObligations = undefined;
+  next.actionRedirect = null;
+  next.reactionStack = [];
+  next.pendingResponse = null;
+  next.pendingInteraction = null;
+  next.lastResult = null;
+  next.isShufflingDrawPile = false;
+  next.shuffleSequence = 0;
+  next.placedTrapMeta = {};
+  next.pendingForcedDiscards = {};
+  next.roundNumber = 1;
+  next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
+
+  const firstPlayerId = next.turnOrder[0];
+  return beginTurn(next, firstPlayerId);
 }

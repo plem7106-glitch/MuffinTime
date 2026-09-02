@@ -71,11 +71,12 @@ export async function createRoomWithRetry(
   hostName: string,
   maxPlayers: number,
   maxAttempts = 5,
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  hostBirthdayMMDD?: string
 ): Promise<{ code: string; state: RoomState }> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const code = makeRoomCode(rng);
-    const state = engineCreateRoom(hostId, hostName, maxPlayers);
+    const state = engineCreateRoom(hostId, hostName, maxPlayers, hostBirthdayMMDD);
     const inserted = await insertRoom(client, code, state);
     if (inserted) return { code, state };
   }
