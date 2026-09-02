@@ -21,8 +21,10 @@ import { ShuffleConfirmModal } from './ShuffleConfirmModal';
 import { ShuffleDrawPileOverlay } from './ShuffleDrawPileOverlay';
 import { RoundTransitionOverlay } from './RoundTransitionOverlay';
 import { TargetSelector } from '../modals/TargetSelector';
+import { OutcomeToggle } from '../modals/OutcomeToggle';
 import { DateInviteModal } from '../modals/DateInviteModal';
 import { getTrapRule } from '../../game/trapRules/registry';
+import { getActionRule } from '../../game/actionRules/registry';
 
 import { TrapModal } from '../modals/TrapModal';
 import { TrapAlertModal } from '../modals/TrapAlertModal';
@@ -76,6 +78,13 @@ export function GameTable() {
   // Action Target Flow State
   const [pendingTargetCard, setPendingTargetCard] = useState<CardDisplay | null>(null);
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
+  const [chosenTargets, setChosenTargets] = useState<PlayerId[]>([]);
+
+  // Dual-role target flow (A115: tallest, then shortest -- two sequential
+  // single-target picks, since click order in a multi-select roster can't
+  // safely disambiguate two distinct roles).
+  const [dualPickPhase, setDualPickPhase] = useState<'first' | 'second' | null>(null);
+  const [dualPickFirstId, setDualPickFirstId] = useState<PlayerId | null>(null);
 
   // Trap Open Flow State
   const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
@@ -177,13 +186,57 @@ export function GameTable() {
 
   const handleRequestTarget = (card: CardDisplay) => {
     setPendingTargetCard(card);
+    setChosenTarget(null);
+    setChosenTargets([]);
+    const rule = getActionRule(card.code);
+    setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
+    setDualPickFirstId(null);
   };
 
+  const pendingActionRule = pendingTargetCard ? getActionRule(pendingTargetCard.code) : undefined;
+  const rosterSelectionCount = pendingActionRule?.rosterSelectionCount;
+
   const handleConfirmTargetAction = () => {
-    if (!pendingTargetCard || !chosenTarget) return;
-    playAction(pendingTargetCard.code, chosenTarget);
+    if (!pendingTargetCard) return;
+    if (pendingActionRule?.needsRosterSelection) {
+      if (chosenTargets.length === 0) return;
+      if (rosterSelectionCount !== undefined && chosenTargets.length !== rosterSelectionCount) return;
+      playAction(pendingTargetCard.code, undefined, { rosterIds: chosenTargets });
+    } else {
+      if (!chosenTarget) return;
+      playAction(pendingTargetCard.code, chosenTarget);
+    }
     setPendingTargetCard(null);
     setChosenTarget(null);
+    setChosenTargets([]);
+  };
+
+  const handleDualPickConfirm = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    if (dualPickPhase === 'first') {
+      setDualPickFirstId(chosenTarget);
+      setChosenTarget(null);
+      setDualPickPhase('second');
+      return;
+    }
+    playAction(pendingTargetCard.code, undefined, { firstId: dualPickFirstId, secondId: chosenTarget });
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setDualPickPhase(null);
+    setDualPickFirstId(null);
+  };
+
+  const handleDualPickCancel = () => {
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setDualPickPhase(null);
+    setDualPickFirstId(null);
+  };
+
+  const handleOutcomeSelect = (outcome: boolean) => {
+    if (!pendingTargetCard) return;
+    playAction(pendingTargetCard.code, undefined, { outcome });
+    setPendingTargetCard(null);
   };
 
   // Handlers for Opening Active Traps
@@ -384,18 +437,67 @@ export function GameTable() {
         onRequestTarget={handleRequestTarget}
       />
 
-      {/* 10. Action Card Target Selector */}
+      {/* 10. Action Card Target Selector (single target, or multi-select roster
+          when the card's rule needs a roster_select -- e.g. "who matches this
+          condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
-        open={pendingTargetCard !== null}
+        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry}
         candidates={opponentCandidates}
         selectedId={chosenTarget}
-        onSelect={setChosenTarget}
+        multiSelect={pendingActionRule?.needsRosterSelection === true}
+        requiredCount={rosterSelectionCount}
+        selectedIds={chosenTargets}
+        onSelect={(id) => {
+          if (!pendingActionRule?.needsRosterSelection) {
+            setChosenTarget(id);
+            return;
+          }
+          setChosenTargets((current) => {
+            if (current.includes(id)) return current.filter((item) => item !== id);
+            if (rosterSelectionCount !== undefined && current.length >= rosterSelectionCount) return current;
+            return [...current, id];
+          });
+        }}
         onConfirm={handleConfirmTargetAction}
         onCancel={() => {
           setPendingTargetCard(null);
           setChosenTarget(null);
+          setChosenTargets([]);
         }}
-        prompt={pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+        prompt={
+          (pendingActionRule?.needsRosterSelection ? pendingActionRule.rosterPrompt : pendingActionRule?.targetPrompt) ??
+          pendingTargetCard?.effect ??
+          'เลือกผู้เล่นเป้าหมาย'
+        }
+      />
+
+      {/* 10.4 Action Card Dual-Role Target Selector (A115: pick "tallest",
+          then pick "shortest" -- two sequential single-target picks so the
+          two roles can never be silently swapped by click order) */}
+      <TargetSelector
+        open={pendingTargetCard !== null && dualPickPhase !== null}
+        candidates={dualPickPhase === 'second' ? opponentCandidates.filter((c) => c.id !== dualPickFirstId) : opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={(id) => setChosenTarget(id)}
+        onConfirm={handleDualPickConfirm}
+        onCancel={handleDualPickCancel}
+        prompt={
+          (dualPickPhase === 'first'
+            ? pendingActionRule?.dualTargetPrompts?.first
+            : pendingActionRule?.dualTargetPrompts?.second) ??
+          pendingTargetCard?.effect ??
+          'เลือกผู้เล่นเป้าหมาย'
+        }
+      />
+
+      {/* 10.5 Action Card Outcome Toggle (binary verdict cards, e.g. E4/E8) */}
+      <OutcomeToggle
+        open={pendingTargetCard !== null && pendingActionRule?.needsOutcomeEntry === true}
+        prompt={pendingActionRule?.outcomePrompt ?? pendingTargetCard?.effect ?? ''}
+        yesLabel={pendingActionRule?.outcomeYesLabel}
+        noLabel={pendingActionRule?.outcomeNoLabel}
+        onSelect={handleOutcomeSelect}
+        onCancel={() => setPendingTargetCard(null)}
       />
 
       {/* 11. Trap Card Open Modal */}

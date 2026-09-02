@@ -9,6 +9,7 @@ export function TargetSelector({
   selectedId,
   selectedIds,
   multiSelect = false,
+  requiredCount,
   onSelect,
   onConfirm,
   onCancel,
@@ -19,6 +20,10 @@ export function TargetSelector({
   selectedId: PlayerId | null;
   selectedIds?: PlayerId[];
   multiSelect?: boolean;
+  /** multiSelect only: confirm stays disabled until exactly this many are
+   * picked (e.g. A172's "choose exactly 2"). Unset means any non-empty
+   * selection enables confirm. */
+  requiredCount?: number;
   onSelect: (id: PlayerId) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -38,14 +43,23 @@ export function TargetSelector({
                 (multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'border-primary bg-primary/10' : 'border-ink/20'
               }`}
             >
-              <span className={selectedId === id ? 'text-primary' : 'text-ink-secondary'}>
+              <span className={(multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'text-primary' : 'text-ink-secondary'}>
                 {(multiSelect ? selectedIds?.includes(id) : selectedId === id) ? '●' : '○'}
               </span>
               <span className="font-semibold text-ink">{player.name}</span>
             </button>
           ))}
         </div>
-        <PrimaryButton disabled={multiSelect ? !(selectedIds && selectedIds.length > 0) : !selectedId} onClick={onConfirm}>
+        <PrimaryButton
+          disabled={
+            multiSelect
+              ? requiredCount !== undefined
+                ? selectedIds?.length !== requiredCount
+                : !(selectedIds && selectedIds.length > 0)
+              : !selectedId
+          }
+          onClick={onConfirm}
+        >
           ยืนยัน
         </PrimaryButton>
         <SecondaryButton onClick={onCancel}>ยกเลิก</SecondaryButton>

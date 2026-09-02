@@ -1,7 +1,7 @@
 import type { RoomState, PlayerId, CardCode, Rng, PendingResponse, PendingInteraction } from '../game/types';
 import { getPlayableCounters } from '../game/counterRules/registry';
 import { getTrapRule, isTrapImplemented } from '../game/trapRules/registry';
-import { getPlayableActions } from '../game/actionRules/registry';
+import { getActionRule, getPlayableActions } from '../game/actionRules/registry';
 import { getCardsByType } from '../data/cards/index';
 
 export type BotDecision =
@@ -63,7 +63,7 @@ export function decideBotTurn(
   }
 
   const code = playableActions[Math.floor(rng() * playableActions.length)];
-  const needsTarget = code === 'A014' || code === 'A016';
+  const needsTarget = getActionRule(code)?.needsTargetSelection === true;
   if (!needsTarget) {
     return { action: 'play', code };
   }

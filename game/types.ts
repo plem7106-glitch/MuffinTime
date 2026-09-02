@@ -128,6 +128,17 @@ export interface PendingInteraction {
   timestamp: number;
 }
 
+/**
+ * A temporary table-wide rule suspension ("...until your next turn" Action
+ * cards -- A019/A072/A085). Cleared by game/turn.ts's advanceTurn the moment
+ * play returns to sourcePlayerId -- no expiry counter/index needed, since
+ * "until your next turn" is naturally "until it's your turn again".
+ */
+export interface GlobalRestriction {
+  type: 'no_counters' | 'no_actions' | 'no_win';
+  sourcePlayerId: PlayerId;
+}
+
 export interface RoomState {
   status: 'lobby' | 'setup' | 'playing' | 'ended' | 'finished';
   hostId: PlayerId;
@@ -161,6 +172,9 @@ export interface RoomState {
   // Interactive Trap / Event State (e.g. T10 date invite)
   pendingInteraction?: PendingInteraction | null;
   placedTrapMeta?: Record<string, { ownerId: PlayerId; placedSequence: number; placedRound: number; placedByPlayerTurnIndex: number }>;
+
+  // Temporary table-wide rule suspensions (e.g. A019/A072/A085)
+  globalRestrictions?: GlobalRestriction[];
 
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;

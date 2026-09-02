@@ -1,4 +1,5 @@
 import { getCardByCode } from './index';
+import { getActionRule } from '../../game/actionRules/registry';
 import type { CardCode } from '../../game/types';
 
 export interface CardDisplay {
@@ -23,6 +24,14 @@ export function getCardDisplay(code: CardCode): CardDisplay {
     effect: card.description_th,
     titleEn: card.name_en,
     image: card.image,
-    needsTarget: card.id === 'A014' || card.id === 'A016',
+    // True for any Action rule that needs a manual picker before it can
+    // resolve (single target, multi-select roster, or an outcome toggle) --
+    // GameTable.tsx's handleRequestTarget picks the right modal per rule.kind.
+    needsTarget: Boolean(
+      getActionRule(card.id)?.needsTargetSelection ||
+        getActionRule(card.id)?.needsRosterSelection ||
+        getActionRule(card.id)?.needsOutcomeEntry ||
+        getActionRule(card.id)?.needsDualTargetSelection
+    ),
   };
 }
