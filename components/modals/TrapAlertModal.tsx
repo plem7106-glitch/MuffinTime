@@ -7,6 +7,7 @@ import { getCardById } from '../../data/cards/index';
 import { getCardDisplay } from '../../data/cards/display';
 import { WarningIcon, ShieldIcon, CloseIcon } from '../ui/Icons';
 import type { CardCode, PlayerId } from '../../game/types';
+import { usePresentation } from '../../lib/presentation/presentationContext';
 
 
 
@@ -31,6 +32,7 @@ export function TrapAlertModal({
   onDecline: () => void;
 }) {
   const { playTrapAlert } = useAudio();
+  const { isIncomingPresentationActive } = usePresentation();
   const [stage, setStage] = useState<'alert' | 'decision'>('alert');
   const [isSelectingCounter, setIsSelectingCounter] = useState(false);
 
@@ -67,7 +69,7 @@ export function TrapAlertModal({
 
   // When a new trap response is received, play audio and start alert stage
   useEffect(() => {
-    if (!open || !trapCode) {
+    if (!open || isIncomingPresentationActive || !trapCode) {
       setStage('alert');
       setIsSelectingCounter(false);
       return;
@@ -84,9 +86,9 @@ export function TrapAlertModal({
     }, 900);
 
     return () => clearTimeout(timer);
-  }, [open, trapCode, responseId, playTrapAlert]);
+  }, [open, trapCode, responseId, playTrapAlert, isIncomingPresentationActive]);
 
-  if (!open || !trapCode || !fullTrapCard) return null;
+  if (!open || isIncomingPresentationActive || !trapCode || !fullTrapCard) return null;
 
   const hasCounters = counterCards.length > 0;
 

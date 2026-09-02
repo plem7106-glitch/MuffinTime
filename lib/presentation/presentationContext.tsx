@@ -5,6 +5,8 @@ import type { PresentationEvent, ActivityItem } from './presentationTypes';
 import type { LiveGameStatusData } from './liveStatusTypes';
 import { soundManager } from './soundManager';
 import { getCardDisplay } from '../../data/cards/display';
+import { IncomingCardPresentation } from '../../components/room/IncomingCardPresentation';
+import { isBlockingIncomingEvent } from './incomingPresentation';
 
 interface PresentationContextValue {
   activeAnimation: PresentationEvent | null;
@@ -13,6 +15,7 @@ interface PresentationContextValue {
   enqueuePresentationEvent: (event: Omit<PresentationEvent, 'id' | 'timestamp'>) => void;
   updatePersistentStatus: (status: LiveGameStatusData | null) => void;
   clearAnimation: () => void;
+  isIncomingPresentationActive: boolean;
 }
 
 const PresentationContext = createContext<PresentationContextValue | null>(null);
@@ -92,10 +95,12 @@ export function PresentationProvider({ children }: { children: React.ReactNode }
       } else {
         setActiveAnimation(nextEvent);
         // Duration of card flight & hold
-        setTimeout(() => {
-          processingRef.current = false;
-          setActiveAnimation(null);
-        }, 550);
+        if (!isBlockingIncomingEvent(nextEvent)) {
+          setTimeout(() => {
+            processingRef.current = false;
+            setActiveAnimation(null);
+          }, 550);
+        }
       }
 
       return rest;
@@ -179,6 +184,11 @@ export function PresentationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const liveStatus = tempEventStatus || persistentStatus;
+  const isIncomingPresentationActive = Boolean(
+    activeAnimation &&
+    (activeAnimation.type === 'ACTION_PLAYED' || activeAnimation.type === 'COUNTER_PLAYED') &&
+    activeAnimation.targetId
+  );
 
   return (
     <PresentationContext.Provider
@@ -189,9 +199,13 @@ export function PresentationProvider({ children }: { children: React.ReactNode }
         enqueuePresentationEvent,
         updatePersistentStatus,
         clearAnimation,
+        isIncomingPresentationActive,
       }}
     >
       {children}
+      {isIncomingPresentationActive && activeAnimation && (
+        <IncomingCardPresentation event={activeAnimation} onContinue={clearAnimation} />
+      )}
     </PresentationContext.Provider>
   );
 }

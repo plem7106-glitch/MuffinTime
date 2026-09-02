@@ -383,6 +383,7 @@ function CreateRoomContent() {
                 <option value="r2-c35">R2 C35 Redirect</option>
                 <option value="r5-counter-chain">R5 Counter-to-Counter</option>
                 <option value="r6-multiple-responders">R6 Multiple Responders</option>
+                <option value="r7-human-action-counter">R7 Human Action → Bot Counter</option>
                 <option value="s1-c43">S1 C43 Target + Cancel</option>
                 <option value="s2-c48">S2 C48 Draw</option>
                 <option value="s3-c50">S3 C50 Steal</option>

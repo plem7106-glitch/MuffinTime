@@ -20,6 +20,13 @@ export interface PresentationEvent {
   actorName?: string;
   targetId?: PlayerId;
   targetName?: PlayerId;
+  frameId?: string;
+  eventId?: string;
+  parentFrameId?: string;
+  originalTargetId?: PlayerId;
+  affectedPlayerIds?: PlayerId[];
+  contextLabel?: string;
+  effectText?: string;
   /** Public card details - NEVER populated for hidden cards (draws, trap placement, hidden transfer) */
   cardCode?: CardCode;
   cardTitle?: string;

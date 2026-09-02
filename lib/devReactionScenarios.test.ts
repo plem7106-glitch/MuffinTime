@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createDevReactionScenario } from './devReactionScenarios';
 
 describe('development reaction scenarios', () => {
+  it('seeds a legal Human Action -> Bot Counter browser scenario without runtime reaction state', () => {
+    const state = createDevReactionScenario('r7-human-action-counter', 'me', 'Tester');
+    expect(state.currentTurnIndex).toBe(1);
+    expect(state.players.me.hand).toEqual(['A016']);
+    expect(state.players['bot-2'].hand).toEqual(['C17']);
+    expect(state.reactionStack ?? []).toHaveLength(0);
+    expect(state.pendingResponse ?? null).toBeNull();
+  });
   it.each([
     ['s1-c43', 'C43'], ['s2-c48', 'C48'], ['s3-c50', 'C50'], ['s4-c41', 'C41'],
   ] as const)('creates %s with the social card in the tester hand and no runtime state', (scenario, card) => {

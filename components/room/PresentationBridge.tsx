@@ -4,6 +4,10 @@ import { useEffect, useRef } from 'react';
 import type { RoomState, PlayerId } from '../../game/types';
 import { GAME_EVENT_TYPES } from '../../game/events';
 import { usePresentation } from '../../lib/presentation/presentationContext';
+import { shouldShowIncomingCounter } from '../../lib/presentation/incomingPresentation';
+import { getCardDisplay } from '../../data/cards/display';
+
+const getCardName = (code: string) => getCardDisplay(code as any).th;
 
 interface PresentationBridgeProps {
   state: RoomState;
@@ -76,16 +80,27 @@ export function PresentationBridge({ state, viewerId }: PresentationBridgeProps)
             type: 'ACTION_PLAYED',
             actorId: payload.actorId || actorId,
             actorName: state.players[payload.actorId || actorId]?.name ?? actorName,
-            targetId: payload.targetId,
+            targetId: payload.targetId === viewerId || state.pendingResponse?.affectedPlayerIds?.includes(viewerId) ? viewerId : undefined,
             cardCode: payload.actionCode,
+            contextLabel: payload.targetId === viewerId ? 'การ์ดนี้เลือกคุณเป็นเป้าหมาย' : state.pendingResponse?.affectedPlayerIds?.includes(viewerId) ? 'คุณอยู่ในกลุ่มผู้เล่นที่ได้รับผลจากการ์ดนี้' : undefined,
           });
         } else if (ev.type === GAME_EVENT_TYPES.COUNTER_PLAYED) {
           const payload = ev.payload as any;
+          const parentFrame = state.reactionStack?.find((frame) => frame.frameId === payload.targetFrameId);
+          const affectsViewer = shouldShowIncomingCounter({
+            viewerId,
+            actorId: payload.actorId || actorId,
+            eventTargetIds: ev.targetIds,
+            parentFrame,
+          });
           enqueuePresentationEvent({
             type: 'COUNTER_PLAYED',
             actorId: payload.actorId || actorId,
             actorName: state.players[payload.actorId || actorId]?.name ?? actorName,
+            targetId: affectsViewer ? viewerId : undefined,
             cardCode: payload.counterCode,
+            parentFrameId: payload.targetFrameId,
+            contextLabel: parentFrame ? `กำลังสวนการ์ด ${getCardName(parentFrame.sourceCode)}` : undefined,
           });
         } else if (ev.type === GAME_EVENT_TYPES.SOCIAL_COUNTER_PLAYED) {
           const payload = ev.payload as any;
@@ -103,6 +118,7 @@ export function PresentationBridge({ state, viewerId }: PresentationBridgeProps)
             type: 'TRAP_ACTIVATED',
             actorId: payload.ownerId || actorId,
             actorName: state.players[payload.ownerId || actorId]?.name ?? actorName,
+            targetId: state.pendingResponse?.affectedPlayerIds?.includes(viewerId) || state.pendingResponse?.targetId === viewerId ? viewerId : undefined,
             cardCode: payload.trapCode,
           });
         } else if (ev.type === GAME_EVENT_TYPES.CARD_STOLEN) {

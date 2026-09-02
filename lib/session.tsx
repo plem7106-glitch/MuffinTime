@@ -50,7 +50,7 @@ import {
 } from '../game/trapRules/engine';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getCounterContextForActiveFrame, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds } from '../game/counterRules/registry';
-import { createDevReactionScenario, type DevReactionScenario } from './devReactionScenarios';
+import { applyDevReactionScenario, createDevReactionScenario, type DevReactionScenario } from './devReactionScenarios';
 import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { resolveSteal } from '../game/steal';
@@ -244,6 +244,9 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const botName = BOT_NAME_POOL[(i - 1) % BOT_NAME_POOL.length];
         state = addPlayer(state, botId, botName);
       }
+      if (scenario && process.env.NODE_ENV !== 'production') {
+        state = applyDevReactionScenario(state, scenario, hostId);
+      }
 
       const code = `bot-${Math.floor(1000 + Math.random() * 9000)}`;
       setLocalHostId(hostId);
@@ -393,7 +396,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     () =>
       run((state) => {
         if (myPlayerId !== state.hostId) return state;
-        return engineStartGame(state, buildCanonicalDeck());
+        const started = engineStartGame(state, buildCanonicalDeck());
+        return started.devScenario && process.env.NODE_ENV !== 'production'
+          ? applyDevReactionScenario(started, started.devScenario as DevReactionScenario, started.hostId)
+          : started;
       }),
     [run, myPlayerId]
   );
