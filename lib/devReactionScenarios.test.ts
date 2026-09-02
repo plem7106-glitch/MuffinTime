@@ -16,6 +16,17 @@ describe('development reaction scenarios', () => {
     expect(new Set(zones).size).toBe(zones.length);
   });
 
+  it('creates the C01 fixture with a natural A063 source action and no reaction state', () => {
+    const state = createDevReactionScenario('c01-a063', 'me', 'Tester');
+    expect(state.players.me.hand).toEqual(['C01']);
+    expect(state.players['bot-1'].hand).toEqual(['A063', 'A001', 'A002', 'A003']);
+    expect(state.devForcedBotAction).toEqual({ code: 'A063', targetId: 'me' });
+    expect(state.reactionStack ?? []).toHaveLength(0);
+    expect(state.pendingResponse ?? null).toBeNull();
+    const zones = Object.values(state.players).flatMap((p) => p.hand).concat(state.drawPile, state.discardPile, state.banishedCards ?? []);
+    expect(new Set(zones).size).toBe(zones.length);
+  });
+
   it('gives S2 a deterministic physical deck top without creating a draw result', () => {
     const state = createDevReactionScenario('s2-c48', 'me', 'Tester');
     expect(state.drawPile.slice(0, 2)).toEqual(['A003', 'A004']);

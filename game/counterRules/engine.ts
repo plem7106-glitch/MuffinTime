@@ -6,6 +6,7 @@ import { skipTurn } from '../turnFlow';
 import { getNextPlayerId } from '../turn';
 import { cloneState } from '../util';
 import { executeRandomSteal } from '../primitives';
+import { resolveSteal } from '../steal';
 import type { CardCode, PlayerId, RoomState, StackFrame } from '../types';
 
 function redirectFrameTarget(state: RoomState, frameId: string, newTargetId: PlayerId): RoomState {
@@ -255,8 +256,8 @@ export function resolveCounterEffect(
       const parentId = resolvingFrame?.parentFrameId ?? (resolvingFrame?.customPayload?.parentFrameId as string | undefined);
       const parentFrame = parentId ? getStackFrame(state, parentId) : undefined;
       if (!parentFrame) return state;
-      const count = Number(resolvingFrame?.customPayload?.stealCount ?? 1);
-      return executeRandomSteal(state, parentFrame.actorId, actorId, count).state;
+      const count = Math.max(0, Number(resolvingFrame?.customPayload?.stealCount ?? 1));
+      return resolveSteal(state, parentFrame.actorId, actorId, count, 'random', actorId, 'C01');
     }
     case 'C13': {
       let next = cloneState(state);

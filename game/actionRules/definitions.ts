@@ -517,7 +517,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'จั่วไพ่ 3 ใบ แล้วเลือกผู้เล่นอีก 1 คนให้จั่ว 3 ใบเช่นกัน',
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้จั่วไพ่ 3 ใบด้วยกัน',
     executeEffect: (state, frame) => {
-      const afterSelf = draw(state, frame.actorId, 3);
+      const multiplier = Number(frame.customPayload?.numericMultiplier ?? 1);
+      const afterSelf = draw(state, frame.actorId, 3 * multiplier);
       const targetId = frame.targetIds[0];
       const count = 3 * (Number(frame.customPayload?.numericMultiplier ?? 1));
       return targetId ? resolveForcedDraw(afterSelf, targetId, count, frame.actorId, frame.sourceCode, frame.frameId) : afterSelf;
@@ -538,7 +539,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'เลือกผู้เล่นอีก 1 คนมาชนแก้วด้วยกัน ทั้งคู่จั่วไพ่คนละ 2 ใบ',
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้มาชนแก้วด้วยกัน',
     executeEffect: (state, frame) => {
-      const afterSelf = draw(state, frame.actorId, 2);
+      const multiplier = Number(frame.customPayload?.numericMultiplier ?? 1);
+      const afterSelf = draw(state, frame.actorId, 2 * multiplier);
       const targetId = frame.targetIds[0];
       const count = 2 * (Number(frame.customPayload?.numericMultiplier ?? 1));
       return targetId ? resolveForcedDraw(afterSelf, targetId, count, frame.actorId, frame.sourceCode, frame.frameId) : afterSelf;

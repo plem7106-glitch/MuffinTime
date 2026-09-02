@@ -2,7 +2,7 @@ import { allCards } from '../data/cards/index';
 import { addPlayer, createRoom, startGame } from '../game/room';
 import type { CardCode, RoomState } from '../game/types';
 
-export type DevReactionScenario = 'r1-simple-counter' | 'r2-c35' | 'r5-counter-chain' | 'r6-multiple-responders' | 's1-c43' | 's2-c48' | 's3-c50' | 's4-c41';
+export type DevReactionScenario = 'r1-simple-counter' | 'r2-c35' | 'r5-counter-chain' | 'r6-multiple-responders' | 's1-c43' | 's2-c48' | 's3-c50' | 's4-c41' | 'c01-a063';
 
 const hands: Record<DevReactionScenario, CardCode[][]> = {
   'r1-simple-counter': [['A016'], ['C17'], ['A002']],
@@ -13,6 +13,7 @@ const hands: Record<DevReactionScenario, CardCode[][]> = {
   's2-c48': [['A016'], ['C48'], ['A002']],
   's3-c50': [['A001'], ['C50'], ['A002']],
   's4-c41': [['A016'], ['C41'], ['A002']],
+  'c01-a063': [['A063', 'A001', 'A002', 'A003'], ['C01'], ['A004']],
 };
 
 export function createDevReactionScenario(scenario: DevReactionScenario, hostId: string, hostName: string): RoomState {
@@ -41,6 +42,10 @@ export function createDevReactionScenario(scenario: DevReactionScenario, hostId:
     if (scenario === 's2-c48') {
       state.drawPile = ['A003', 'A004', ...state.drawPile.filter((code) => code !== 'A003' && code !== 'A004')];
     }
+  }
+  if (scenario === 'c01-a063') {
+    state.currentTurnIndex = 0;
+    state.devForcedBotAction = { code: 'A063', targetId: hostId };
   }
   return state;
 }

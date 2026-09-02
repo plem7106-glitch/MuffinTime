@@ -387,6 +387,7 @@ function CreateRoomContent() {
                 <option value="s2-c48">S2 C48 Draw</option>
                 <option value="s3-c50">S3 C50 Steal</option>
                 <option value="s4-c41">S4 C41 Pure Social</option>
+                <option value="c01-a063">C01 A063 Steal Count</option>
               </select>
             </label>
           )}

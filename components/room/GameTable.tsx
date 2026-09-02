@@ -125,6 +125,7 @@ export function GameTable() {
   // Generic digital Counter target flow state. Selection is local until Confirm.
   const [pendingCounterCode, setPendingCounterCode] = useState<CardCode | null>(null);
   const [chosenCounterTarget, setChosenCounterTarget] = useState<PlayerId | null>(null);
+  const [pendingCounterCount, setPendingCounterCount] = useState<CardCode | null>(null);
 
   // Auto-close trap open flow or C04 target flow if a counter response window opens or closes
   useEffect(() => {
@@ -728,6 +729,10 @@ export function GameTable() {
         responseId={pendingResponse?.responseId}
         onPlayCounter={(code) => {
           if (!pendingResponse) return;
+          if (code === 'C01') {
+            setPendingCounterCount(code);
+            return;
+          }
           if (getCounterInteraction(code).requiresTarget) {
             setPendingCounterCode(code);
             setChosenCounterTarget(null);
@@ -744,6 +749,10 @@ export function GameTable() {
         counterCards={validCounterCards}
         onPlay={(code) => {
           if (!pendingResponse) return;
+          if (code === 'C01') {
+            setPendingCounterCount(code);
+            return;
+          }
           if (getCounterInteraction(code).requiresTarget) {
             setPendingCounterCode(code);
             setChosenCounterTarget(null);
@@ -771,6 +780,18 @@ export function GameTable() {
           setChosenSocialTarget(null);
         }}
         prompt={pendingSocialCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+      <NumberInputModal
+        open={pendingCounterCount === 'C01' && pendingResponse !== null}
+        prompt="จำนวนไพ่ที่จะขโมย"
+        min={1}
+        max={pendingResponse ? state.players[pendingResponse.actorId]?.hand.length ?? 1 : 1}
+        onConfirm={(value) => {
+          if (!pendingResponse || pendingCounterCount !== 'C01') return;
+          playCounter('C01', pendingResponse.responseId, undefined, { stealCount: value });
+          setPendingCounterCount(null);
+        }}
+        onCancel={() => setPendingCounterCount(null)}
       />
       <TargetSelector
         open={pendingCounterCode !== null && pendingResponse !== null}

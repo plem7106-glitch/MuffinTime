@@ -159,6 +159,61 @@ describe('Counter Phase 6A — Special Digital Counters (C01, C13, C19, C23, C32
     expect(state.players['p2'].hand.length).toBe(6); // 4 initial + C01 added - C01 spent + 2 stolen = 6
   });
 
+  it('C01 — canonical steal lifecycle is intercepted by C28 and then finalized', () => {
+    let state = setupTestState();
+    state.players.p2.hand.push('C01');
+    state.players.p1.hand = ['A001', 'A002', 'A003', 'A004', 'C28'];
+
+    state = resolveActionWithCounterWindow(state, 'p1', 'A063', ['p2']);
+    const actionFrameId = getTopFrame(state)!.frameId;
+    state = playCounterEngine(state, 'p2', 'C01', actionFrameId, { stealCount: 2 });
+    const c01Frame = getTopFrame(state)!;
+    for (const pid of c01Frame.eligibleResponderIds) {
+      if (c01Frame.responses[pid]?.status === 'pending') {
+        state = submitResponse(state, c01Frame.frameId, pid, { status: 'skipped' });
+      }
+    }
+    state = resolveCompletedStackFrames(state);
+
+    const stealFrame = getTopFrame(state)!;
+    expect(stealFrame.sourceCode).toBe('STEAL');
+    const operationId = Object.keys(state.pendingSteals ?? {})[0];
+    expect(operationId).toBeTruthy();
+    expect(state.players.p2.hand).not.toContain('C01');
+    expect(state.discardPile.filter((code) => code === 'C01')).toHaveLength(1);
+
+    state = playCounterEngine(state, 'p1', 'C28', stealFrame.frameId);
+    state = skipCounterEngine(state);
+
+    expect(state.pendingSteals?.[operationId!]).toBeUndefined();
+    expect(state.reactionStack ?? []).toHaveLength(0);
+    expect(state.players.p1.hand).toHaveLength(2);
+    expect(state.players.p2.hand).toHaveLength(6);
+    expect(state.discardPile.filter((code) => code === 'C28')).toHaveLength(1);
+    expect(state.discardPile.filter((code) => code === 'A063')).toHaveLength(1);
+    expect(state.players.p1.hand).not.toContain('C28');
+  });
+
+  it.each([
+    ['3 requested / 3 available', 3, 3],
+    ['4 requested / 2 available', 4, 2],
+    ['requested >0 / 0 available', 2, 0],
+  ])('C01 edge — %s clamps in canonical resolveSteal', (_label, requested, available) => {
+    let state = setupTestState();
+    state.players.p1.hand = Array.from({ length: available }, (_, i) => `A${String(i + 1).padStart(3, '0')}` as CardCode);
+    state.players.p2.hand = ['C01'];
+    state = resolveActionWithCounterWindow(state, 'p1', 'A063', ['p2']);
+    const actionFrameId = getTopFrame(state)!.frameId;
+    state = playCounterEngine(state, 'p2', 'C01', actionFrameId, { stealCount: requested });
+    state = skipCounterEngine(state);
+
+    expect(state.players.p1.hand).toHaveLength(available - Math.min(requested, available));
+    expect(state.players.p2.hand).toHaveLength(Math.min(requested, available));
+    expect(state.pendingSteals ?? {}).toEqual({});
+    expect(state.reactionStack ?? []).toHaveLength(0);
+    expect(state.discardPile.filter((code) => code === 'C01')).toHaveLength(1);
+  });
+
   it('C01 — Countered by C29 (A063 Resumes, 0 Cards Stolen)', () => {
     let state = setupTestState();
     state.players['p2'].hand.push('C01');
@@ -262,6 +317,20 @@ describe('Counter Phase 6A — Special Digital Counters (C01, C13, C19, C23, C32
 
     // C23 cancelled! Normal count 5 applied -> P2 draws 5!
     expect(state.players['p2'].hand.length).toBe(4 + 5);
+  });
+
+  it('C23 — A052 doubles both the actor draw branch and target request', () => {
+    let state = setupTestState();
+    state.players.p2.hand.push('C06');
+    state = executeActionFrameEffect(state, {
+      frameId: 'a052-c23', parentFrameId: null, sourceType: 'action', sourceCode: 'A052', actorId: 'p1',
+      targetIds: ['p2'], targetScope: 'single', eligibleResponderIds: [], responses: {},
+      modifiers: [], status: 'resolving', turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      customPayload: { numericMultiplier: 2 },
+    });
+    expect(state.players.p1.hand).toHaveLength(10);
+    expect(state.pendingForcedDraws).toBeDefined();
+    expect(Object.values(state.pendingForcedDraws ?? {})[0]?.requestedCount).toBe(6);
   });
 
   it('C32 — Really Far Away (Stops Trap T01 & Grants Trap Immunity Until Next Turn)', () => {
