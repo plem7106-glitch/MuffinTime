@@ -110,10 +110,34 @@ independently).
   has now happened twice on this project (see both divergence notes above); treat a third
   occurrence as the expected case to check for, not a surprise.
 - Last known-good check on this branch (post-Cluster-C checkpoint, post-merge with `main`'s
-  Counter-card engine at `73f74ba`): `npx vitest run` → 781 passed (58 files), `npx tsc
-  --noEmit` → clean. Run both again before you start — confirm your baseline. (628/44 was
-  the count before this merge — the jump to 781/58 is entirely the Counter-card engine's own
-  tests landing, not anything Cluster C added.)
+  Counter-card engine at `73f74ba`, post final-review fix wave at `daab350`): `npx vitest
+  run` → 782 passed (58 files), `npx tsc --noEmit` → clean. Run both again before you start
+  — confirm your baseline. (628/44 was the count before the `main` merge — the jump to
+  781/58 was entirely the Counter-card engine's own tests landing, not anything Cluster C
+  added; 782 is +1 from a regression test added by the final-review fix wave, see below.)
+- **Cluster C's final whole-branch review found two real, Important-severity bugs from
+  extending `RoomState.pendingInteraction` to a second producer/consumer** (previously only
+  T10's date-invite trap used it) — both fixed in commit `daab350`, both worth knowing about
+  if you extend `pendingInteraction` again for a future card:
+  1. `game/trapRules/engine.ts`'s `initiateTrapInteraction` unconditionally overwrote
+     `pendingInteraction` with no occupancy guard — activating T10 while an A126/A130
+     delegated pick was in flight silently destroyed the in-flight interaction (card already
+     discarded, effect permanently lost, no error shown). Fixed with a one-line guard
+     (`if (state.pendingInteraction) return cloneState(state);`), covered by a new
+     regression test in `game/trapRules/batch1.test.ts`.
+  2. `lib/session.tsx`'s bot auto-respond effect (for T10) fired on ANY `pendingInteraction`
+     targeting a bot, without checking `interaction.type` — so **A126/A130 were 100% broken
+     in the project's own "🤖 เล่นกับบอท (Test Mode)"**, the primary bot smoke-test surface,
+     since in an all-bot room the delegated player is always a bot. Fixed by scoping that
+     effect to `type === 'date_invite'` only — a delegated pick targeting a bot now correctly
+     stays blocked (recoverable via host-unstick) instead of silently fizzling, matching the
+     already-documented "bots bypass this cluster's mechanics" precedent from Cluster A.
+  **Lesson for whoever extends `pendingInteraction` next**: grep every existing
+  producer (`initiateTrapInteraction`, `initiateDelegatedTargetPick`) and consumer
+  (the bot auto-respond effect, plus the already-known `canEndTurn`/`drawCard`/`playAction`/
+  `hostSkipTurn`/`PresentationBridge` list) before adding a new interaction `type` — the
+  design spec for Cluster C enumerated only the consumer side and missed both producer-side
+  issues.
 - **A card whose `executeEffect` triggers a turn transition (calling `resolveTurnArrival`
   or anything reaching `checkWinnerAtTurnStart`) must independently guard against running
   that chain on a player who didn't genuinely just have their turn begin.** Cluster B (A119)
