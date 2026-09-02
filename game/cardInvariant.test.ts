@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCanonicalDeck } from '../data/cards/deck';
-import { addPlayer, createRoom, startGame } from './room';
+import { addPlayer, createRoom, restartGame, startGame } from './room';
 import { inspectCardConservation, assertCardConservation } from './cardInvariant';
 import { draw, discard } from './pile';
 import { placeTrap, removeTrap } from './trap';
@@ -62,5 +62,27 @@ describe('card conservation invariant', () => {
     assertCardConservation(state);
     state = swapHands(state, 'p1', 'p2');
     assertCardConservation(state);
+  });
+
+  it('preserves every card through restartGame, including a placed trap and reaction-stack metadata', () => {
+    let state = startedRoom();
+    const trapIndex = state.drawPile.findIndex((code) => code.startsWith('T'));
+    const trapCode = state.drawPile.splice(trapIndex, 1)[0];
+    state.players.p1.hand.push(trapCode);
+    state = placeTrap(state, 'p1', trapCode);
+    assertCardConservation(state);
+    state = pushStackFrame(state, {
+      sourceType: 'trap',
+      sourceCode: trapCode,
+      actorId: 'p1',
+      targetIds: ['p2'],
+      targetScope: 'single',
+      eligibleResponderIds: ['p2'],
+    });
+    assertCardConservation(state);
+
+    const next = restartGame(state, () => 0.5);
+    assertCardConservation(next);
+    expect(next.reactionStack).toEqual([]);
   });
 });

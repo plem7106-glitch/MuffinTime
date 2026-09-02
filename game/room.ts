@@ -267,3 +267,76 @@ export function resetForPlayAgain(state: RoomState): RoomState {
   next.roundNumber = 1;
   return next;
 }
+
+/**
+ * A092 "ฉันบ้าไปแล้ว!" (I'm Crazy!): mid-game full restart. Unlike
+ * resetForPlayAgain (which requires status 'finished'/'ended' and detours
+ * through 'lobby'), this fires while status stays 'playing' -- it pools
+ * every card currently anywhere in the game (not a fresh canonical deck,
+ * per the card's own text), reshuffles, deals 3 fresh cards per player, and
+ * resets turn order/win state/reaction-stack state. Room/social identity
+ * fields (hostId, joinOrder, maxPlayers, gameSuggesterId, playDirection,
+ * and each PlayerState's name/connected/birthdayMMDD) are deliberately left
+ * untouched -- see the design spec's rulings for why gameSuggesterId in
+ * particular is preserved rather than cleared.
+ */
+export function restartGame(state: RoomState, rng: Rng = Math.random): RoomState {
+  if (state.status !== 'playing') return cloneState(state);
+  const next = cloneState(state);
+  const playerIds = Object.keys(next.players);
+
+  // "นำไพ่ทั้งหมดกลับเข้ากอง" -- pool every card currently anywhere in the
+  // game (not a fresh canonical deck).
+  const pool: CardCode[] = [...next.drawPile, ...next.discardPile];
+  for (const pid of playerIds) {
+    pool.push(...next.players[pid].hand, ...next.players[pid].traps);
+  }
+  next.drawPile = shuffle(pool, rng);
+  next.discardPile = [];
+
+  const seatOrder =
+    next.seatOrder && next.seatOrder.length === playerIds.length && next.seatOrder.every((id) => next.players[id])
+      ? next.seatOrder
+      : playerIds;
+  next.seatOrder = [...seatOrder];
+  next.turnOrder = [...seatOrder];
+  next.direction = next.playDirection === 'counterclockwise' ? -1 : 1;
+
+  for (const pid of playerIds) {
+    next.players[pid].hand = [];
+    next.players[pid].traps = [];
+    next.players[pid].hasCalledMuffinTime = false;
+    next.players[pid].skipNextTurn = false;
+    resetPlayerPerTurnFlags(next.players[pid]);
+  }
+  for (const pid of next.turnOrder) {
+    for (let i = 0; i < 3; i++) {
+      next.players[pid].hand.push(next.drawPile.pop()!);
+    }
+  }
+
+  next.currentTurnIndex = 0;
+  next.muffinTimeTarget = 10;
+  next.winnerId = undefined;
+  next.finishReason = undefined;
+  next.gameEndReason = undefined;
+  next.winnerPlayerIds = undefined;
+  next.finalHandCounts = undefined;
+  next.globalRestrictions = [];
+  next.pendingWinChecks = [];
+  next.pendingActionObligations = undefined;
+  next.actionRedirect = null;
+  next.reactionStack = [];
+  next.pendingResponse = null;
+  next.pendingInteraction = null;
+  next.lastResult = null;
+  next.isShufflingDrawPile = false;
+  next.shuffleSequence = 0;
+  next.placedTrapMeta = {};
+  next.pendingForcedDiscards = {};
+  next.roundNumber = 1;
+  next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
+
+  const firstPlayerId = next.turnOrder[0];
+  return beginTurn(next, firstPlayerId);
+}
