@@ -61,34 +61,39 @@ unconditionally, ignoring the flag).
 
 ## Approach
 
-`game/turn.ts` gains one new exported function, `jumpToPlayerTurn(state, targetId)`, plus
-two internal refactors that generalize existing logic rather than duplicate it a third
-and fourth time:
+**Update (post-merge with `main`):** this spec originally proposed extracting a
+`resetPerTurnFlags(player)` helper to avoid a third copy of the per-turn reset checklist.
+Between writing this spec and starting implementation, `feature/birthday-cards` was merged
+with `main`'s independent "Trap Fix"/"Trap and card" commits (see the handoff doc's
+"Branch state" section), which had *already* built exactly this consolidation — a
+`beginTurn(state, activePlayerId)` function in `game/turn.ts` that resets every per-turn
+`PlayerState` flag (including `bonusActionPlaysRemaining`/`mustPlayActionThisTurn`, folded
+in during the merge) and clears a matching `GlobalRestriction`, called by both
+`advanceTurn` and `emergencyForceSkipTurn`. **`jumpToPlayerTurn` should call `beginTurn`
+directly instead of building a redundant helper.** The `resolveTurnArrival` extraction
+below is still needed — `main`'s refactor didn't touch the `resolvePendingWinChecks`/
+`resolvePendingActionObligations` chain, which still only exists inlined in
+`lib/session.tsx`'s `advanceAndCheckWin`.
 
-1. **`resetPerTurnFlags(player)`** (new, private to `game/turn.ts`) — the reset checklist
-   (`placedTrapThisTurn`, `hasDrawnThisTurn`, `hasPlayedActionThisTurn`,
-   `bonusActionPlaysRemaining`, `mustPlayActionThisTurn`) currently duplicated verbatim in
-   both `advanceTurn` and `emergencyForceSkipTurn`. Extracting it here means `jumpToPlayerTurn`
-   doesn't become a *third* copy — directly addresses the final Cluster A review's
-   recommendation, since this cluster is about to add exactly the kind of new "lands on a
-   player" call site that recommendation anticipated.
-2. **`resolveTurnArrival(state, currentId)`** (new, exported from `game/turn.ts`) — the
-   `resolvePendingWinChecks` → win-check → `resolvePendingActionObligations` chain
-   currently inlined in `lib/session.tsx`'s `advanceAndCheckWin`. Extracting it lets both
-   `advanceAndCheckWin` (a normal turn-end) and A119's `executeEffect` (an immediate jump)
-   call the identical, already-tested resolution chain instead of `advanceAndCheckWin`
-   growing a twin. `advanceAndCheckWin` itself becomes a thin wrapper:
-   `resolveTurnArrival(advanceTurn(room), currentId)`.
-3. **`jumpToPlayerTurn(state, targetId)`** (new, exported) — two-phase walk (see "Ruling
-   confirmed" and "Design decisions" above), landing on `targetId` (or past them if
-   skip-flagged), then calling `resetPerTurnFlags` for whoever it lands on, clearing a
-   `GlobalRestriction` sourced by them, bumping `roundNumber` if a lap boundary was crossed,
-   and incrementing `sequenceNumber` — the same tail `advanceTurn` already performs for its
-   own landed-on player, just reached via a multi-step walk instead of a single step.
-   Guards defensively at the top, mirroring `advanceTurn`'s own `if (count <= 0) return
-   next;`: no-ops (returns the state unchanged, cloned) if `turnOrder` is empty or
-   `targetId` isn't found in it — the UI's `TargetSelector` should never actually produce
-   an invalid target, but the function doesn't trust that from the outside.
+`game/turn.ts` gains two new exported functions:
+
+1. **`resolveTurnArrival(state, currentId)`** — the `resolvePendingWinChecks` → win-check
+   → `resolvePendingActionObligations` chain currently inlined in `lib/session.tsx`'s
+   `advanceAndCheckWin`. Extracting it lets both `advanceAndCheckWin` (a normal turn-end)
+   and A119's `executeEffect` (an immediate jump) call the identical, already-tested
+   resolution chain instead of `advanceAndCheckWin` growing a twin. `advanceAndCheckWin`
+   itself becomes a thin wrapper: `resolveTurnArrival(advanceTurn(room), currentId)`.
+2. **`jumpToPlayerTurn(state, targetId)`** — two-phase walk (see "Ruling confirmed" and
+   "Design decisions" above), landing on `targetId` (or past them if skip-flagged), then
+   calling `beginTurn(next, activePlayerId)` for whoever it lands on (handles the
+   flag-reset/restriction-clearing tail for free — no new reset logic to write or
+   maintain), bumping `roundNumber` if a lap boundary was crossed, and incrementing
+   `sequenceNumber` — the same tail `advanceTurn` already performs for its own landed-on
+   player, just reached via a multi-step walk instead of a single step. Guards defensively
+   at the top, mirroring `advanceTurn`'s own `if (count <= 0) return next;`: no-ops
+   (returns the state unchanged, cloned) if `turnOrder` is empty or `targetId` isn't found
+   in it — the UI's `TargetSelector` should never actually produce an invalid target, but
+   the function doesn't trust that from the outside.
 
 A119's card definition in `game/actionRules/definitions.ts`:
 
@@ -124,13 +129,12 @@ case-by-case basis, not assume this pattern generalizes automatically.
 ## Testing plan
 
 - `game/turn.test.ts`: `jumpToPlayerTurn` — happy path (lands on target, resets their
-  flags, clears their restriction), wraps `roundNumber` correctly in both directions,
-  honors a skip-flagged target (clears the flag, continues past), leaves in-between
-  players' `skipNextTurn`/pending-check state completely untouched. Plus tests for the two
-  extracted helpers (`resolveTurnArrival` covering win-check/obligation resolution reused
-  from Cluster A/Group 2's existing test shapes; a light sanity check that `advanceTurn`'s
-  existing test suite still passes unchanged after the `resetPerTurnFlags` extraction,
-  since it's a pure refactor of already-tested code).
+  flags via `beginTurn`, clears their restriction), wraps `roundNumber` correctly in both
+  directions, honors a skip-flagged target (clears the flag, continues past), leaves
+  in-between players' `skipNextTurn`/pending-check state completely untouched. Plus tests
+  for `resolveTurnArrival` covering win-check/obligation resolution, reused from Cluster
+  A/Group 2's existing test shapes. `beginTurn` itself is already tested (via `main`'s
+  `game/turnRules.test.ts` and `advanceTurn`'s own suite) — no new tests needed for it.
 - `game/actionRules/definitions.test.ts`: A119's `executeEffect` — jumps to the chosen
   target, no-op when no target is picked.
 - `lib/session.tsx`'s `advanceAndCheckWin` has no direct test file (established convention
