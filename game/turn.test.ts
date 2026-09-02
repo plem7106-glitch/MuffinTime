@@ -643,22 +643,29 @@ describe('jumpToPlayerTurn (A119)', () => {
     expect(next.globalRestrictions).toEqual([{ type: 'no_win', sourcePlayerId: 'p1' }]);
   });
 
-  it('walks backward when direction is -1', () => {
+  it('walks backward when direction is -1, crossing the lap boundary a clockwise walk to the same target would not', () => {
+    // currentTurnIndex 1 (p2) -> target p4 (index 3). Phase 1's landing
+    // index is always order.indexOf(targetId) regardless of direction, so a
+    // test must assert on something direction actually changes along the
+    // way -- here, whether the walk crosses index 0:
+    //   clockwise (dir 1):  1 -> 2 -> 3, never touches index 0, no wrap
+    //   counterclockwise (dir -1): 1 -> 0 -> 3, crosses index 0 immediately
     const state = {
       turnOrder: ['p1', 'p2', 'p3', 'p4'],
-      currentTurnIndex: 0,
+      currentTurnIndex: 1,
       direction: -1,
+      roundNumber: 1,
       players: {
         p1: { skipNextTurn: false },
         p2: { skipNextTurn: false },
-        p3: { skipNextTurn: false, hasDrawnThisTurn: true },
-        p4: { skipNextTurn: false },
+        p3: { skipNextTurn: false },
+        p4: { skipNextTurn: false, hasDrawnThisTurn: true },
       },
     } as unknown as RoomState;
-    const next = jumpToPlayerTurn(state, 'p3');
-    // Counterclockwise from p1: p4, p3 -- lands on p3 (index 2).
-    expect(next.currentTurnIndex).toBe(2);
-    expect(next.players.p3.hasDrawnThisTurn).toBe(false);
+    const next = jumpToPlayerTurn(state, 'p4');
+    expect(next.currentTurnIndex).toBe(3);
+    expect(next.players.p4.hasDrawnThisTurn).toBe(false);
+    expect(next.roundNumber).toBe(2);
   });
 
   it('terminates and clears every flag when every other player is skip-flagged, landing back on the target', () => {
