@@ -89,7 +89,7 @@ describe('card conservation invariant', () => {
     state.drawPile.push('A064');
     state = draw(state, 'p2', 1);
     assertCardConservation(state);
-    expect(state.players.p2.hand).toContain('A064');
+    expect(state.players.p2.hand).toEqual(['A064']);
   });
 
   it('preserves every card through restartGame with A064 sitting mid-drawPile', () => {
