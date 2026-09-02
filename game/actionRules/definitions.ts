@@ -976,10 +976,22 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state) => rosterSkipTurn(state, extremeByHandSize(state, 'max')),
   },
 
-  // The following is deliberately NOT included in this batch -- it needs
-  // real new infrastructure this codebase doesn't have yet, not just a UI
-  // picker like the earlier "ponytail" simplifications:
-  //  - A158 (a live per-player drink-count tally): no such counter exists.
+  // A158: "if you haven't drunk this round, steal 3 from whoever has drunk
+  // the most" -- no per-player drink counter exists anywhere in this
+  // codebase (or gets added here). Resolved live, honor-system, via
+  // needsDrinkCheck's two-step UI flow (outcome toggle, then a conditional
+  // target pick) -- see its doc comment in ./types.ts.
+  A158: {
+    code: 'A158', name_en: 'Sober Spy', name_th: 'ตาสว่างยามเมา', kind: 'auto',
+    needsDrinkCheck: true,
+    outcomePrompt: 'คุณดื่มไปหรือยังในรอบนี้?', outcomeYesLabel: 'ดื่มแล้ว', outcomeNoLabel: 'ยังไม่ดื่ม',
+    targetPrompt: 'ใครดื่มมากที่สุดตอนนี้?',
+    description_th: 'ถ้าคุณยังไม่ได้ดื่มเลยในรอบนี้ ขโมยไพ่ 3 ใบจากผู้เล่นที่ดื่มมากที่สุด',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+    },
+  },
 
   // A118: steal 3 from whoever suggested this game (RoomState.gameSuggesterId,
   // host-picked during setup -- see game/room.ts's setGameSuggester).

@@ -42,6 +42,16 @@ export interface ActionRuleDefinition {
   numberInputPrompt?: string;
   numberInputMin?: number;
   numberInputMax?: number;
+  /** Honor-system "have you drunk this round?" gate (A158) -- there is no
+   * persistent drink-count tracking anywhere in this codebase, and this
+   * card deliberately does not add any. The UI asks live, at play time: an
+   * outcome toggle first ("already drunk?" -- if yes, resolves with no
+   * target and executeEffect no-ops), then, only if "not yet", a single
+   * target pick ("who has drunk the most?"). Reuses outcomePrompt/
+   * outcomeYesLabel/outcomeNoLabel for step 1 and targetPrompt for step 2 --
+   * no new customPayload accessor needed, executeEffect just reads
+   * frame.targetIds[0] the same way plain needsTargetSelection cards do. */
+  needsDrinkCheck?: boolean;
   executeEffect: (state: RoomState, frame: StackFrame) => RoomState;
 }
 

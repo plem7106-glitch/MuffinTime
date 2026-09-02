@@ -1155,3 +1155,17 @@ describe('A118 (steals 3 from whoever suggested this game)', () => {
     expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
   });
 });
+
+describe('A158 (honor-system: ask live, no persistent drink tracking)', () => {
+  it('steals up to 3 cards from the chosen target when the actor picked one (has not drunk)', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A158', 'me', 'p2');
+    expect(next.players.p2.hand.length).toBe(0); // only had 3
+    expect(next.players.me.hand.length).toBe(4); // 1 + 3 stolen
+  });
+
+  it('is a no-op when no target was picked (actor already drunk this round)', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A158', 'me')).toEqual(state);
+  });
+});

@@ -87,6 +87,11 @@ export function GameTable() {
   const [dualPickPhase, setDualPickPhase] = useState<'first' | 'second' | null>(null);
   const [dualPickFirstId, setDualPickFirstId] = useState<PlayerId | null>(null);
 
+  // Honor-system drink-check flow (A158: outcome toggle, then -- only if
+  // "haven't drunk yet" -- a single target pick. No persistent drink
+  // tracking anywhere; resolved live at play time.)
+  const [drinkCheckPhase, setDrinkCheckPhase] = useState<'outcome' | 'target' | null>(null);
+
   // Trap Open Flow State
   const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
   const [trapTargetPrompt, setTrapTargetPrompt] = useState<string>('เลือกผู้เล่นเป้าหมาย');
@@ -201,6 +206,7 @@ export function GameTable() {
     const rule = getActionRule(card.code);
     setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
     setDualPickFirstId(null);
+    setDrinkCheckPhase(rule?.needsDrinkCheck ? 'outcome' : null);
   };
 
   const pendingActionRule = pendingTargetCard ? getActionRule(pendingTargetCard.code) : undefined;
@@ -253,6 +259,28 @@ export function GameTable() {
     if (!pendingTargetCard) return;
     playAction(pendingTargetCard.code, undefined, { numberInput });
     setPendingTargetCard(null);
+  };
+
+  const handleDrinkCheckCancel = () => {
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setDrinkCheckPhase(null);
+  };
+
+  const handleDrinkOutcomeSelect = (alreadyDrunk: boolean) => {
+    if (!pendingTargetCard) return;
+    if (alreadyDrunk) {
+      playAction(pendingTargetCard.code);
+      handleDrinkCheckCancel();
+      return;
+    }
+    setDrinkCheckPhase('target');
+  };
+
+  const handleDrinkTargetConfirm = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    playAction(pendingTargetCard.code, chosenTarget);
+    handleDrinkCheckCancel();
   };
 
   // Handlers for Opening Active Traps
@@ -457,7 +485,7 @@ export function GameTable() {
           when the card's rule needs a roster_select -- e.g. "who matches this
           condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
-        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput}
+        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput && !pendingActionRule?.needsDrinkCheck}
         candidates={opponentCandidates}
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
@@ -525,6 +553,26 @@ export function GameTable() {
         max={pendingActionRule?.numberInputMax}
         onConfirm={handleNumberInputConfirm}
         onCancel={() => setPendingTargetCard(null)}
+      />
+
+      {/* 10.7 Action Card Drink Check (A158: honor-system outcome toggle,
+          then -- only if "haven't drunk yet" -- a single target pick) */}
+      <OutcomeToggle
+        open={pendingTargetCard !== null && pendingActionRule?.needsDrinkCheck === true && drinkCheckPhase === 'outcome'}
+        prompt={pendingActionRule?.outcomePrompt ?? pendingTargetCard?.effect ?? ''}
+        yesLabel={pendingActionRule?.outcomeYesLabel}
+        noLabel={pendingActionRule?.outcomeNoLabel}
+        onSelect={handleDrinkOutcomeSelect}
+        onCancel={handleDrinkCheckCancel}
+      />
+      <TargetSelector
+        open={pendingTargetCard !== null && pendingActionRule?.needsDrinkCheck === true && drinkCheckPhase === 'target'}
+        candidates={opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={(id) => setChosenTarget(id)}
+        onConfirm={handleDrinkTargetConfirm}
+        onCancel={handleDrinkCheckCancel}
+        prompt={pendingActionRule?.targetPrompt ?? pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
       />
 
       {/* 11. Trap Card Open Modal */}
