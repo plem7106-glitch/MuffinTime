@@ -75,14 +75,6 @@ export function canEndTurn(state: RoomState, playerId: PlayerId): boolean {
 }
 
 /**
- * Establishes the canonical per-turn state for an active player beginning their turn:
- * - turnPhase = 'trap_placement'
- * - placedTrapThisTurn = false
- * - hasDrawnThisTurn = false
- * - hasPlayedActionThisTurn = false
- * - Lifts global restrictions created by activePlayerId that were defined to expire on their next turn.
- */
-/**
  * The 5-field per-turn PlayerState reset checklist, shared by beginTurn,
  * game/room.ts's startGame/resetForPlayAgain, and restartGame (A092) --
  * extracted so a future caller of "start this player's turn fresh" doesn't
@@ -96,6 +88,12 @@ export function resetPlayerPerTurnFlags(player: PlayerState): void {
   player.mustPlayActionThisTurn = false;
 }
 
+/**
+ * Establishes the canonical per-turn state for an active player beginning their turn:
+ * - Resets their per-turn flags via resetPlayerPerTurnFlags
+ * - turnPhase = 'trap_placement'
+ * - Lifts global restrictions created by activePlayerId that were defined to expire on their next turn.
+ */
 export function beginTurn(state: RoomState, activePlayerId: PlayerId): RoomState {
   const next = cloneState(state);
   if (next.players[activePlayerId]) {
