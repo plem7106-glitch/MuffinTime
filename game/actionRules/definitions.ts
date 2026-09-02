@@ -1750,6 +1750,20 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
+  // -- Group 1 Cluster A (classification doc's Phase 2 batch, spec:
+  // docs/superpowers/specs/2026-09-02-group1-cluster-a-design.md) --
+
+  A100: {
+    code: 'A100', name_en: 'Muffin Factory', name_th: 'โรงงานมัฟฟิน', kind: 'auto',
+    description_th: 'คุณสามารถเล่น Action เพิ่มอีก 2 ใบในเทิร์นนี้',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      const player = next.players[frame.actorId];
+      player.bonusActionPlaysRemaining = (player.bonusActionPlaysRemaining ?? 0) + 2;
+      return next;
+    },
+  },
+
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so
   // drawing it later fires an extra effect). No existing hook for that in

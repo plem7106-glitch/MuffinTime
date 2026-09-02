@@ -14,6 +14,7 @@ export function HandTrayModal({
   canAct,
   hasDrawnThisTurn,
   hasPlayedActionThisTurn,
+  hasBonusActionPlays,
   isTrapPlacementPhase,
   trapsCount,
   onClose,
@@ -27,6 +28,7 @@ export function HandTrayModal({
   canAct: boolean;
   hasDrawnThisTurn?: boolean;
   hasPlayedActionThisTurn?: boolean;
+  hasBonusActionPlays?: boolean;
   isTrapPlacementPhase?: boolean;
   trapsCount: number;
   onClose: () => void;
@@ -297,7 +299,7 @@ export function HandTrayModal({
                     <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
                       คุณจั่วไพ่ประจำเทิร์นแล้ว (กด จบเทิร์น เพื่อเปลี่ยนตา)
                     </div>
-                  ) : hasPlayedActionThisTurn ? (
+                  ) : hasPlayedActionThisTurn && !hasBonusActionPlays ? (
                     <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
                       คุณใช้แอ็กชันประจำเทิร์นไปแล้ว (แตะกองจั่วเพื่อจั่วไพ่)
                     </div>

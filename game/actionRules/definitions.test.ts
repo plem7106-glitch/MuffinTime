@@ -1212,3 +1212,18 @@ describe('A166 (chugging challenge: target draws on success, actor draws on fail
     expect(executeActionFrameEffect(state, frameWithTargetAndPayload('A166', 'me', 'p2', {}))).toEqual(state);
   });
 });
+
+describe('A100 (grants 2 bonus Action plays this turn)', () => {
+  it('adds 2 to bonusActionPlaysRemaining for the actor', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A100', 'me');
+    expect(next.players.me.bonusActionPlaysRemaining).toBe(2);
+  });
+
+  it('stacks on top of an existing bonus if played again', () => {
+    const state = threePlayerState();
+    state.players.me.bonusActionPlaysRemaining = 1;
+    const next = resolveActionEffect(state, 'A100', 'me');
+    expect(next.players.me.bonusActionPlaysRemaining).toBe(3);
+  });
+});

@@ -447,13 +447,18 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
         const actorId = myPlayerId!;
         const player = state.players[actorId];
-        if (player?.hasPlayedActionThisTurn) return state;
+        const usingBonusPlay = Boolean(player?.hasPlayedActionThisTurn) && (player?.bonusActionPlaysRemaining ?? 0) > 0;
+        if (player?.hasPlayedActionThisTurn && !usingBonusPlay) return state;
         if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
         if ((code === 'A014' || code === 'A016') && !targetId) return state;
         if (targetId && !state.players[targetId]) return state;
         const afterDiscard = discard(state, actorId, 1, [code]);
         if (afterDiscard.players[actorId]) {
-          afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+          if (usingBonusPlay) {
+            afterDiscard.players[actorId].bonusActionPlaysRemaining = (afterDiscard.players[actorId].bonusActionPlaysRemaining ?? 0) - 1;
+          } else {
+            afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+          }
         }
         const next = pushStackFrame(afterDiscard, {
           sourceType: 'action',

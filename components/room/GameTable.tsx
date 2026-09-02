@@ -496,6 +496,7 @@ export function GameTable() {
         canAct={canAct}
         hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
         hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
+        hasBonusActionPlays={(me.bonusActionPlaysRemaining ?? 0) > 0}
         isTrapPlacementPhase={state.turnPhase === 'trap_placement'}
         trapsCount={me.traps.length}
         onClose={() => setIsHandTrayOpen(false)}

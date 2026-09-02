@@ -120,6 +120,9 @@ export interface PlayerState {
    * never a full date. Used only by A037/A066/A137. A player who never sets
    * this is simply excluded from those cards' birthday comparisons. */
   birthdayMMDD?: string;
+  /** A100: extra Action plays available this turn, beyond the normal 1.
+   * Reset to 0 every turn by advanceTurn, same as hasPlayedActionThisTurn. */
+  bonusActionPlaysRemaining?: number;
 }
 
 export interface PendingInteraction {

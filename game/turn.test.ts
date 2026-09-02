@@ -121,6 +121,21 @@ describe('advanceTurn', () => {
     // p3 (whoever seatOrder would have named) must be untouched.
     expect(next.players.p3.hasPlayedActionThisTurn).toBe(true);
   });
+
+  it('resets bonusActionPlaysRemaining to 0 for the incoming player', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: false, bonusActionPlaysRemaining: 2 },
+        p3: { skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    const next = advanceTurn(state);
+    expect(next.players.p2.bonusActionPlaysRemaining).toBe(0);
+  });
 });
 
 describe('emergencyForceSkipTurn', () => {

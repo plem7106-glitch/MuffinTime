@@ -80,6 +80,7 @@ export function advanceTurn(state: RoomState): RoomState {
     next.players[activePlayerId].placedTrapThisTurn = false;
     next.players[activePlayerId].hasDrawnThisTurn = false;
     next.players[activePlayerId].hasPlayedActionThisTurn = false;
+    next.players[activePlayerId].bonusActionPlaysRemaining = 0;
   }
   next.turnPhase = 'trap_placement';
   next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
@@ -244,6 +245,7 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
     next.players[activePlayerId].placedTrapThisTurn = false;
     next.players[activePlayerId].hasDrawnThisTurn = false;
     next.players[activePlayerId].hasPlayedActionThisTurn = false;
+    next.players[activePlayerId].bonusActionPlaysRemaining = 0;
   }
   if (next.globalRestrictions && next.globalRestrictions.length > 0) {
     next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);
