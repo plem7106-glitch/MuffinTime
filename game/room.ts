@@ -1,5 +1,5 @@
 import { cloneState, shuffle } from './util';
-import { beginTurn } from './turn';
+import { beginTurn, resetPlayerPerTurnFlags } from './turn';
 import type { RoomState, PlayerId, CardCode, Rng, PlayDirection } from './types';
 
 export const GLOBAL_MIN_PLAYERS = 3;
@@ -160,11 +160,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   next.status = 'playing';
   next.currentTurnIndex = 0;
   for (const pid of Object.keys(next.players)) {
-    next.players[pid].placedTrapThisTurn = false;
-    next.players[pid].hasDrawnThisTurn = false;
-    next.players[pid].hasPlayedActionThisTurn = false;
-    next.players[pid].bonusActionPlaysRemaining = 0;
-    next.players[pid].mustPlayActionThisTurn = false;
+    resetPlayerPerTurnFlags(next.players[pid]);
   }
   next.actionRedirect = null;
   next.pendingActionObligations = undefined;
@@ -243,18 +239,8 @@ export function resetForPlayAgain(state: RoomState): RoomState {
 
   // Reset match-specific player state
   for (const pid of playerIds) {
-    next.players[pid] = {
-      ...next.players[pid],
-      hand: [],
-      traps: [],
-      hasCalledMuffinTime: false,
-      skipNextTurn: false,
-      placedTrapThisTurn: false,
-      hasDrawnThisTurn: false,
-      hasPlayedActionThisTurn: false,
-      bonusActionPlaysRemaining: 0,
-      mustPlayActionThisTurn: false,
-    };
+    next.players[pid] = { ...next.players[pid], hand: [], traps: [], hasCalledMuffinTime: false, skipNextTurn: false };
+    resetPlayerPerTurnFlags(next.players[pid]);
   }
   next.actionRedirect = null;
   next.pendingActionObligations = undefined;
