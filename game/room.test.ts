@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRoom, addPlayer, removePlayer, startGame, startSetup, setGameSuggester, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
+import { createRoom, addPlayer, removePlayer, startGame, startSetup, setGameSuggester, resetForPlayAgain, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
 
 describe('createRoom', () => {
   it('creates a lobby room with the host as the first player', () => {
@@ -148,6 +148,20 @@ describe('startGame', () => {
     const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
     const started = startGame(room, allCodes, () => 0);
     expect(() => startGame(started, allCodes, () => 0)).toThrow('game already started');
+  });
+});
+
+describe('resetForPlayAgain', () => {
+  it('resets bonusActionPlaysRemaining to 0', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.players.host1.bonusActionPlaysRemaining = 1;
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.players.host1.bonusActionPlaysRemaining).toBe(0);
   });
 });
 
