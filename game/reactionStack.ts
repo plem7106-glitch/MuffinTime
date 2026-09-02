@@ -12,6 +12,8 @@ import type {
   TriggerContext,
 } from './types';
 import { resumePendingForcedDiscard, type ForcedDiscardDestination } from './forcedDiscard';
+import { resumePendingSteal } from './steal';
+import { resumePendingForcedDraw } from './forcedDraw';
 
 export interface CreateFrameParams {
   sourceType: FrameSourceType;
@@ -87,6 +89,10 @@ export function getTopFrame(state: RoomState): StackFrame | undefined {
   return state.reactionStack[state.reactionStack.length - 1];
 }
 
+export function getStackFrame(state: RoomState, frameId: string): StackFrame | undefined {
+  return state.reactionStack?.find((f) => f.frameId === frameId);
+}
+
 /**
  * Keeps `state.pendingResponse` in sync with the top frame for backward compatibility with UI modals.
  */
@@ -99,7 +105,7 @@ export function syncPendingResponseBridge(state: RoomState): RoomState {
 
   const bridge: PendingResponse = {
     responseId: top.frameId,
-    kind: top.sourceType === 'trap' ? 'trap' : 'action',
+    kind: top.sourceType === 'trap' ? 'trap' : top.sourceType === 'counter' ? 'counter' : 'action',
     code: top.sourceCode,
     actorId: top.actorId,
     triggerPlayerIds: top.triggerPlayerIds,
@@ -152,10 +158,16 @@ export function popStackFrame(state: RoomState): { state: RoomState; poppedFrame
 
   syncPendingResponseBridge(next);
   if (poppedFrame) {
-    const linked = Object.values(next.pendingForcedDiscards ?? {}).filter((operation) => operation.causalFrameId === poppedFrame.frameId);
-    for (const operation of linked) {
+    const linkedDiscards = Object.values(next.pendingForcedDiscards ?? {}).filter((operation) => operation.causalFrameId === poppedFrame.frameId);
+    for (const operation of linkedDiscards) {
       const replacement = poppedFrame.customPayload?.replacementDestination as ForcedDiscardDestination | undefined;
       next = resumePendingForcedDiscard(next, operation.operationId, replacement);
+    }
+    const linkedSteals = Object.values(next.pendingSteals ?? {}).filter(
+      (operation) => operation.causalFrameId === poppedFrame.frameId || operation.operationId === poppedFrame.customPayload?.stealOperationId
+    );
+    for (const operation of linkedSteals) {
+      next = resumePendingSteal(next, operation.operationId);
     }
   }
   return { state: next, poppedFrame };
@@ -187,14 +199,26 @@ export function removeStackFrame(
 
   syncPendingResponseBridge(next);
   if (removedFrame) {
-    const linked = Object.values(next.pendingForcedDiscards ?? {}).filter(
+    const linkedDiscards = Object.values(next.pendingForcedDiscards ?? {}).filter(
       (operation) => operation.causalFrameId === removedFrame.frameId
     );
-    for (const operation of linked) {
+    for (const operation of linkedDiscards) {
       const replacement = removedFrame.customPayload?.replacementDestination as
         | ForcedDiscardDestination
         | undefined;
       next = resumePendingForcedDiscard(next, operation.operationId, replacement);
+    }
+    const linkedSteals = Object.values(next.pendingSteals ?? {}).filter(
+      (operation) => operation.causalFrameId === removedFrame.frameId || operation.operationId === removedFrame.customPayload?.stealOperationId
+    );
+    for (const operation of linkedSteals) {
+      next = resumePendingSteal(next, operation.operationId);
+    }
+    const linkedDraws = Object.values(next.pendingForcedDraws ?? {}).filter(
+      (operation) => operation.operationId === removedFrame.customPayload?.forcedDrawOperationId
+    );
+    for (const operation of linkedDraws) {
+      next = resumePendingForcedDraw(next, operation.operationId);
     }
   }
   return { state: next, removedFrame };

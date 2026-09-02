@@ -11,6 +11,9 @@ export const GAME_EVENT_TYPES = {
   CARD_NAME_MATCH: 'EVENT_CARD_NAME_MATCH',
   MUFFIN_TIME_CALLED: 'EVENT_MUFFIN_TIME_CALLED',
   MANUAL_TRIGGER: 'EVENT_MANUAL_TRIGGER',
+  MANUAL_RECOVERY_DISCARD: 'EVENT_MANUAL_RECOVERY_DISCARD',
+  MANUAL_RECOVERY_TRANSFER: 'EVENT_MANUAL_RECOVERY_TRANSFER',
+  SOCIAL_COUNTER_PLAYED: 'EVENT_SOCIAL_COUNTER_PLAYED',
 } as const;
 
 export type GameEventType = (typeof GAME_EVENT_TYPES)[keyof typeof GAME_EVENT_TYPES];
@@ -35,6 +38,7 @@ export interface CardStolenPayload {
   thiefId: PlayerId;
   count: number;
   stolenCards?: CardCode[];
+  operationId?: string;
 }
 
 export interface ActionPlayedPayload {
@@ -77,6 +81,17 @@ export interface ManualTriggerPayload {
   note?: string;
 }
 
+export interface ManualRecoveryDiscardPayload {
+  actorId: PlayerId;
+  count: number;
+}
+
+export interface ManualRecoveryTransferPayload {
+  actorId: PlayerId;
+  recipientId: PlayerId;
+  count: number;
+}
+
 export type EventPayloadMap = {
   [GAME_EVENT_TYPES.FORCED_DISCARD]: ForcedDiscardPayload;
   [GAME_EVENT_TYPES.CARD_STOLEN]: CardStolenPayload;
@@ -88,6 +103,8 @@ export type EventPayloadMap = {
   [GAME_EVENT_TYPES.CARD_NAME_MATCH]: CardNameMatchPayload;
   [GAME_EVENT_TYPES.MUFFIN_TIME_CALLED]: HandCountPayload;
   [GAME_EVENT_TYPES.MANUAL_TRIGGER]: ManualTriggerPayload;
+  [GAME_EVENT_TYPES.MANUAL_RECOVERY_DISCARD]: ManualRecoveryDiscardPayload;
+  [GAME_EVENT_TYPES.MANUAL_RECOVERY_TRANSFER]: ManualRecoveryTransferPayload;
 };
 
 export interface GameEvent<K extends GameEventType = GameEventType> {

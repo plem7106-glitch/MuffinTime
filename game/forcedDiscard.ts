@@ -47,30 +47,78 @@ export function prepareForcedDiscard(
     originalDestination: 'discard_pile', intercepted: false, status: 'prepared' };
 }
 
+import { getPlayableCounters } from './counterRules/registry';
+
+export function getEligibleForcedDiscardResponders(
+  state: RoomState,
+  operation: ForcedDiscardOperation
+): PlayerId[] {
+  if (operation.cardCodes.length === 0) return [];
+  const eligibleResponders: PlayerId[] = [];
+
+  for (const pid of Object.keys(state.players)) {
+    const hand = state.players[pid]?.hand ?? [];
+    const context = {
+      actorId: pid,
+      targetPlayerId: operation.targetPlayerId,
+      operationKind: 'forced_discard' as const,
+      forcedDiscardOp: operation,
+    };
+    const playable = getPlayableCounters(hand, { kind: 'action', code: 'FORCED_DISCARD' }, context);
+    if (playable.length > 0) {
+      eligibleResponders.push(pid);
+    }
+  }
+
+  return eligibleResponders;
+}
+
 export function resolveForcedDiscard(state: RoomState, targetPlayerId: PlayerId, requestedCount: number, sourcePlayerId?: PlayerId, selectedCardCodes?: CardCode[]): RoomState {
   const operation = prepareForcedDiscard(state, targetPlayerId, requestedCount, sourcePlayerId, undefined, selectedCardCodes);
   const reaction = preDiscardReactionResolver?.(state, operation) ?? null;
-  if (reaction) {
+  const eligibleCounterResponders = getEligibleForcedDiscardResponders(state, operation);
+
+  if (reaction || eligibleCounterResponders.length > 0) {
     const pending = preparePendingForcedDiscard(state, operation, 'pending');
-    const linked = pushStackFrame(pending, {
-      ...reaction.frameParams,
-      customPayload: { ...(reaction.frameParams.customPayload ?? {}), forcedDiscardOperationId: operation.operationId },
-    });
+    const baseResponders = reaction?.frameParams.eligibleResponderIds ?? [];
+    const allResponders = Array.from(new Set([...baseResponders, ...eligibleCounterResponders]));
+
+    const frameParams: CreateFrameParams = reaction
+      ? {
+          ...reaction.frameParams,
+          eligibleResponderIds: allResponders,
+          customPayload: { ...(reaction.frameParams.customPayload ?? {}), forcedDiscardOperationId: operation.operationId },
+        }
+      : {
+          sourceType: 'action',
+          sourceCode: 'FORCED_DISCARD',
+          actorId: sourcePlayerId ?? targetPlayerId,
+          targetIds: [targetPlayerId],
+          eligibleResponderIds: allResponders,
+          customPayload: { forcedDiscardOperationId: operation.operationId },
+        };
+
+    const linked = pushStackFrame(pending, frameParams);
     const frameId = linked.reactionStack?.[linked.reactionStack.length - 1]?.frameId;
     if (!frameId) return state;
+
     linked.pendingForcedDiscards![operation.operationId] = {
-      ...linked.pendingForcedDiscards![operation.operationId], causalFrameId: frameId,
+      ...linked.pendingForcedDiscards![operation.operationId],
+      causalFrameId: frameId,
+      status: 'awaiting_reaction',
     };
-    if (reaction.replacementDestination) {
+
+    if (reaction?.replacementDestination) {
       linked.pendingForcedDiscards![operation.operationId] = {
         ...linked.pendingForcedDiscards![operation.operationId],
         finalDestination: reaction.replacementDestination,
         intercepted: reaction.replacementDestination !== operation.originalDestination,
-        status: 'awaiting_reaction',
       };
     }
+
     return linked;
   }
+
   const pending = preparePendingForcedDiscard(state, operation);
   return finalizePendingForcedDiscard(pending, operation.operationId);
 }

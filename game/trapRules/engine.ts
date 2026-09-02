@@ -261,6 +261,23 @@ export function executeTrapFrameEffect(
 ): RoomState {
   const rule = getTrapRule(frame.sourceCode);
   if (rule) {
+    if (frame.targetIds && frame.targetIds.length > 1 && rule.needsTargetSelection) {
+      let next = state;
+      for (const tid of frame.targetIds) {
+        if (!next.players[tid] || next.players[tid].trapImmunityUntilTurn) continue;
+        const subFrame: StackFrame = {
+          ...frame,
+          targetIds: [tid],
+          affectedPlayerIds: [tid],
+        };
+        next = rule.executeEffect(next, subFrame);
+      }
+      return next;
+    }
+    const mainTargetId = frame.targetIds?.[0] ?? frame.affectedPlayerIds?.[0];
+    if (mainTargetId && state.players[mainTargetId]?.trapImmunityUntilTurn) {
+      return state;
+    }
     return rule.executeEffect(state, frame);
   }
   return state;

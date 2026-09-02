@@ -27,6 +27,7 @@ export function createRoom(
     muffinTimeTarget: 10,
     drawPile: [],
     discardPile: [],
+    banishedCards: [],
     maxPlayers: validatedMax,
     players: {
       [hostId]: {

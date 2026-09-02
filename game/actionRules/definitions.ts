@@ -12,6 +12,7 @@ import { drawFromBottom } from '../pile';
 import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
 import { rosterDraws, rosterDiscards, rosterStolenBy, rosterSkipTurn } from '../roster';
+import { resolveForcedDraw } from '../forcedDraw';
 import type { ActionRuleDefinition } from './types';
 import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
@@ -222,7 +223,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     name_th: 'ปาชีส!',
     description_th: 'ผู้เล่นคนอื่นทั้งหมดทิ้งไพ่คนละ 1 ใบ',
     kind: 'auto',
-    executeEffect: (state, frame) => everyoneDiscards(state, 1, [frame.actorId]),
+    executeEffect: (state, frame) => everyoneDiscards(state, 1, frame.targetScope === 'single' ? [] : [frame.actorId], Math.random, frame.actorId, frame.targetScope === 'single' ? frame.targetIds : undefined),
   },
 
   A014: {
@@ -464,7 +465,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const afterSelf = draw(state, frame.actorId, 3);
       const targetId = frame.targetIds[0];
-      return targetId ? draw(afterSelf, targetId, 3) : afterSelf;
+      const count = 3 * (Number(frame.customPayload?.numericMultiplier ?? 1));
+      return targetId ? resolveForcedDraw(afterSelf, targetId, count, frame.actorId, frame.sourceCode, frame.frameId) : afterSelf;
     },
   },
   A124: {
@@ -473,7 +475,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้จั่วไพ่ 5 ใบ',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? draw(state, targetId, 5) : state;
+      const count = 5 * (Number(frame.customPayload?.numericMultiplier ?? 1));
+      return targetId ? resolveForcedDraw(state, targetId, count, frame.actorId, frame.sourceCode, frame.frameId) : state;
     },
   },
   A140: {
@@ -483,7 +486,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const afterSelf = draw(state, frame.actorId, 2);
       const targetId = frame.targetIds[0];
-      return targetId ? draw(afterSelf, targetId, 2) : afterSelf;
+      const count = 2 * (Number(frame.customPayload?.numericMultiplier ?? 1));
+      return targetId ? resolveForcedDraw(afterSelf, targetId, count, frame.actorId, frame.sourceCode, frame.frameId) : afterSelf;
     },
   },
   A038: {
@@ -492,7 +496,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้ทิ้งไพ่ 3 ใบ',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 3) : state;
+      const count = 3 * (Number(frame.customPayload?.numericMultiplier ?? 1));
+      return targetId ? discard(state, targetId, count) : state;
     },
   },
   A039: {
@@ -524,7 +529,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
       const discarded = discard(state, targetId, state.players[targetId].hand.length);
-      return draw(discarded, targetId, 3);
+      return resolveForcedDraw(discarded, targetId, 3, frame.actorId, frame.sourceCode, frame.frameId);
     },
   },
   A093: {

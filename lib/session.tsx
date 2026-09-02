@@ -34,6 +34,7 @@ import {
   submitResponse,
   areAllResponsesComplete,
   getTopFrame,
+  getStackFrame,
   addModifierToFrame,
   syncPendingResponseBridge,
 } from '../game/reactionStack';
@@ -46,11 +47,14 @@ import {
   executeTrapFrameEffect,
 } from '../game/trapRules/engine';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
-import { getPlayableCounters } from '../game/counterRules/registry';
+import { getPlayableCounters, type CounterContext } from '../game/counterRules/registry';
 import { resolveCounterEffect } from '../game/counterRules/engine';
+import { resolveForcedDiscard } from '../game/forcedDiscard';
+import { resolveSteal } from '../game/steal';
 import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
+import { executeManualRecoveryDiscard, executeManualRecoveryGive } from '../game/recovery';
 import {
   decideBotTurn,
   decideBotTrapPlacement,
@@ -110,13 +114,15 @@ export interface GameSessionValue {
   openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
   initiateTrapInteraction: (code: CardCode, targetId: PlayerId) => void;
   respondToTrapInteraction: (interactionId: string, decision: 'accept' | 'refuse') => void;
-  playCounter: (code: CardCode, responseId: string) => void;
+  playCounter: (code: CardCode, responseId: string, actorIdOverride?: PlayerId, customPayloadOverride?: Record<string, unknown>) => void;
   skipCounter: (responseId: string) => void;
   declareMuffinTime: () => void;
   finishGame: (winnerId: PlayerId, reason?: 'normal' | 'manual') => void;
   playAgain: () => void;
   shuffleDrawPile: () => void;
   finishShuffleDrawPile: () => void;
+  manualDiscard: (cardCodes: CardCode[]) => void;
+  manualGiveCard: (recipientId: PlayerId, cardCodes: CardCode[]) => void;
 }
 
 const GameSessionContext = createContext<GameSessionValue | null>(null);
@@ -498,7 +504,99 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     while (currentTop && areAllResponsesComplete(currentTop)) {
       const resolvingFrame = currentTop;
       if (resolvingFrame.status !== 'cancelled') {
-        if (resolvingFrame.sourceType === 'trap') {
+        if (resolvingFrame.sourceType === 'counter') {
+          // 1. Primary Interception: Apply cancellation to parent frame if un-cancelled
+          const parentId = resolvingFrame.parentFrameId ?? (resolvingFrame.customPayload?.parentFrameId as string | undefined);
+          if (parentId) {
+            next = addModifierToFrame(next, parentId, {
+              modifierId: `mod-${resolvingFrame.sourceCode}-${Date.now()}`,
+              sourceFrameId: resolvingFrame.frameId,
+              type: 'cancel_all',
+              affectedTargetIds: [resolvingFrame.actorId],
+            });
+          }
+
+          // Forced Discard Operation modification for C02, C03, C30
+          const opId = (resolvingFrame.customPayload?.forcedDiscardOperationId as string | undefined)
+            ?? (parentId ? (getStackFrame(next, parentId)?.customPayload?.forcedDiscardOperationId as string | undefined) : undefined)
+            ?? Object.keys(next.pendingForcedDiscards ?? {})[0];
+
+          if (opId && next.pendingForcedDiscards?.[opId]) {
+            const op = next.pendingForcedDiscards[opId];
+            if (resolvingFrame.sourceCode === 'C02') {
+              // C02: Stop another player from discarding their cards.
+              next.pendingForcedDiscards[opId] = { ...op, status: 'canceled' };
+            } else if (resolvingFrame.sourceCode === 'C03') {
+              // C03: If you're being forced to discard cards, keep 2 of them.
+              const newCount = Math.max(0, op.cardCodes.length - 2);
+              const newCardCodes = op.cardCodes.slice(0, newCount);
+              next.pendingForcedDiscards[opId] = {
+                ...op,
+                cardCodes: newCardCodes,
+                requestedCount: newCount,
+                status: newCount === 0 ? 'canceled' : op.status,
+              };
+            } else if (resolvingFrame.sourceCode === 'C30') {
+              // C30: Stop being forced to discard cards and draw that many instead.
+              const drawCount = op.cardCodes.length;
+              next.pendingForcedDiscards[opId] = { ...op, status: 'canceled' };
+              next = draw(next, op.targetPlayerId, drawCount);
+            }
+          }
+
+          // Steal Operation modification for C04, C06, C08, C12, C26, C28
+          const stealOpId = (resolvingFrame.customPayload?.stealOperationId as string | undefined)
+            ?? (parentId ? (getStackFrame(next, parentId)?.customPayload?.stealOperationId as string | undefined) : undefined)
+            ?? Object.keys(next.pendingSteals ?? {})[0];
+
+          if (stealOpId && next.pendingSteals?.[stealOpId]) {
+            const op = next.pendingSteals[stealOpId];
+            if (['C06', 'C12', 'C28'].includes(resolvingFrame.sourceCode)) {
+              // C06, C12, C28: Stop the steal operation
+              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+            } else if (resolvingFrame.sourceCode === 'C04') {
+              // C04: Stop steal against self + redirect steal to newVictimId
+              const newVictimId = (resolvingFrame.customPayload?.newVictimId as string | undefined)
+                ?? (resolvingFrame.targetIds.find((id) => id !== op.thiefId && id !== op.victimId));
+
+              if (newVictimId && next.players[newVictimId] && newVictimId !== op.thiefId && newVictimId !== op.victimId) {
+                const newVictimHand = next.players[newVictimId].hand.length;
+                const newActualCount = Math.min(op.requestedCount, newVictimHand);
+                next.pendingSteals[stealOpId] = {
+                  ...op,
+                  victimId: newVictimId,
+                  redirectedFromId: op.victimId,
+                  selectedCardCode: undefined, // invalidate original victim's card selection
+                  actualCount: newActualCount,
+                  status: 'redirected', // mark redirected so resumePendingSteal opens new reaction cycle for newVictimId
+                };
+                if (parentId) {
+                  const res = removeStackFrame(next, parentId);
+                  next = res.state;
+                }
+              } else {
+                next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+              }
+            } else if (resolvingFrame.sourceCode === 'C08') {
+              // C08: Stop steal + victim forced discards that many cards instead
+              const countToDiscard = op.actualCount;
+              const victimId = op.victimId;
+              const thiefId = op.thiefId;
+              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+              next = resolveForcedDiscard(next, victimId, countToDiscard, thiefId);
+            } else if (resolvingFrame.sourceCode === 'C26') {
+              // C26: Stop steal + victim steals that many cards back from thief
+              const countToStealBack = op.actualCount;
+              const victimId = op.victimId;
+              const thiefId = op.thiefId;
+              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+              next = resolveSteal(next, thiefId, victimId, countToStealBack, op.stealMode, victimId);
+            }
+          }
+
+          // 2. Deferred Secondary Effect: Execute secondary effect only when surviving
+          next = resolveCounterEffect(next, resolvingFrame.sourceCode, resolvingFrame.actorId, resolvingFrame);
+        } else if (resolvingFrame.sourceType === 'trap') {
           next = executeTrapFrameEffect(next, resolvingFrame);
         } else {
           next = executeActionFrameEffect(next, resolvingFrame);
@@ -559,13 +657,39 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const playCounter = useCallback(
-    (code: CardCode, responseId: string) =>
+    (code: CardCode, responseId: string, actorIdOverride?: PlayerId, customPayloadOverride?: Record<string, unknown>) =>
       run((state) => {
         const top = getTopFrame(state);
         if (!top || top.frameId !== responseId) return state;
         if (state.globalRestrictions?.some((r) => r.type === 'no_counters')) return state;
-        const counterActorId = myPlayerId!;
-        if (!state.pendingResponse || !getPlayableCounters(state.players[counterActorId]?.hand ?? [], state.pendingResponse).includes(code)) return state;
+        const counterActorId = actorIdOverride ?? myPlayerId!;
+        if (!counterActorId || !state.players[counterActorId]) return state;
+        const topFrame = top;
+        const forcedOpId = (topFrame.customPayload?.forcedDiscardOperationId as string | undefined)
+          ?? Object.keys(state.pendingForcedDiscards ?? {})[0];
+        const forcedOp = forcedOpId ? state.pendingForcedDiscards?.[forcedOpId] : undefined;
+
+        const stealOpId = (topFrame.customPayload?.stealOperationId as string | undefined)
+          ?? Object.keys(state.pendingSteals ?? {})[0];
+        const stealOp = stealOpId ? state.pendingSteals?.[stealOpId] : undefined;
+
+        const ctx: CounterContext | undefined = forcedOp
+          ? { actorId: counterActorId, targetPlayerId: forcedOp.targetPlayerId, operationKind: 'forced_discard' as const, forcedDiscardOp: forcedOp, roomState: state }
+          : stealOp
+          ? { actorId: counterActorId, targetPlayerId: stealOp.victimId, operationKind: 'steal' as const, stealOp, roomState: state }
+          : state.pendingResponse?.kind === 'action'
+          ? { actorId: counterActorId, actionActorId: topFrame.actorId ?? state.pendingResponse.actorId, targetPlayerId: topFrame.actorId ?? state.pendingResponse.actorId, roomState: state }
+          : undefined;
+
+        if (!state.pendingResponse || !getPlayableCounters(state.players[counterActorId]?.hand ?? [], state.pendingResponse, ctx).includes(code)) return state;
+
+        if (code === 'C04') {
+          const newVictimId = customPayloadOverride?.newVictimId as string | undefined;
+          if (!stealOp || !newVictimId || !state.players[newVictimId] || newVictimId === stealOp.thiefId || newVictimId === stealOp.victimId) {
+            return state;
+          }
+        }
+
         const afterDiscard = discard(state, counterActorId, 1, [code]);
 
         // Submit counter response to top frame
@@ -574,15 +698,16 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           counterCode: code,
         });
 
-        // Resolve counter card effect (e.g. demo draws)
-        next = resolveCounterEffect(next, code, counterActorId);
-
-        // Add modifier to target frame
-        next = addModifierToFrame(next, responseId, {
-          modifierId: `mod-${code}-${Date.now()}`,
-          sourceFrameId: responseId,
-          type: 'cancel_all',
-          affectedTargetIds: [counterActorId],
+        // Push new child StackFrame for the played Counter card!
+        next = pushStackFrame(next, {
+          sourceType: 'counter',
+          sourceCode: code,
+          actorId: counterActorId,
+          targetIds: [top.actorId],
+          customPayload: {
+            parentFrameId: responseId,
+            ...(customPayloadOverride ?? {}),
+          },
         });
 
         const counterEvent = createGameEvent(GAME_EVENT_TYPES.COUNTER_PLAYED, counterActorId, {
@@ -599,7 +724,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           ...next,
           lastResult: {
             responseId,
-            kind: top.sourceType === 'trap' ? 'trap' : 'action',
+            kind: top.sourceType === 'trap' ? 'trap' : top.sourceType === 'counter' ? 'counter' : 'action',
             code: top.sourceCode,
             actorId: top.actorId,
             targetId: top.targetIds[0],
@@ -656,6 +781,24 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
   const declareMuffinTimeFn = useCallback(
     () => run((state) => engineDeclareMuffinTime(state, myPlayerId!)),
+    [run, myPlayerId]
+  );
+
+  const manualDiscard = useCallback(
+    (cardCodes: CardCode[]) =>
+      run((state) => {
+        const actorId = myPlayerId!;
+        return executeManualRecoveryDiscard(state, actorId, cardCodes);
+      }),
+    [run, myPlayerId]
+  );
+
+  const manualGiveCard = useCallback(
+    (recipientId: PlayerId, cardCodes: CardCode[]) =>
+      run((state) => {
+        const senderId = myPlayerId!;
+        return executeManualRecoveryGive(state, senderId, recipientId, cardCodes);
+      }),
     [run, myPlayerId]
   );
 
@@ -733,14 +876,31 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       const isHumanTarget = !pendingResponse.targetId || pendingResponse.targetId === myPlayerId;
       const noCounters = roomState.globalRestrictions?.some((r) => r.type === 'no_counters') ?? false;
       const humanHand = roomState.players[myPlayerId]?.hand ?? [];
-      const humanCanCounter = !noCounters && getPlayableCounters(humanHand, pendingResponse).length > 0;
+      const topFrame = getTopFrame(roomState);
+      const forcedOpId = (topFrame?.customPayload?.forcedDiscardOperationId as string | undefined)
+        ?? Object.keys(roomState.pendingForcedDiscards ?? {})[0];
+      const forcedOp = forcedOpId ? roomState.pendingForcedDiscards?.[forcedOpId] : undefined;
+
+      const stealOpId = (topFrame?.customPayload?.stealOperationId as string | undefined)
+        ?? Object.keys(roomState.pendingSteals ?? {})[0];
+      const stealOp = stealOpId ? roomState.pendingSteals?.[stealOpId] : undefined;
+
+      const humanCtx: CounterContext | undefined = forcedOp
+        ? { actorId: myPlayerId, targetPlayerId: forcedOp.targetPlayerId, operationKind: 'forced_discard' as const, forcedDiscardOp: forcedOp }
+        : stealOp
+        ? { actorId: myPlayerId, targetPlayerId: stealOp.victimId, operationKind: 'steal' as const, stealOp }
+        : pendingResponse?.kind === 'action'
+        ? { actorId: myPlayerId, actionActorId: topFrame?.actorId ?? pendingResponse.actorId, targetPlayerId: topFrame?.actorId ?? pendingResponse.actorId, roomState }
+        : undefined;
+
+      const humanCanCounter = !noCounters && getPlayableCounters(humanHand, pendingResponse, humanCtx).length > 0;
 
       // 1. If human was hit by a trap, human sees TrapAlertModal to decide counter/decline
       if (!isHumanActor && isHumanTarget && pendingResponse.kind === 'trap') {
         return;
       }
-      // 2. If human can counter an action, human sees CounterModal to decide play/skip
-      if (!isHumanActor && humanCanCounter && pendingResponse.kind === 'action') {
+      // 2. If human can counter an action/forced discard/steal, human sees CounterModal to decide play/skip
+      if (!isHumanActor && humanCanCounter) {
         return;
       }
 
@@ -754,52 +914,28 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         // Evaluate bot counter decisions
         let botCounterActorId: string | null = null;
         let botCounterCode: string | null = null;
+        let botCustomPayload: Record<string, unknown> | undefined;
         if (!noCounters) {
           for (const botId of eligibleBotIds) {
-            const decision = decideBotCounter(roomState, botId, pendingResponse);
+            const botCtx: CounterContext | undefined = forcedOp
+              ? { actorId: botId, targetPlayerId: forcedOp.targetPlayerId, operationKind: 'forced_discard' as const, forcedDiscardOp: forcedOp, roomState }
+              : stealOp
+              ? { actorId: botId, targetPlayerId: stealOp.victimId, operationKind: 'steal' as const, stealOp, roomState }
+              : pendingResponse?.kind === 'action'
+              ? { actorId: botId, actionActorId: top?.actorId ?? pendingResponse.actorId, targetPlayerId: top?.actorId ?? pendingResponse.actorId, roomState }
+              : undefined;
+            const decision = decideBotCounter(roomState, botId, pendingResponse, botCtx);
             if (decision.action === 'counter') {
               botCounterActorId = botId;
               botCounterCode = decision.code;
+              botCustomPayload = decision.customPayload;
               break;
             }
           }
         }
 
         if (botCounterActorId && botCounterCode) {
-          const actorId = botCounterActorId;
-          const code = botCounterCode;
-          run((state) => {
-            const currentTop = getTopFrame(state);
-            if (!currentTop || currentTop.frameId !== responseId) return state;
-
-            const afterDiscard = discard(state, actorId, 1, [code]);
-            let next = submitResponse(afterDiscard, responseId, actorId, {
-              status: 'countered',
-              counterCode: code,
-            });
-            next = resolveCounterEffect(next, code, actorId);
-            next = addModifierToFrame(next, responseId, {
-              modifierId: `mod-${code}-${Date.now()}`,
-              sourceFrameId: responseId,
-              type: 'cancel_all',
-              affectedTargetIds: [actorId],
-            });
-
-            next = resolveCompletedStackFrames(next);
-            return {
-              ...next,
-              lastResult: {
-                responseId,
-                kind: currentTop.sourceType === 'trap' ? 'trap' : 'action',
-                code: currentTop.sourceCode ?? code,
-                actorId: currentTop.actorId ?? actorId,
-                targetId: currentTop.targetIds[0],
-                countered: true,
-                counteredBy: actorId,
-                counterCode: code,
-              },
-            };
-          });
+          playCounter(botCounterCode, responseId, botCounterActorId, botCustomPayload);
         } else {
           skipCounter(responseId);
         }
@@ -977,6 +1113,8 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     playAgain,
     shuffleDrawPile,
     finishShuffleDrawPile,
+    manualDiscard,
+    manualGiveCard,
   };
 
   return <GameSessionContext.Provider value={value}>{children}</GameSessionContext.Provider>;

@@ -39,6 +39,8 @@ import { PresentationOverlay } from './PresentationOverlay';
 import { ActivityFeed } from './ActivityFeed';
 import { PresentationBridge } from './PresentationBridge';
 import { LiveGameStatus } from './LiveGameStatus';
+import { ManualDiscardModal } from './ManualDiscardModal';
+import { ManualGiveModal } from './ManualGiveModal';
 
 
 import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon } from '../ui/Icons';
@@ -70,6 +72,8 @@ export function GameTable() {
     shuffleDrawPile,
     finishShuffleDrawPile,
     leaveRoom,
+    manualDiscard,
+    manualGiveCard,
   } = useGameSession();
 
   // Modals & Panels State
@@ -81,6 +85,8 @@ export function GameTable() {
   const [isShuffleConfirmOpen, setIsShuffleConfirmOpen] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
   const [isHostSkipConfirmOpen, setIsHostSkipConfirmOpen] = useState(false);
+  const [isManualDiscardOpen, setIsManualDiscardOpen] = useState(false);
+  const [isManualGiveOpen, setIsManualGiveOpen] = useState(false);
 
   // Action Target Flow State
   const [pendingTargetCard, setPendingTargetCard] = useState<CardDisplay | null>(null);
@@ -101,7 +107,11 @@ export function GameTable() {
   const [chosenTrapTarget, setChosenTrapTarget] = useState<PlayerId | null>(null);
   const [chosenTrapTargets, setChosenTrapTargets] = useState<PlayerId[]>([]);
 
-  // Auto-close trap open flow if a counter response window opens
+  // C04 Counter Target Flow State
+  const [pendingC04Code, setPendingC04Code] = useState<CardCode | null>(null);
+  const [chosenC04Target, setChosenC04Target] = useState<PlayerId | null>(null);
+
+  // Auto-close trap open flow or C04 target flow if a counter response window opens or closes
   useEffect(() => {
     if (pendingResponse && (pendingTrapOpen !== null || pendingTrapCode !== null || awaitingTrapTarget)) {
       setPendingTrapOpen(null);
@@ -109,7 +119,11 @@ export function GameTable() {
       setAwaitingTrapTarget(false);
       setChosenTrapTarget(null);
     }
-  }, [pendingResponse, pendingTrapOpen, pendingTrapCode, awaitingTrapTarget]);
+    if (!pendingResponse && pendingC04Code !== null) {
+      setPendingC04Code(null);
+      setChosenC04Target(null);
+    }
+  }, [pendingResponse, pendingTrapOpen, pendingTrapCode, awaitingTrapTarget, pendingC04Code]);
 
   if (!activeRoom || !myPlayerId) return null;
 
@@ -567,16 +581,56 @@ export function GameTable() {
         actorName={pendingResponse?.actorId ? state.players[pendingResponse.actorId]?.name : 'ฝ่ายตรงข้าม'}
         counterCards={validCounterCards}
         responseId={pendingResponse?.responseId}
-        onPlayCounter={(code) => pendingResponse && playCounter(code, pendingResponse.responseId)}
+        onPlayCounter={(code) => {
+          if (!pendingResponse) return;
+          if (code === 'C04') {
+            setPendingC04Code('C04');
+            setChosenC04Target(null);
+            return;
+          }
+          playCounter(code, pendingResponse.responseId);
+        }}
         onDecline={() => pendingResponse && skipCounter(pendingResponse.responseId)}
       />
 
       {/* 14. Counter Card Response Window Modal (For Action responses) */}
       <CounterModal
-        open={pendingResponse?.kind === 'action' && validCounterCards.length > 0}
+        open={(pendingResponse?.kind === 'action' || pendingResponse?.kind === 'counter') && validCounterCards.length > 0}
         counterCards={validCounterCards}
-        onPlay={(code) => pendingResponse && playCounter(code, pendingResponse.responseId)}
+        onPlay={(code) => {
+          if (!pendingResponse) return;
+          if (code === 'C04') {
+            setPendingC04Code('C04');
+            setChosenC04Target(null);
+            return;
+          }
+          playCounter(code, pendingResponse.responseId);
+        }}
         onSkip={() => pendingResponse && skipCounter(pendingResponse.responseId)}
+      />
+
+      {/* 14.5 C04 Target Redirect Selector */}
+      <TargetSelector
+        open={pendingC04Code === 'C04' && pendingResponse !== null}
+        candidates={opponentCandidates.filter(
+          (c) => c.id !== pendingResponse?.actorId && c.id !== myPlayerId
+        )}
+        selectedId={chosenC04Target}
+        onSelect={(id) => setChosenC04Target(id)}
+        onConfirm={() => {
+          if (pendingResponse && chosenC04Target) {
+            playCounter('C04', pendingResponse.responseId, undefined, {
+              newVictimId: chosenC04Target,
+            });
+            setPendingC04Code(null);
+            setChosenC04Target(null);
+          }
+        }}
+        onCancel={() => {
+          setPendingC04Code(null);
+          setChosenC04Target(null);
+        }}
+        prompt="เลือกผู้เล่นที่คุณต้องการให้ถูกขโมยไพ่แทนคุณ (C04 Not My Hand!)"
       />
 
 
@@ -607,6 +661,8 @@ export function GameTable() {
         onOpenManualFinish={() => setIsManualFinishOpen(true)}
         onOpenHostUnstick={() => setIsHostSkipConfirmOpen(true)}
         hostUnstickLabel={pendingResponse ? 'บังคับข้ามการตอบโต้ที่ค้าง' : 'บังคับข้ามเทิร์นที่ค้าง'}
+        onOpenManualDiscard={() => setIsManualDiscardOpen(true)}
+        onOpenManualGive={() => setIsManualGiveOpen(true)}
       />
 
       <HostSkipConfirmModal
@@ -650,6 +706,25 @@ export function GameTable() {
           key={state.shuffleSequence ?? 1}
           isHost={isHost}
           onComplete={finishShuffleDrawPile}
+        />
+      )}
+
+      {/* 19. Bug Recovery Modals */}
+      <ManualDiscardModal
+        isOpen={isManualDiscardOpen}
+        hand={me?.hand ?? []}
+        onClose={() => setIsManualDiscardOpen(false)}
+        onConfirmDiscard={(cardCodes) => manualDiscard(cardCodes)}
+      />
+
+      {myPlayerId && (
+        <ManualGiveModal
+          isOpen={isManualGiveOpen}
+          hand={me?.hand ?? []}
+          players={state.players}
+          myPlayerId={myPlayerId}
+          onClose={() => setIsManualGiveOpen(false)}
+          onConfirmGive={(recipientId, cardCodes) => manualGiveCard(recipientId, cardCodes)}
         />
       )}
 

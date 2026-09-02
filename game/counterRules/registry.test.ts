@@ -13,7 +13,7 @@ describe('counter capability registry', () => {
   });
 
   it('offers only implemented and eligible Counters', () => {
-    expect(getPlayableCounters(['C05', 'C06', 'C09'], { kind: 'trap', code: 'T01' })).toEqual(['C09']);
-    expect(getPlayableCounters(['C05', 'C06', 'C17'], { kind: 'action', code: 'A001' })).toEqual(['C17']);
+    expect(getPlayableCounters(['C41', 'C06', 'C09'], { kind: 'trap', code: 'T01' })).toEqual(['C09']);
+    expect(getPlayableCounters(['C41', 'C06', 'C17'], { kind: 'action', code: 'A001' })).toEqual(['C17']);
   });
 });

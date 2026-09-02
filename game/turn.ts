@@ -84,6 +84,7 @@ export function beginTurn(state: RoomState, activePlayerId: PlayerId): RoomState
     next.players[activePlayerId].placedTrapThisTurn = false;
     next.players[activePlayerId].hasDrawnThisTurn = false;
     next.players[activePlayerId].hasPlayedActionThisTurn = false;
+    next.players[activePlayerId].trapImmunityUntilTurn = false;
   }
   next.turnPhase = 'trap_placement';
 
