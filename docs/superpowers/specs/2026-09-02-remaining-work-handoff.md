@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 167/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G are done
+## Status: 168/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G/E are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -30,6 +30,12 @@ independently).
 - Last known-good check, on `main` at `43d0d40`, verified directly (not just assumed from
   CI): `npx vitest run` → **808 passed (60 files)**, `npx tsc --noEmit` → clean. Run both
   again before you start — confirm your baseline hasn't drifted.
+- **Group 1 Cluster E (A064) shipped on branch `feature/group1-cluster-e`**, forked from
+  `main` at `43d0d40` (two docs-only commits landed on `main` between the fork and now —
+  `e3a91f5`, `3f3a0e9` — both just this cluster's own handoff-doc update and design spec,
+  not unrelated drift; no code changed). Final verification on that branch, run directly
+  before wrapping up: `npx vitest run --reporter=dot` → **815 passed (60 files)**,
+  `npx tsc --noEmit` → clean.
 - **History, briefly** (full blow-by-blow no longer actionable, kept only for context): this
   branch's life involved reconciling with `main` twice while Cluster C was in flight — once
   before Cluster C started (a large trap/presentation subsystem landed on `main` directly,
@@ -54,9 +60,13 @@ independently).
   assume it's empty and don't assume it's safe just because tests pass; skim the commits
   and their diff stat before building on top of or reconciling with them.
 - No PR is currently open. If you finish a cluster and `gh` isn't available (`which gh` has
-  been unavailable in most sessions on this project so far — check yourself, don't assume
-  either way), open one manually via the compare URL:
+  been unavailable in every session on this project so far, this one included — check
+  yourself, don't assume either way), open one manually via the compare URL:
   `https://github.com/plem7106-glitch/MuffinTime/compare/main...<your-branch>?expand=1`.
+  **`feature/group1-cluster-e` has been pushed to origin but still needs this manual PR
+  step** — nobody has opened it yet. If you're picking up Cluster F next, fork from `main`
+  (which does not yet include Cluster E's work), not from `feature/group1-cluster-e` — don't
+  assume E has merged by the time you start.
 - **Cluster C's final whole-branch review found two real, Important-severity bugs from
   extending `RoomState.pendingInteraction` to a second producer/consumer** (previously only
   T10's date-invite trap used it) — both fixed in commit `daab350`, both worth knowing about
@@ -145,7 +155,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 6 cards left, all in Group 1 (Group 2 and Group 3 are done)
+## What's next — 5 cards left, all in Group 1 (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -186,7 +196,7 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 — Clusters A, B, C & G DONE (167/173 checkpoint), 3 clusters / 6 cards remain
+### Group 1 — Clusters A, B, C, G & E DONE (168/173 checkpoint), 2 clusters / 5 cards remain
 
 Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
 decomposed into 7 clusters by shared mechanism during brainstorming — see
@@ -288,6 +298,53 @@ are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
   fixture in `game/room.test.ts` was already silently tripping this exact case before the fix
   — the fix's guard turned that into a loud, assertable failure instead of a latent one.
 
+**Cluster E (A064, draw-pile deferred trigger, standalone) is done.** Its own plan/spec docs
+are `docs/superpowers/specs/2026-09-03-group1-cluster-e-design.md` and
+`docs/superpowers/plans/2026-09-03-group1-cluster-e.md`.
+
+- **A064** "เปลือกกล้วย" (Banana Peel) — planted face-up back into the draw pile; whoever
+  draws it keeps it and discards 3 other cards, chosen at random. `game/pile.ts`'s `draw()`
+  gained a one-line hook (`if (card === 'A064') next =
+  discardOthersAfterBananaPeel(next, playerId)`) that fires after every card lands in a
+  hand, regardless of what triggered the draw — a player's own manual draw, another card's
+  forced multi-draw, a bot's draw, all funnel through this one function, so no separate hook
+  was needed anywhere else. A064's `executeEffect` (`game/actionRules/definitions.ts`) is a
+  thin pop-from-discard-pile/splice-into-draw-pile-at-a-random-position delegate, matching
+  A043's existing inline random-splice pattern (`Math.random()` called directly, same
+  established precedent as A007's coin flip — genuine-randomness cards in this codebase
+  aren't required to thread an injectable `rng`). `kind: 'auto'`, no target, no new UI.
+  **Zero new `RoomState`/`PlayerState` fields.**
+- **Turned out simpler than the classification doc originally feared.** That doc flagged
+  this as needing a hook inside `draw()`, "the most-called primitive in the game," and
+  grouped it with the riskiest Phase 2 batch on that basis. The hook is real, but
+  `data/cards.json`'s `action` array lists each code exactly once and `buildCanonicalDeck()`
+  builds the real 231-card deck 1:1 from it — **only one physical copy of A064 exists in the
+  whole deck** — so there was never a "which card is the planted one" position to track,
+  update, or forget to reset anywhere; excluding it by literal card code inside
+  `discardOthersAfterBananaPeel`'s `hand.filter()` is exact, no index-tracking required.
+- Two rulings confirmed with the user (neither resolved by card text alone): **insertion
+  position** is random (matching A043's existing precedent — not fixed top or bottom).
+  **"หงายหน้า" (face-up)** is flavor text only, no new UI — this codebase has no existing
+  mechanism anywhere that announces which card a player just drew (checked: no such
+  event/toast in `game/events.ts` or `lib/presentation/`), so building one here would be new
+  UI work disproportionate to what the card needs — the same scope call already made for
+  A056's card-picker deferral.
+- Checked, not a gap: interaction with A040 "ฉันชอบมัน!"'s `actionRedirect` (Cluster A) — if
+  A040 is active when A064 is played, the played card is redirected into A040's target's
+  hand instead of `discardPile`, and A064's own plant-into-deck effect correctly no-ops (its
+  top-of-discard-pile guard catches this) instead of planting the wrong card. Interaction
+  with `restartGame` (Cluster G) — a planted-but-undrawn A064 just gets swept into
+  `restartGame`'s pool-and-reshuffle like every other card, no special-casing needed.
+- Task 2 also fixed a small, unrelated stale gap noticed in passing: updating
+  `game/actionRules/registry.test.ts` for A064 left its one test with no remaining
+  negative-path (`not_implemented`) assertion — fixed by asserting that against A091 (still
+  genuinely unimplemented), restoring the suite's only coverage of that status path. Not an
+  A064 behavior change, just a test-file drive-by fix, called out separately in commit
+  `886c4d6`.
+- Card-conservation tests added in `game/cardInvariant.test.ts` cover A064's full lifecycle
+  (played → planted → drawn by someone else → its own discard-3 trigger) and its interaction
+  with `restartGame` while sitting mid-`drawPile` at reset time.
+
 **Cluster C (A126, A130 — 2-hop delegated targeting) is done.** Its own plan/spec docs are
 `docs/superpowers/specs/2026-09-02-group1-cluster-c-design.md` and
 `docs/superpowers/plans/2026-09-02-group1-cluster-c.md`.
@@ -352,25 +409,23 @@ are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
 - Zero new `PlayerState`/`RoomState` fields — the whole cluster rides on
   `pendingInteraction`, which already existed.
 
-**Remaining: 3 clusters, 6 cards** — `A017, A028, A064, A091, A094, A108`. Each needs its
-own spec (and likely its own plan) before implementation, following the same
-brainstorming → writing-plans → subagent-driven-development flow used for Clusters A, B, C,
-and G. Per the original decomposition:
+**Remaining: 2 clusters, 5 cards** — `A017, A028, A091, A094, A108`. Each needs its own spec
+(and likely its own plan) before implementation, following the same brainstorming →
+writing-plans → subagent-driven-development flow used for Clusters A, B, C, G, and E. Per
+the original decomposition:
 
 - **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
   system directly): `A017`, `A028`, `A094`, `A108`
-- **Cluster E** (draw-pile hook): `A064`
 - **Cluster F** (forced-vs-voluntary loss tracking): `A091`
 
-**Confirmed next order: E → F → D** (superseding the plan's original assumption, which had
-no fixed order beyond "C first"). This was reassessed after closer inspection of E and F
-turned up two corrections to the original classification doc's risk estimates:
+**Confirmed order: E → F → D** (superseding the plan's original assumption, which had no
+fixed order beyond "C first"). **E is done** (see above); **F is next, D last**. This order
+was set after closer inspection of E and F turned up two corrections to the original
+classification doc's risk estimates:
 
-- **Cluster E (A064) turned out simpler than expected.** It needs only a special-case check
-  for card code `'A064'` inside `draw()`, plus a small `executeEffect` that moves the card
-  from the discard pile into the draw pile at a random position — no new `RoomState`/
-  `PlayerState` field at all. Lowest-risk of the three remaining clusters, hence going
-  first.
+- **Cluster E (A064) turned out simpler than expected** — see its full write-up above.
+  Lowest-risk of the three remaining clusters at the time, which is exactly why it went
+  first; that assessment held up in practice (zero new state fields, no design surprises).
 - **Cluster F (A091) turned out to need a forced-vs-voluntary distinction threaded through
   dozens of existing call sites** in the `discard`/steal primitives across
   `definitions.ts`/`transfer.ts`/`primitives.ts`/`roster.ts`/`group.ts` — comparable risk to
@@ -389,7 +444,7 @@ Full per-card reasoning for all of these is in the classification doc's "Phase 2
 (`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
 these casually inside a small-batch PR — each wants its own
 `superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
-surface area, the same way Clusters A, B, C, and G got one.
+surface area, the same way Clusters A, B, C, G, and E got one.
 
 ## Known gap, not yet built (unrelated to the above)
 
