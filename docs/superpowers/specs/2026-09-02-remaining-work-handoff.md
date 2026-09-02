@@ -31,11 +31,13 @@ independently).
   CI): `npx vitest run` → **808 passed (60 files)**, `npx tsc --noEmit` → clean. Run both
   again before you start — confirm your baseline hasn't drifted.
 - **Group 1 Cluster E (A064) shipped on branch `feature/group1-cluster-e`**, forked from
-  `main` at `43d0d40` (two docs-only commits landed on `main` between the fork and now —
-  `e3a91f5`, `3f3a0e9` — both just this cluster's own handoff-doc update and design spec,
-  not unrelated drift; no code changed). Final verification on that branch, run directly
-  before wrapping up: `npx vitest run --reporter=dot` → **815 passed (60 files)**,
-  `npx tsc --noEmit` → clean.
+  `main` at `3f3a0e9` — two docs-only commits past Cluster C's merge `43d0d40`
+  (`e3a91f5` and `3f3a0e9` itself: this cluster's own handoff-doc update and design spec,
+  not unrelated drift; no code changed). `main` has not moved since the fork —
+  `git log --oneline main..origin/main` was empty right before push — so the branch is a
+  strict descendant of `main`'s tip and merges as a fast-forward. Final verification on that
+  branch, run directly before wrapping up: `npx vitest run --reporter=dot` → **815 passed
+  (60 files)**, `npx tsc --noEmit` → clean.
 - **History, briefly** (full blow-by-blow no longer actionable, kept only for context): this
   branch's life involved reconciling with `main` twice while Cluster C was in flight — once
   before Cluster C started (a large trap/presentation subsystem landed on `main` directly,
@@ -55,12 +57,12 @@ independently).
   merged (`43d0d40`) — **not** via a careful manual reconciliation like the first two times,
   since the merge had no textual conflicts. Verified post-merge (see the test/tsc line
   above) that nothing is obviously broken, but nobody has actually *read* those 4 commits'
-  diff. **Before starting Cluster D/E/F, and definitely before opening a PR for one:**
+  diff. **Before starting Cluster F/D, and definitely before opening a PR for one:**
   `git fetch origin && git log --oneline main..origin/main` — if this has ANY output, don't
   assume it's empty and don't assume it's safe just because tests pass; skim the commits
   and their diff stat before building on top of or reconciling with them.
 - No PR is currently open. If you finish a cluster and `gh` isn't available (`which gh` has
-  been unavailable in every session on this project so far, this one included — check
+  been unavailable in most sessions on this project so far, this one included — check
   yourself, don't assume either way), open one manually via the compare URL:
   `https://github.com/plem7106-glitch/MuffinTime/compare/main...<your-branch>?expand=1`.
   **`feature/group1-cluster-e` has been pushed to origin but still needs this manual PR
