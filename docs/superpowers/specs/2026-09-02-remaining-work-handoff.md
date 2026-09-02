@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 153/173 Action cards implemented
+## Status: 157/173 Action cards implemented
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -22,12 +22,14 @@ independently).
 
 ## Branch state — start here, don't branch from `main`
 
-- Work so far is on `feature/birthday-cards`, forked from `main`, fully pushed to origin
-  (tip `a4a6d5f` at time of writing). **Not merged, no PR opened yet.**
-- `main` only has 150/173 cards. This branch has 153/173 (adds A037/A066/A137, the
-  birthday-comparison cards) plus a new `PlayerState.birthdayMMDD` schema field. **Branch
-  your next work off `feature/birthday-cards`, not `main`**, or you'll be missing that
-  infrastructure and the 3 extra cards.
+- Work so far is on `feature/birthday-cards`, forked from `main`. **Not merged, no PR opened
+  yet as of the 153/173 checkpoint (tip `a4a6d5f`)** — a later commit on this same branch
+  added A135/A023/A024/A027 (157/173) plus `RoomState.pendingWinChecks` (see Group 2 below);
+  check `git log` for the current tip before assuming this file is fully in sync with it.
+- `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
+  `PlayerState.birthdayMMDD`) and A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
+  `ActionRuleDefinition.needsNumberInput`). **Branch your next work off `feature/birthday-cards`,
+  not `main`**, or you'll be missing that infrastructure and these 7 extra cards.
 - When your work is done and tests pass: open a PR from your branch **into `main`**
   (not into `feature/birthday-cards` — that one should get its own PR/merge first, or get
   merged as part of yours if you fold it in). Use `git push` and the PR-creation URL GitHub
@@ -36,8 +38,8 @@ independently).
   raw `curl` against `https://api.github.com/repos/plem7106-glitch/MuffinTime/pulls`).
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch: `npx vitest run` → 502 passed,
-  `npx tsc --noEmit` → clean. Run both again before you start — confirm your baseline.
+- Last known-good check on this branch (at the 157/173 checkpoint): `npx vitest run` → 520
+  passed, `npx tsc --noEmit` → clean. Run both again before you start — confirm your baseline.
 
 ## How to implement a card (the pattern)
 
@@ -78,47 +80,24 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 20 cards left, 3 groups
+## What's next — 16 cards left, 3 groups
 
-### Group 2 (6 cards, data-collection, no deep engine work) — do these next
+### Group 2 (4 cards left, data-collection, no deep engine work) — do these next
+
+**Done (157/173 checkpoint):** A135, A023, A024, A027. See `game/actionRules/definitions.ts`
+(search "A135", "A023/A024/A027"), `game/types.ts`'s `PendingWinCheck`, `game/turn.ts`'s
+`resolvePendingWinChecks` (wired into `lib/session.tsx`'s `advanceAndCheckWin`), and
+`components/modals/NumberInputModal.tsx`. A135 added `ActionRuleDefinition.needsNumberInput`
+(mirrors `needsTodayDate`). A023/A024/A027 added `RoomState.pendingWinChecks`, consumed
+exactly once — on the actor's own next turn — by `resolvePendingWinChecks`; A024/A027 ties
+resolve as a one-shot no-op (not the physical game's "try again" redraw) — a deliberate scope
+simplification, not a silent assumption, flagged here for whoever reviews the PR.
 
 Relevant schema today: `RoomState` (`game/types.ts:146`) has `muffinTimeTarget: number`,
-`globalRestrictions?: GlobalRestriction[]`, `players: Record<PlayerId, PlayerState>`.
-`PlayerState` (`game/types.ts:109`) has `hand`, `traps`, `birthdayMMDD?`. Neither has
-anything for "who suggested this game" or "drink count" yet — you'll add fields.
-
-- **`A135` "เวลาแห่งความตาย" — do this one first, it's the simplest.**
-  Card text: "เปลี่ยนเงื่อนไขชนะของ Muffin Time จาก 10 ใบ เป็นจำนวนไพ่ที่คุณเลือก" (change
-  the Muffin Time win target from 10 to a number you choose, for the rest of the game).
-  `changeMuffinTarget(state, n)` already exists (`game/turnFlow.ts:16`) — the only new work
-  is UI: no numeric-input modal exists yet (`components/modals/` has `TargetSelector` and
-  `OutcomeToggle` but nothing for a free-form number). Add a `needsNumberInput?: boolean` +
-  `numberInputPrompt?: string` pair to `ActionRuleDefinition` (mirror how `needsTodayDate`
-  was added), a small new modal component, and wire it into `GameTable.tsx` the same way
-  the others are wired. Pick sane min/max bounds for the input (e.g. 1–20) — the physical
-  game has no stated limit, use judgment.
-
-- **`A023`, `A024`, `A027` — same new mechanic, do together in one PR.**
-  - A023 "ยิงฉันสิ": "หากถึงเทิร์นถัดไปของคุณแล้วยังมีไพ่เหลืออยู่ในมือ คุณชนะเกม" — if you
-    (the actor) still have any cards in hand by your own next turn, you win.
-  - A024 "จุดจบ": "เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือน้อยที่สุดชนะ หากเสมอกัน
-    ให้ลองใหม่" — at the actor's next turn, whoever has the fewest cards wins; if tied, no
-    winner this time ("try again" in the physical game means redraw/replay the card later —
-    treating a tie as a one-shot no-op instead of re-scheduling is a scope simplification;
-    confirm this reading is acceptable before shipping, or design the re-trigger if not).
-  - A027 "เหลือเวลาอีก 1 ปี": same as A024 but *most* cards wins instead of fewest.
-  - None of these resolve immediately when played — they all need a **scheduled check** that
-    fires specifically when the *actor's own* next turn starts (not the very next player's
-    turn, unless the actor is also the next player). No such mechanism exists yet. Design:
-    add `RoomState.pendingWinChecks?: Array<{ sourcePlayerId: PlayerId; type:
-    'hand_nonempty' | 'fewest_hand' | 'most_hand' }>` (or similar — your call on exact
-    shape), push an entry in each card's `executeEffect`, and evaluate it in
-    `lib/session.tsx`'s `advanceAndCheckWin` (`lib/session.tsx:120`) right alongside the
-    existing `checkWinnerAtTurnStart(advanced, currentId)` call — that function already runs
-    exactly once per turn transition, checking whether `currentId === advanced turnOrder[currentTurnIndex]`
-    matches any pending check's `sourcePlayerId`, evaluating it, and removing it from the
-    array (consume-once) is the natural hook point. Respect `GlobalRestriction`'s `no_win`
-    type the same way `checkWinnerAtTurnStart` does (`game/turn.ts:146`).
+`globalRestrictions?: GlobalRestriction[]`, `pendingWinChecks?: PendingWinCheck[]`,
+`players: Record<PlayerId, PlayerState>`. `PlayerState` (`game/types.ts:109`) has `hand`,
+`traps`, `birthdayMMDD?`. Neither has anything for "who suggested this game" or "drink
+count" yet — you'll add fields for the two cards below.
 
 - **`A118` "ไอเดียใครเนี่ย?"**: "ขโมยไพ่ 3 ใบจากผู้เล่นที่เป็นคนเสนอให้เล่นเกมนี้" — steal 3
   cards from whoever suggested playing this game. Needs a one-time fact captured somewhere
