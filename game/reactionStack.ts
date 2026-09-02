@@ -162,6 +162,45 @@ export function popStackFrame(state: RoomState): { state: RoomState; poppedFrame
 }
 
 /**
+ * Removes a specific stack frame by its unique frameId from anywhere in the stack.
+ */
+export function removeStackFrame(
+  state: RoomState,
+  frameId: string
+): { state: RoomState; removedFrame?: StackFrame } {
+  let next = cloneState(state);
+  if (!next.reactionStack || next.reactionStack.length === 0) {
+    syncPendingResponseBridge(next);
+    return { state: next };
+  }
+
+  const idx = next.reactionStack.findIndex((f) => f.frameId === frameId);
+  if (idx === -1) {
+    syncPendingResponseBridge(next);
+    return { state: next };
+  }
+
+  const [removedFrame] = next.reactionStack.splice(idx, 1);
+  if (next.reactionStack.length === 0) {
+    next.turnPhase = removedFrame?.turnContext.phase ?? 'main';
+  }
+
+  syncPendingResponseBridge(next);
+  if (removedFrame) {
+    const linked = Object.values(next.pendingForcedDiscards ?? {}).filter(
+      (operation) => operation.causalFrameId === removedFrame.frameId
+    );
+    for (const operation of linked) {
+      const replacement = removedFrame.customPayload?.replacementDestination as
+        | ForcedDiscardDestination
+        | undefined;
+      next = resumePendingForcedDiscard(next, operation.operationId, replacement);
+    }
+  }
+  return { state: next, removedFrame };
+}
+
+/**
  * Submits a player's response (counter, skip) to a specific frameId.
  * Idempotent and safely rejects stale frame submissions.
  */

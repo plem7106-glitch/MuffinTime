@@ -1,6 +1,7 @@
 import type { RoomState, PlayerId, CardCode, Rng, PendingResponse, PendingInteraction } from '../game/types';
 import { getPlayableCounters } from '../game/counterRules/registry';
 import { getTrapRule, isTrapImplemented } from '../game/trapRules/registry';
+import { canActivateManualTrap } from '../game/trapRules/engine';
 import { getActionRule, getPlayableActions } from '../game/actionRules/registry';
 import { getCardsByType } from '../data/cards/index';
 
@@ -126,7 +127,8 @@ export function decideBotManualTrapActivation(
 
   const manualTraps = player.traps.filter((code) => {
     const rule = getTrapRule(code);
-    return rule && (rule.mode === 'manual_honor' || rule.mode === 'interactive');
+    if (!rule || (rule.mode !== 'manual_honor' && rule.mode !== 'interactive')) return false;
+    return canActivateManualTrap(state, botId, code);
   });
 
   if (manualTraps.length === 0) return null;

@@ -12,6 +12,8 @@ export function CenterTable({
   isMyTurn,
   canAct,
   hasDrawnThisTurn,
+  hasPlayedActionThisTurn,
+  isTrapPlacementPhase = false,
   onDraw,
   onOpenDiscardPile,
 }: {
@@ -20,10 +22,13 @@ export function CenterTable({
   isMyTurn: boolean;
   canAct: boolean;
   hasDrawnThisTurn?: boolean;
+  hasPlayedActionThisTurn?: boolean;
+  isTrapPlacementPhase?: boolean;
   onDraw: () => void;
   onOpenDiscardPile?: () => void;
 }) {
-  const canClickDeck = isMyTurn && canAct && !hasDrawnThisTurn && drawPileCount > 0;
+  const hasUsedMainChoice = Boolean(hasDrawnThisTurn || hasPlayedActionThisTurn);
+  const canClickDeck = isMyTurn && canAct && !hasUsedMainChoice && drawPileCount > 0;
 
   // Retrieve top discarded card details if available
   const topDiscardCode = discardPile.length > 0 ? discardPile[discardPile.length - 1] : null;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { activateManualTrap, executeTrapFrameEffect, checkAndTriggerAutomaticTraps } from './engine';
+import { activateManualTrap, executeTrapFrameEffect, checkAndTriggerAutomaticTraps, canActivateManualTrap } from './engine';
+import { decideBotManualTrapActivation } from '../../lib/botTurn';
 import { getTrapRule, isTrapImplemented } from './registry';
 import { getTopFrame, pushStackFrame, popStackFrame } from '../reactionStack';
 import { createGameEvent, GAME_EVENT_TYPES } from '../events';
@@ -236,9 +237,18 @@ describe('Trap Batch 2 & 3 (T11-T66) Declarative Rules', () => {
   it('T53: Draws 2 for all players including owner at or after next turn', () => {
     let state = room();
     state = placeTrap(state, 'p1', 'T53');
+
+    // Verification of canActivateManualTrap predicate
+    expect(canActivateManualTrap(state, 'p1', 'T53')).toBe(false);
+
     state = advanceTurn(state); // p2
+    expect(canActivateManualTrap(state, 'p1', 'T53')).toBe(false);
+
     state = advanceTurn(state); // p3
+    expect(canActivateManualTrap(state, 'p1', 'T53')).toBe(false);
+
     state = advanceTurn(state); // p1 (next turn)
+    expect(canActivateManualTrap(state, 'p1', 'T53')).toBe(true);
 
     const activated = activateManualTrap(state, 'p1', 'T53', []);
     const frame = getTopFrame(activated)!;
@@ -246,5 +256,21 @@ describe('Trap Batch 2 & 3 (T11-T66) Declarative Rules', () => {
     expect(resolved.players.p1.hand).toHaveLength(6); // 4 + 2 = 6 ('a', 'b', 'c', 'T52', +2 drawn)
     expect(resolved.players.p2.hand).toHaveLength(7); // 5 + 2 = 7
     expect(resolved.players.p3.hand).toHaveLength(6); // 4 + 2 = 6
+  });
+
+  it('Bot manual trap decision filters out T52 and T53 when not eligible', () => {
+    let state = room();
+    state.turnOrder = ['bot-1', 'p2', 'p3'];
+    state.players['bot-1'] = { name: 'Bot 1', hand: [], traps: ['T53'], connected: true, hasCalledMuffinTime: false, skipNextTurn: false, placedTrapThisTurn: true, hasDrawnThisTurn: false, hasPlayedActionThisTurn: false };
+    state.placedTrapMeta = {
+      'bot-1_T53': { ownerId: 'bot-1', placedSequence: 1, placedRound: 1, placedByPlayerTurnIndex: 0 }
+    };
+    state.sequenceNumber = 1;
+
+    // Same turn placed -> bot decision returns null for T53 (0% chance to select illegal T53)
+    for (let i = 0; i < 20; i++) {
+      const decision = decideBotManualTrapActivation(state, 'bot-1', () => 0.1);
+      expect(decision).toBeNull();
+    }
   });
 });

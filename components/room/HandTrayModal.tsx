@@ -299,7 +299,7 @@ export function HandTrayModal({
                     </div>
                   ) : hasPlayedActionThisTurn ? (
                     <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
-                      คุณใช้แอ็กชันประจำเทิร์นไปแล้ว (แตะกองจั่วเพื่อจั่วไพ่)
+                      คุณเล่นแอ็กชันประจำเทิร์นแล้ว (กด จบเทิร์น เพื่อเปลี่ยนตา)
                     </div>
                   ) : (
                     <button
@@ -314,17 +314,23 @@ export function HandTrayModal({
                     </button>
                   )
                 ) : selectedCardInfo.type === 'trap' ? (
-                  <button
-                    type="button"
-                    onClick={handleActionConfirm}
-                    disabled={trapsCount >= 3}
-                    className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-trap px-4 text-xs sm:text-sm font-black text-white shadow-md shadow-trap/25 transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <CheckIcon className="h-4 w-4 stroke-[3]" />
-                    <span>
-                      {trapsCount >= 3 ? 'กับดักเต็มแล้ว (3/3)' : 'วางกับดักลงบนโต๊ะ'}
-                    </span>
-                  </button>
+                  !isTrapPlacementPhase ? (
+                    <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-gray-200 bg-gray-100/70 px-3 text-[11px] font-bold text-ink-secondary">
+                      ช่วงวางกับดักผ่านไปแล้ว (วางได้ในเทิร์นถัดไปของคุณ)
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleActionConfirm}
+                      disabled={trapsCount >= 3}
+                      className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-trap px-4 text-xs sm:text-sm font-black text-white shadow-md shadow-trap/25 transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <CheckIcon className="h-4 w-4 stroke-[3]" />
+                      <span>
+                        {trapsCount >= 3 ? 'กับดักเต็มแล้ว (3/3)' : 'วางกับดักลงบนโต๊ะ'}
+                      </span>
+                    </button>
+                  )
                 ) : (
                   <div className="flex min-h-[40px] flex-1 items-center justify-center rounded-xl border border-counter/30 bg-counter/10 px-3 text-[11px] font-bold text-counter">
                     ใช้ตอบโต้เมื่อมีการเล่น Action หรือ Trap

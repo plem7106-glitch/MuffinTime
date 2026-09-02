@@ -77,6 +77,42 @@ export function checkAndTriggerAutomaticTraps(
 }
 
 /**
+ * Evaluates whether a placed trap can currently be manually activated by its owner.
+ * Returns false if:
+ * - Trap is not in owner's active placed traps
+ * - Trap rule is missing
+ * - T52 or T53 is claimed before the owner's next turn (same turn placed or during other players' turns)
+ */
+export function canActivateManualTrap(
+  state: RoomState,
+  ownerId: PlayerId,
+  trapCode: CardCode
+): boolean {
+  const player = state.players[ownerId];
+  if (!player || !player.traps || !player.traps.includes(trapCode)) {
+    return false;
+  }
+
+  const rule = getTrapRule(trapCode);
+  if (!rule) return false;
+
+  if (trapCode === 'T52' || trapCode === 'T53') {
+    const meta = state.placedTrapMeta?.[`${ownerId}_${trapCode}`];
+    if (meta) {
+      const activePlayerId = state.turnOrder[state.currentTurnIndex];
+      const isOwnerTurnNow = activePlayerId === ownerId;
+      const currentSeq = state.sequenceNumber ?? 0;
+      const hasTurnAdvanced = currentSeq > meta.placedSequence;
+      if (!isOwnerTurnNow || !hasTurnAdvanced) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
  * Manually activates an active placed trap by its owner (e.g. for Manual / Honor System traps T01, T06, T07, T08).
  */
 export function activateManualTrap(
@@ -94,15 +130,8 @@ export function activateManualTrap(
   if (!rule) return cloneState(state);
 
   if (trapCode === 'T52' || trapCode === 'T53') {
-    const meta = state.placedTrapMeta?.[`${ownerId}_${trapCode}`];
-    if (meta) {
-      const activePlayerId = state.turnOrder[state.currentTurnIndex];
-      const isOwnerTurnNow = activePlayerId === ownerId;
-      const currentSeq = state.sequenceNumber ?? 0;
-      const hasTurnAdvanced = currentSeq > meta.placedSequence;
-      if (!isOwnerTurnNow || !hasTurnAdvanced) {
-        throw new Error(`${trapCode} cannot be claimed until your next turn`);
-      }
+    if (!canActivateManualTrap(state, ownerId, trapCode)) {
+      throw new Error(`${trapCode} cannot be claimed until your next turn`);
     }
   }
   const triggerPlayerIds = targetPlayerIds;
@@ -113,11 +142,12 @@ export function activateManualTrap(
 
   const afterRemove = removeTrap(state, ownerId, trapCode);
 
-  appendGameEvent(afterRemove, createGameEvent(GAME_EVENT_TYPES.TRAP_ACTIVATED, ownerId, {
+  const trapEvent = createGameEvent(GAME_EVENT_TYPES.TRAP_ACTIVATED, ownerId, {
     ownerId, trapCode, triggerPlayerIds, affectedPlayerIds, targetIds: affectedPlayerIds,
-  }, affectedPlayerIds));
+  }, affectedPlayerIds);
+  appendGameEvent(afterRemove, trapEvent);
 
-  return pushStackFrame(afterRemove, {
+  let next = pushStackFrame(afterRemove, {
     sourceType: 'trap',
     sourceCode: trapCode,
     actorId: ownerId,
@@ -130,6 +160,8 @@ export function activateManualTrap(
       triggerPlayerIds,
     },
   });
+
+  return checkAndTriggerAutomaticTraps(next, trapEvent);
 }
 
 /**

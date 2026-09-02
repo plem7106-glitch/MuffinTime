@@ -11,6 +11,7 @@ import type {
   CardCountEvaluation,
 } from './types';
 import { resolveForcedDiscard } from './forcedDiscard';
+import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 
 /**
  * Evaluates how an effect handles situations where available cards differ from requested count.
@@ -191,6 +192,12 @@ export function executeRandomSteal(
     }
   }
 
+  if (stolen.length > 0) {
+    appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.CARD_STOLEN, thiefId, {
+      victimId, thiefId, count: stolen.length, stolenCards: stolen,
+    }, [victimId]));
+  }
+
   return { state: next, evaluation, stolenCards: stolen };
 }
 
@@ -227,8 +234,15 @@ export function executeFullHandTransfer(
   const receiver = next.players[receiverId];
   if (!victim || !receiver) return next;
 
-  receiver.hand.push(...victim.hand);
-  victim.hand = [];
+  const count = victim.hand.length;
+  if (count > 0) {
+    const stolen = [...victim.hand];
+    receiver.hand.push(...stolen);
+    victim.hand = [];
+    appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.CARD_STOLEN, receiverId, {
+      victimId, thiefId: receiverId, count, stolenCards: stolen,
+    }, [victimId]));
+  }
   return next;
 }
 

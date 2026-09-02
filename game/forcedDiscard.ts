@@ -3,6 +3,7 @@ import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 import type { CardCode, PlayerId, RoomState } from './types';
 import { pushStackFrame } from './reactionStack';
 import type { CreateFrameParams } from './reactionStack';
+import { checkAndTriggerAutomaticTraps } from './trapRules/engine';
 
 export type ForcedDiscardDestination = 'discard_pile' | { playerId: PlayerId };
 export type ForcedDiscardStatus = 'prepared' | 'awaiting_reaction' | 'ready_to_finalize' | 'completed' | 'canceled';
@@ -139,14 +140,15 @@ export function finalizeForcedDiscard(state: RoomState, operation: ForcedDiscard
   else if (next.players[destination.playerId]) next.players[destination.playerId].hand.push(...moved);
   else return state;
   const completed = completeForcedDiscard(operation, destination);
-  appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.FORCED_DISCARD, operation.sourcePlayerId ?? operation.targetPlayerId, {
+  const event = createGameEvent(GAME_EVENT_TYPES.FORCED_DISCARD, operation.sourcePlayerId ?? operation.targetPlayerId, {
     victimId: operation.targetPlayerId, actorId: operation.sourcePlayerId ?? operation.targetPlayerId, count: moved.length,
     operationId: completed.operationId, sourcePlayerId: completed.sourcePlayerId, targetPlayerId: completed.targetPlayerId,
     requestedCount: completed.requestedCount, actualCount: completed.actualCount, cardCodes: moved,
     originalDestination: completed.originalDestination, finalDestination: completed.finalDestination,
     intercepted: completed.intercepted,
-  }, [operation.targetPlayerId]));
-  return next;
+  }, [operation.targetPlayerId]);
+  appendGameEvent(next, event);
+  return checkAndTriggerAutomaticTraps(next, event);
 }
 
 export function completeForcedDiscard(operation: ForcedDiscardOperation, destination: ForcedDiscardDestination = operation.originalDestination) {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
-import { getNextPlayerId, isMuffinTimeEligible } from '../../game/turn';
+import { getNextPlayerId, isMuffinTimeEligible, canEndTurn } from '../../game/turn';
 import { getPlayableCounters } from '../../game/counterRules/registry';
 import { getCardDisplay, type CardDisplay } from '../../data/cards/display';
 import { GameHeader } from './GameHeader';
@@ -23,6 +23,7 @@ import { RoundTransitionOverlay } from './RoundTransitionOverlay';
 import { TargetSelector } from '../modals/TargetSelector';
 import { OutcomeToggle } from '../modals/OutcomeToggle';
 import { DateInviteModal } from '../modals/DateInviteModal';
+import { canActivateManualTrap } from '../../game/trapRules/engine';
 import { getTrapRule } from '../../game/trapRules/registry';
 import { getActionRule } from '../../game/actionRules/registry';
 
@@ -50,6 +51,7 @@ export function GameTable() {
     declareMuffinTime,
     playAction,
     placeTrapCard,
+    skipTrapPlacement,
     openTrapCard,
     initiateTrapInteraction,
     respondToTrapInteraction,
@@ -242,6 +244,7 @@ export function GameTable() {
   // Handlers for Opening Active Traps
   const handleOpenTrapTap = (trapCode: CardCode) => {
     if (pendingResponse) return;
+    if (!canActivateManualTrap(state, myPlayerId, trapCode)) return;
     const card = getCardDisplay(trapCode);
     setPendingTrapOpen(card);
   };
@@ -334,6 +337,8 @@ export function GameTable() {
           isMyTurn={isMyTurn}
           canAct={canAct}
           hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
+          hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
+          isTrapPlacementPhase={state.turnPhase === 'trap_placement'}
           onDraw={drawCard}
           onOpenDiscardPile={() => setIsDiscardPileOpen(true)}
         />
@@ -357,7 +362,6 @@ export function GameTable() {
           disabled={pendingResponse !== null || isShuffling || isRoundTransitionActive}
         />
 
-
         {/* Declare Muffin Time Button (Compact banner if eligible) */}
         {canDeclare && (
           <button
@@ -374,17 +378,7 @@ export function GameTable() {
       {/* D. BOTTOM ACTION BAR (Persistent fixed bar)         */}
       {/* =================================================== */}
       {(() => {
-        const hasDrawnThisTurn = Boolean(me.hasDrawnThisTurn);
-        const canEndTurn =
-          isMyTurn &&
-          state.turnPhase === 'main' &&
-          hasDrawnThisTurn &&
-          !pendingResponse &&
-          !state.pendingInteraction &&
-          (!state.reactionStack || state.reactionStack.length === 0) &&
-          !isFinished &&
-          !isShuffling &&
-          !isRoundTransitionActive;
+        const isEndTurnAllowed = canEndTurn(state, myPlayerId) && !isRoundTransitionActive;
 
         return (
           <div className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-center p-2.5 bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-lg pointer-events-auto">
@@ -403,9 +397,9 @@ export function GameTable() {
               <button
                 type="button"
                 onClick={endTurn}
-                disabled={!canEndTurn}
+                disabled={!isEndTurnAllowed}
                 className={`flex-1 flex min-h-[46px] items-center justify-center gap-1.5 rounded-2xl border-2 px-3 text-xs sm:text-sm font-black transition-all ${
-                  canEndTurn
+                  isEndTurnAllowed
                     ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/25 hover:bg-emerald-700 active:scale-[0.98] cursor-pointer animate-pulse'
                     : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
                 }`}
