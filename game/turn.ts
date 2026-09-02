@@ -40,6 +40,68 @@ export function getTurnPreviewSequence(
   return [...seatOrder, seatOrder[0]];
 }
 
+/**
+ * Checks whether the active player has completed their mandatory Main Choice
+ * (either drew 1 card OR played 1 Action card).
+ */
+export function hasCompletedMainChoice(player?: {
+  hasDrawnThisTurn?: boolean;
+  hasPlayedActionThisTurn?: boolean;
+}): boolean {
+  return Boolean(player?.hasDrawnThisTurn || player?.hasPlayedActionThisTurn);
+}
+
+/**
+ * Authoritative single rule governing whether a player can End Turn.
+ */
+export function canEndTurn(state: RoomState, playerId: PlayerId): boolean {
+  const isCurrentTurn = Boolean(
+    state.turnOrder &&
+      state.currentTurnIndex !== undefined &&
+      state.turnOrder[state.currentTurnIndex] === playerId
+  );
+  if (!isCurrentTurn) return false;
+  if (state.turnPhase !== 'main') return false;
+  const player = state.players[playerId];
+  if (!player || !hasCompletedMainChoice(player)) return false;
+  // A035 "Come Out to Play": a player obligated by a pending action
+  // obligation can't end their turn until they've played an Action.
+  if (player.mustPlayActionThisTurn && !player.hasPlayedActionThisTurn) return false;
+  if (state.pendingResponse || state.pendingInteraction) return false;
+  if (state.reactionStack && state.reactionStack.length > 0) return false;
+  if (state.status !== 'playing') return false;
+  if (state.isShufflingDrawPile) return false;
+  return true;
+}
+
+/**
+ * Establishes the canonical per-turn state for an active player beginning their turn:
+ * - turnPhase = 'trap_placement'
+ * - placedTrapThisTurn = false
+ * - hasDrawnThisTurn = false
+ * - hasPlayedActionThisTurn = false
+ * - Lifts global restrictions created by activePlayerId that were defined to expire on their next turn.
+ */
+export function beginTurn(state: RoomState, activePlayerId: PlayerId): RoomState {
+  const next = cloneState(state);
+  if (next.players[activePlayerId]) {
+    next.players[activePlayerId].placedTrapThisTurn = false;
+    next.players[activePlayerId].hasDrawnThisTurn = false;
+    next.players[activePlayerId].hasPlayedActionThisTurn = false;
+    next.players[activePlayerId].bonusActionPlaysRemaining = 0;
+    next.players[activePlayerId].mustPlayActionThisTurn = false;
+  }
+  next.turnPhase = 'trap_placement';
+
+  // "...until your next turn" restrictions (A019/A072/A085) lift the moment
+  // play returns to whoever created them.
+  if (next.globalRestrictions && next.globalRestrictions.length > 0) {
+    next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);
+  }
+
+  return next;
+}
+
 export function advanceTurn(state: RoomState): RoomState {
   const next = cloneState(state);
   // turnOrder, not seatOrder, decides whose turn it is -- every gameplay
@@ -77,28 +139,14 @@ export function advanceTurn(state: RoomState): RoomState {
 
   next.currentTurnIndex = index;
   const activePlayerId = order[index];
-  if (next.players[activePlayerId]) {
-    next.players[activePlayerId].placedTrapThisTurn = false;
-    next.players[activePlayerId].hasDrawnThisTurn = false;
-    next.players[activePlayerId].hasPlayedActionThisTurn = false;
-    next.players[activePlayerId].bonusActionPlaysRemaining = 0;
-    next.players[activePlayerId].mustPlayActionThisTurn = false;
-  }
-  next.turnPhase = 'trap_placement';
   next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
-
-  // "...until your next turn" restrictions (A019/A072/A085) lift the moment
-  // play returns to whoever created them.
-  if (next.globalRestrictions && next.globalRestrictions.length > 0) {
-    next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);
-  }
 
   if (wrapped) {
     next.roundNumber = (next.roundNumber ?? 1) + 1;
   } else if (!next.roundNumber) {
     next.roundNumber = 1;
   }
-  return next;
+  return beginTurn(next, activePlayerId);
 }
 
 export function finishByDeckExhaustion(state: RoomState): RoomState {
@@ -266,18 +314,7 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
   if (order.length === 0) return next;
   const dir = next.direction ?? (next.playDirection === 'counterclockwise' ? -1 : 1);
   next.currentTurnIndex = getNextPlayerIndex(order.length, next.currentTurnIndex, dir);
-  next.turnPhase = 'trap_placement';
   const activePlayerId = order[next.currentTurnIndex];
-  if (next.players[activePlayerId]) {
-    next.players[activePlayerId].placedTrapThisTurn = false;
-    next.players[activePlayerId].hasDrawnThisTurn = false;
-    next.players[activePlayerId].hasPlayedActionThisTurn = false;
-    next.players[activePlayerId].bonusActionPlaysRemaining = 0;
-    next.players[activePlayerId].mustPlayActionThisTurn = false;
-  }
-  if (next.globalRestrictions && next.globalRestrictions.length > 0) {
-    next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);
-  }
-  return next;
+  return beginTurn(next, activePlayerId);
 }
 

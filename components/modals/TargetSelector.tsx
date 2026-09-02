@@ -2,6 +2,7 @@ import { BottomSheet } from '../ui/BottomSheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import type { PlayerId, PlayerState } from '../../game/types';
+import { soundManager } from '../../lib/presentation/soundManager';
 
 export function TargetSelector({
   open,
@@ -38,9 +39,14 @@ export function TargetSelector({
           {candidates.map(({ id, player }) => (
             <button
               key={id}
-              onClick={() => onSelect(id)}
-              className={`flex items-center gap-2 rounded-card border p-2 text-left ${
-                (multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'border-primary bg-primary/10' : 'border-ink/20'
+              onClick={() => {
+                soundManager.playSfx('/sounds/Select.mp3', 0.35);
+                onSelect(id);
+              }}
+              className={`flex items-center gap-2 rounded-card border p-2.5 text-left transition-all active:scale-[0.98] ${
+                (multiSelect ? selectedIds?.includes(id) : selectedId === id)
+                  ? 'border-primary bg-primary/10 ring-2 ring-primary/40 shadow-sm'
+                  : 'border-ink/20 hover:border-primary/50'
               }`}
             >
               <span className={(multiSelect ? selectedIds?.includes(id) : selectedId === id) ? 'text-primary' : 'text-ink-secondary'}>

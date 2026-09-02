@@ -29,8 +29,10 @@ export function CardDetailModal({
         >
           <CloseIcon className="h-4 w-4" />
         </button>
-        <div className="pt-2">
-          <Card card={card} variant="full" />
+        <div className="pt-2 flex justify-center w-full">
+          <div className="w-[min(65vw,230px)] sm:w-[240px] aspect-[2/3]">
+            <Card card={card} variant="full" />
+          </div>
         </div>
       </div>
     </div>

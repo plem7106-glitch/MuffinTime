@@ -1,4 +1,5 @@
 import { cloneState, shuffle } from './util';
+import { beginTurn } from './turn';
 import type { RoomState, PlayerId, CardCode, Rng, PlayDirection } from './types';
 
 export const GLOBAL_MIN_PLAYERS = 3;
@@ -158,7 +159,6 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   }
   next.status = 'playing';
   next.currentTurnIndex = 0;
-  next.turnPhase = 'trap_placement';
   for (const pid of Object.keys(next.players)) {
     next.players[pid].placedTrapThisTurn = false;
     next.players[pid].hasDrawnThisTurn = false;
@@ -169,10 +169,12 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   next.actionRedirect = null;
   next.pendingActionObligations = undefined;
   next.roundNumber = 1;
+  next.sequenceNumber = 1;
   next.gameEndReason = undefined;
   next.winnerPlayerIds = undefined;
   next.finalHandCounts = undefined;
-  return next;
+  const firstPlayerId = next.turnOrder[0];
+  return beginTurn(next, firstPlayerId);
 }
 
 

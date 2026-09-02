@@ -23,8 +23,13 @@ export function placeTrap(state: RoomState, playerId: PlayerId, cardCode: CardCo
       next.currentTurnIndex !== undefined &&
       next.turnOrder[next.currentTurnIndex] === playerId
   );
-  if (isCurrentTurn && player.placedTrapThisTurn) {
-    throw new Error('already placed a trap this turn');
+  if (isCurrentTurn) {
+    if (player.placedTrapThisTurn) {
+      throw new Error('already placed a trap this turn');
+    }
+    if (next.turnPhase !== 'trap_placement') {
+      throw new Error('cannot place trap: trap placement phase has passed for this turn');
+    }
   }
 
   const pos = player.hand.indexOf(cardCode);

@@ -107,8 +107,10 @@ export function Card({
       <button
         type="button"
         onClick={onClick}
-        className={`flex w-32 aspect-[2/3] shrink-0 flex-col justify-between rounded-card border-2 bg-card p-2 text-left shadow-sm transition-transform ${theme.border} ${
-          selected ? '-translate-y-2 shadow-md ring-2 ring-primary' : ''
+        className={`flex w-32 aspect-[2/3] shrink-0 flex-col justify-between rounded-card border-2 bg-card p-2 text-left shadow-sm transition-all duration-200 ${theme.border} ${
+          selected
+            ? '-translate-y-2.5 scale-[1.04] shadow-xl ring-2 ring-primary bg-pink-50/20'
+            : 'hover:-translate-y-1 hover:shadow-md active:scale-[0.98]'
         } ${className}`}
       >
         <div className="flex items-center justify-between shrink-0">
@@ -182,9 +184,9 @@ export function Card({
       {renderImageSlot(false)}
 
       {/* Title & Description */}
-      <div className="flex flex-col gap-1.5 pt-0.5 shrink-0 overflow-y-auto max-h-[38%]">
-        <h3 className="text-base sm:text-lg font-bold text-ink leading-snug">{displayTitle}</h3>
-        <p className="text-xs sm:text-sm leading-relaxed text-ink-secondary whitespace-pre-line break-words">
+      <div className="flex flex-col gap-1 sm:gap-1.5 pt-0.5 shrink-0 min-h-0">
+        <h3 className="text-sm sm:text-base md:text-lg font-bold text-ink leading-tight">{displayTitle}</h3>
+        <p className="text-xs sm:text-sm leading-snug text-ink-secondary whitespace-pre-line break-words">
           {displayDesc}
         </p>
       </div>

@@ -9,6 +9,7 @@ import {
   finishByDeckExhaustion,
   resolvePendingWinChecks,
   resolvePendingActionObligations,
+  canEndTurn,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -449,6 +450,42 @@ describe('resolvePendingActionObligations', () => {
     const next = resolvePendingActionObligations(state, 'p1');
     expect(next.players.p1.mustPlayActionThisTurn).toBeUndefined();
     expect(next.pendingActionObligations).toEqual([]);
+  });
+});
+
+describe('canEndTurn (A035 interaction with the draw-XOR-play-Action rule)', () => {
+  function obligatedState(overrides: Partial<RoomState['players'][string]> = {}): RoomState {
+    return {
+      status: 'playing',
+      turnOrder: ['p1', 'p2'],
+      currentTurnIndex: 0,
+      turnPhase: 'main',
+      players: {
+        p1: { mustPlayActionThisTurn: true, hasPlayedActionThisTurn: false, ...overrides },
+        p2: {},
+      },
+    } as unknown as RoomState;
+  }
+
+  it('blocks ending the turn while obligated and no Action has been played yet', () => {
+    const state = obligatedState({ hasDrawnThisTurn: true });
+    expect(canEndTurn(state, 'p1')).toBe(false);
+  });
+
+  it('allows ending the turn once the obligated player has played an Action', () => {
+    const state = obligatedState({ hasPlayedActionThisTurn: true });
+    expect(canEndTurn(state, 'p1')).toBe(true);
+  });
+
+  it('is unaffected by mustPlayActionThisTurn when it is false', () => {
+    const state = {
+      status: 'playing',
+      turnOrder: ['p1', 'p2'],
+      currentTurnIndex: 0,
+      turnPhase: 'main',
+      players: { p1: { mustPlayActionThisTurn: false, hasDrawnThisTurn: true }, p2: {} },
+    } as unknown as RoomState;
+    expect(canEndTurn(state, 'p1')).toBe(true);
   });
 });
 
