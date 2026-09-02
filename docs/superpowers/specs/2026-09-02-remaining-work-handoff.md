@@ -20,101 +20,43 @@ by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
 follows (mirrors the sibling `game/trapRules/` for Trap cards, which a collaborator built
 independently).
 
-## Branch state — start here, don't branch from `main`
+## Branch state — `main` is current, branch from it
 
-- Work so far is on `feature/birthday-cards`, forked from `main`. **PR #3 is MERGED**, not
-  open — confirmed via `git log` (not `gh`, which wasn't available in the session that found
-  this): `origin/main` contains merge commit `38d2cf8` ("Merge pull request #3 from
-  plem7106-glitch/feature/birthday-cards"), whose parents are `ff09a4a` (main's prior tip)
-  and `7e198d0` (this branch's tip as of the Cluster G checkpoint, i.e. *before* Cluster C).
-  **This branch's Cluster C commits (`08c97af`..`50a6f33`) are NOT in that merge** — they
-  were made after PR #3 was already merged, so they have nowhere to land automatically.
-  Don't assume you can just `git push` this branch and have it "pick up" into `main`; a
-  fresh PR is still needed (see the divergence note immediately below, and the "fresh PR"
-  bullet further down).
-- **`main` had diverged**: a different author (`Patyz-Hack`) pushed two large commits
-  directly to `main` outside PR review — `96103b9` "Trap Fix" and `ff09a4a` "Trap and
-  card" — touching the exact same core files this branch's Action-card work builds on
-  (`game/turn.ts`, `lib/session.tsx`, `components/room/GameTable.tsx`), plus a large new
-  sound/presentation subsystem (`lib/presentation/`) and trap-engine work. This was
-  reconciled via merge commit `ec9e517` (not a rebase — avoids a force-push and resolves
-  each conflict once). Key things that commit changed, now folded into this branch:
-  - **The turn rule was corrected**: each turn is draw **XOR** play one Action, not both
-    — restoring the original v1 design spec
-    (`docs/superpowers/specs/2026-08-31-muffin-time-web-design.md`'s "ระบบเทิร์น" section),
-    which this branch's engine had never actually enforced. `game/turn.ts`'s
-    `hasCompletedMainChoice`/`canEndTurn` is now the single authority for end-turn
-    eligibility (replacing duplicated inline checks in `lib/session.tsx`/`GameTable.tsx`),
-    and `game/turn.ts`'s `beginTurn(state, activePlayerId)` is now the single place that
-    resets per-turn `PlayerState` flags (replacing the duplicated reset blocks
-    `advanceTurn`/`emergencyForceSkipTurn` used to each carry — see the reset-checklist
-    note below, now much lower-risk since there's only one call site to remember).
-  - A035's `mustPlayActionThisTurn` check is folded into `canEndTurn`. A new guard was
-    added to `lib/session.tsx`'s `drawCard`: under the corrected draw-XOR-play rule,
-    drawing would otherwise permanently foreclose ever satisfying an A035 obligation
-    (`playAction` is unconditionally blocked once `hasDrawnThisTurn` is set) — so drawing
-    itself is now blocked while `mustPlayActionThisTurn` is true and unsatisfied, funneling
-    an obligated player toward playing an Action as their only legal choice that turn.
-  - If you're picking up Group 1 Cluster C or later and haven't seen this reconciliation,
-    read `game/turn.ts` and `lib/session.tsx`'s `playAction`/`drawCard`/`endTurn` fresh —
-    don't assume they still look like what an earlier Cluster's spec doc described.
-- **`main` diverged a second time** (this is now a *pattern*, not a one-off — budget for it
-  every time you're about to push). After PR #3 merged at `38d2cf8`, the same author
-  (`Patyz-Hack`) pushed two more large commits straight to `main`, again outside PR review:
-  `ca38dc6` "X" (39 files, +6338/-157 — a new Counter-card engine: `game/counterRules/engine.ts`,
-  `game/steal.ts`, `game/forcedDiscard.ts`, `game/forcedDraw.ts`, `game/recovery.ts`, ~10 new
-  `counterPhase*.test.ts` files, plus `ManualDiscardModal.tsx`/`ManualGiveModal.tsx`) and
-  `8d4cb1e` "Counter" (a merge commit reconciling that work with the just-merged PR #3; 34
-  more files). **This has already been reconciled**, via merge commit `73f74ba` (mirroring
-  `ec9e517`'s approach for the first divergence — a merge, not a rebase, to avoid a
-  force-push and resolve each conflict once) — `feature/birthday-cards` now contains both
-  the Counter-card engine and Cluster C. Real file overlap existed in
-  `components/room/GameTable.tsx`, `game/actionRules/definitions.ts`, `game/types.ts`,
-  `lib/session.tsx`, but only `lib/session.tsx` had an actual line-level conflict (both
-  sides added an adjacent line to `GameSessionValue`'s interface right after
-  `respondToTrapInteraction` — this branch's `respondToDelegatedTargetPick` vs `main`'s
-  widened `playCounter` signature; resolved by keeping both). Verified post-merge: `npx
-  vitest run` → 781 passed (58 files), `npx tsc --noEmit` → clean. Pushed to
-  `origin/feature/birthday-cards` at `73f74ba`.
-- `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
-  `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
-  `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
-  `ActionRuleDefinition.needsDrinkCheck`), A166 (`ActionRuleDefinition.needsTargetThenOutcome`),
-  A100/A035/A040 (`PlayerState.bonusActionPlaysRemaining`/`mustPlayActionThisTurn`,
-  `RoomState.pendingActionObligations`/`actionRedirect`), A119 (`game/turn.ts`'s
-  `jumpToPlayerTurn`/`resolveTurnArrival` — no new `PlayerState`/`RoomState` fields), A092
-  (`game/turn.ts`'s `resetPlayerPerTurnFlags` and `game/room.ts`'s `restartGame` — again no new
-  `PlayerState`/`RoomState` fields, both are pure refactors/new functions over the existing
-  shape), and A126/A130 (`game/actionRules/delegatedTargetPick.ts` — extends the existing
-  `RoomState.pendingInteraction` mechanism with a new `type`, again no new `PlayerState`/
-  `RoomState` fields). As of `73f74ba`, `feature/birthday-cards` has everything: all 167
-  cards above, plus the Counter-card engine `main` gained via `ca38dc6`/`8d4cb1e`. It is the
-  furthest-ahead branch right now — safe to branch Cluster D/E/F off it. Still worth a
-  `git fetch origin && git log --oneline main..origin/main` check before you start, though
-  (this has now happened twice — treat a third divergence as the expected case to check for,
-  not a surprise), and definitely before pushing anything.
-- **PR #3 is merged and closed — a push to `feature/birthday-cards` does not land anywhere
-  automatically.** A fresh PR into `main` is still needed for Cluster C (the merge above only
-  reconciled the branch against `main`'s divergence locally + pushed the branch; it did not
-  open a PR). `gh` has NOT been consistently available across sessions on this project
-  (present and authenticated as `plem7106-glitch` in some, absent entirely — `which gh` finds
-  nothing — in others, including the session that did this reconciliation); check `which gh`
-  and `gh auth status` yourself rather than assuming either way. If absent, open one manually:
-  `https://github.com/plem7106-glitch/MuffinTime/compare/main...feature/birthday-cards?expand=1`.
-  For whichever cluster you finish next (D/E/F), branch off the now-reconciled
-  `feature/birthday-cards` (or off `main` once this fresh PR merges, whichever is current at
-  the time) — **not** off the old, pre-merge `feature/birthday-cards` tip if you have a stale
-  local checkout from before `73f74ba`.
-- **Before pushing anything: `git fetch origin && git log --oneline main..origin/main` — if
-  this has ANY output, stop and investigate before pushing, don't assume it's empty.** This
-  has now happened twice on this project (see both divergence notes above); treat a third
-  occurrence as the expected case to check for, not a surprise.
-- Last known-good check on this branch (post-Cluster-C checkpoint, post-merge with `main`'s
-  Counter-card engine at `73f74ba`, post final-review fix wave at `daab350`): `npx vitest
-  run` → 782 passed (58 files), `npx tsc --noEmit` → clean. Run both again before you start
-  — confirm your baseline. (628/44 was the count before the `main` merge — the jump to
-  781/58 was entirely the Counter-card engine's own tests landing, not anything Cluster C
-  added; 782 is +1 from a regression test added by the final-review fix wave, see below.)
+- **Group 1 Cluster C (A126, A130) is merged into `main`.** PR #4
+  (`plem7106-glitch/feature/birthday-cards` → `main`) merged at commit `43d0d40`.
+  `feature/birthday-cards` has served its purpose and is no longer the branch to build on —
+  **branch your next work off `main`**, not off any local copy of `feature/birthday-cards`
+  you may still have lying around (it's behind `main` now).
+- Last known-good check, on `main` at `43d0d40`, verified directly (not just assumed from
+  CI): `npx vitest run` → **808 passed (60 files)**, `npx tsc --noEmit` → clean. Run both
+  again before you start — confirm your baseline hasn't drifted.
+- **History, briefly** (full blow-by-blow no longer actionable, kept only for context): this
+  branch's life involved reconciling with `main` twice while Cluster C was in flight — once
+  before Cluster C started (a large trap/presentation subsystem landed on `main` directly,
+  reconciled via merge `ec9e517`) and once after Cluster C's own work was done (a large new
+  Counter-card engine landed on `main` directly, reconciled via merge `73f74ba`). Both are
+  fully folded into `main` now; the corrected turn rule (draw **XOR** play one Action —
+  `game/turn.ts`'s `hasCompletedMainChoice`/`canEndTurn` is the single authority) and the
+  Counter-card engine (`game/counterRules/`, `game/steal.ts`, `game/forcedDiscard.ts`,
+  `game/recovery.ts`, etc.) are both just part of the current codebase now, not something to
+  re-derive from old spec docs.
+- **This has now happened a THIRD time, and it's worth treating as a standing risk rather
+  than a resolved incident.** While Cluster C's PR #4 was open awaiting merge, the same
+  author (`Patyz-Hack`) pushed 4 more commits directly to `main` outside PR review
+  (`cab9c0a` "Couterx", `4bac430` "ct", `08fa636` "UI", `72a9a7d` "XXX" — terse,
+  low-information commit messages, consistent with this author's style across all three
+  incidents). These got folded into `main` via GitHub's own merge button when PR #4 was
+  merged (`43d0d40`) — **not** via a careful manual reconciliation like the first two times,
+  since the merge had no textual conflicts. Verified post-merge (see the test/tsc line
+  above) that nothing is obviously broken, but nobody has actually *read* those 4 commits'
+  diff. **Before starting Cluster D/E/F, and definitely before opening a PR for one:**
+  `git fetch origin && git log --oneline main..origin/main` — if this has ANY output, don't
+  assume it's empty and don't assume it's safe just because tests pass; skim the commits
+  and their diff stat before building on top of or reconciling with them.
+- No PR is currently open. If you finish a cluster and `gh` isn't available (`which gh` has
+  been unavailable in most sessions on this project so far — check yourself, don't assume
+  either way), open one manually via the compare URL:
+  `https://github.com/plem7106-glitch/MuffinTime/compare/main...<your-branch>?expand=1`.
 - **Cluster C's final whole-branch review found two real, Important-severity bugs from
   extending `RoomState.pendingInteraction` to a second producer/consumer** (previously only
   T10's date-invite trap used it) — both fixed in commit `daab350`, both worth knowing about
