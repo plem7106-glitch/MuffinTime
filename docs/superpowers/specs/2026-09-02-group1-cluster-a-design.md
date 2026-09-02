@@ -101,11 +101,13 @@ interface RoomState {
    `advanceAndCheckWin`, same call site as the other pending-check resolvers. On a match
    for `currentId`: removes them from `pendingActionObligations`; if their hand contains
    ≥1 card where `getCardById(code)?.type === 'action'` **and** no `no_actions`
-   `GlobalRestriction` is active for them, sets `mustPlayActionThisTurn = true`. No flag
-   set (silently exempt) otherwise — this `no_actions` check exists specifically to avoid
-   a soft-lock: without it, a player under an active `no_actions` restriction (from
-   A019/A072/A085) plus an A035 obligation could never legally play an Action and would
-   be permanently unable to end their turn.
+   `GlobalRestriction` is active table-wide (checked the same unscoped way
+   `playAction`'s existing gate does: `globalRestrictions?.some((r) => r.type ===
+   'no_actions')`, no `sourcePlayerId` filtering), sets `mustPlayActionThisTurn = true`.
+   No flag set (silently exempt) otherwise — this check exists specifically to avoid a
+   soft-lock: without it, a player obligated by A035 while a `no_actions` restriction
+   (from A019/A072/A085) is active table-wide could never legally play an Action and
+   would be permanently unable to end their turn.
 3. `lib/session.tsx`'s `endTurn` gains a new guard:
    `if (player?.mustPlayActionThisTurn && !player.hasPlayedActionThisTurn) return state;`
 4. UI (`GameTable.tsx`): a persistent amber banner, matching the existing per-turn-status
