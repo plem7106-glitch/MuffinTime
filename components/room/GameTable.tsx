@@ -152,6 +152,8 @@ export function GameTable() {
 
   const canAct = isMyTurn && !pendingResponse && !isFinished && !isShuffling && !isRoundTransitionActive;
   const canDeclare = !pendingResponse && !isFinished && !isShuffling && !isRoundTransitionActive && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
+  // A035 "Come Out to Play" -- blocks ending this turn until an obligated Action is played.
+  const mustPlayActionFirst = Boolean(me.mustPlayActionThisTurn) && !me.hasPlayedActionThisTurn;
 
   const isShuffleDisabled = !isHost || !!pendingResponse || isShuffling || isRoundTransitionActive || state.drawPile.length <= 1;
   const shuffleDisabledReason = pendingResponse
@@ -435,6 +437,13 @@ export function GameTable() {
             <span>🧁 ประกาศ MUFFIN TIME! (มีไพ่ครบ 10 ใบ)</span>
           </button>
         )}
+
+        {/* A035 "Come Out to Play" obligation banner -- blocks ending this turn */}
+        {isMyTurn && mustPlayActionFirst && (
+          <div className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 shrink-0">
+            <span>ต้องเล่น Action ก่อนจบเทิร์นนี้ (A035)</span>
+          </div>
+        )}
       </div>
 
       {/* =================================================== */}
@@ -446,6 +455,7 @@ export function GameTable() {
           isMyTurn &&
           state.turnPhase === 'main' &&
           hasDrawnThisTurn &&
+          !mustPlayActionFirst &&
           !pendingResponse &&
           !state.pendingInteraction &&
           (!state.reactionStack || state.reactionStack.length === 0) &&

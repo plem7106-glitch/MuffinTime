@@ -24,6 +24,7 @@ import {
   emergencyForceSkipTurn,
   checkWinnerAtTurnStart,
   resolvePendingWinChecks,
+  resolvePendingActionObligations,
   declareMuffinTime as engineDeclareMuffinTime,
   finishByDeckExhaustion,
 } from '../game/turn';
@@ -128,7 +129,7 @@ function advanceAndCheckWin(room: RoomState): RoomState {
   if (checkWinnerAtTurnStart(afterPendingChecks, currentId)) {
     return { ...afterPendingChecks, status: 'finished', winnerId: currentId, finishReason: 'normal' };
   }
-  return afterPendingChecks;
+  return resolvePendingActionObligations(afterPendingChecks, currentId);
 }
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
@@ -422,6 +423,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const pid = myPlayerId!;
         const player = state.players[pid];
         if (!player?.hasDrawnThisTurn) return state;
+        if (player?.mustPlayActionThisTurn && !player.hasPlayedActionThisTurn) return state;
         return advanceAndCheckWin(state);
       }),
     [run, myPlayerId]

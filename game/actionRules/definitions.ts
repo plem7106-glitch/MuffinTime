@@ -1764,6 +1764,18 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
+  A035: {
+    code: 'A035', name_en: 'Come Out to Play', name_th: 'ออกมาเล่นกันเถอะ', kind: 'auto',
+    description_th: 'ในเทิร์นถัดไป ผู้เล่นทุกคนที่มี Action อยู่ในมือต้องเล่น Action',
+    executeEffect: (state) => {
+      const next = cloneState(state);
+      const existing = new Set(next.pendingActionObligations ?? []);
+      for (const id of Object.keys(next.players)) existing.add(id);
+      next.pendingActionObligations = [...existing];
+      return next;
+    },
+  },
+
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so
   // drawing it later fires an extra effect). No existing hook for that in

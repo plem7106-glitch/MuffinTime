@@ -123,6 +123,11 @@ export interface PlayerState {
   /** A100: extra Action plays available this turn, beyond the normal 1.
    * Reset to 0 every turn by advanceTurn, same as hasPlayedActionThisTurn. */
   bonusActionPlaysRemaining?: number;
+  /** A035: this player is obligated to play an Action before ending their
+   * current turn. Set only by resolvePendingActionObligations when it finds
+   * them holding ≥1 Action card at their obligated turn's start. Reset to
+   * false every turn by advanceTurn. */
+  mustPlayActionThisTurn?: boolean;
 }
 
 export interface PendingInteraction {
@@ -208,6 +213,11 @@ export interface RoomState {
 
   // Win/lose checks deferred to a specific player's own next turn (A023/A024/A027)
   pendingWinChecks?: PendingWinCheck[];
+
+  /** A035: player IDs still owed an obligation check on their own next turn.
+   * Consumed exactly once per player by resolvePendingActionObligations,
+   * mirroring PendingWinCheck/resolvePendingWinChecks's lifecycle. */
+  pendingActionObligations?: PlayerId[];
 
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;

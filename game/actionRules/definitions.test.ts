@@ -1227,3 +1227,21 @@ describe('A100 (grants 2 bonus Action plays this turn)', () => {
     expect(next.players.me.bonusActionPlaysRemaining).toBe(3);
   });
 });
+
+describe('A035 (obligates every player to play an Action on their own next turn)', () => {
+  it('adds every current player to pendingActionObligations', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A035', 'me');
+    expect(next.pendingActionObligations).toEqual(expect.arrayContaining(['me', 'p2', 'p3']));
+    expect(next.pendingActionObligations).toHaveLength(3);
+  });
+
+  it('does not duplicate a player already queued', () => {
+    const state = threePlayerState();
+    state.pendingActionObligations = ['p2'];
+    const next = resolveActionEffect(state, 'A035', 'me');
+    expect(next.pendingActionObligations?.filter((id) => id === 'p2')).toHaveLength(1);
+    expect(next.pendingActionObligations).toEqual(expect.arrayContaining(['me', 'p2', 'p3']));
+    expect(next.pendingActionObligations).toHaveLength(3);
+  });
+});

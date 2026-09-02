@@ -1,5 +1,6 @@
 import { cloneState } from './util';
 import type { RoomState, PlayerId, PlayDirection, PendingWinCheck } from './types';
+import { getCardById } from '../data/cards/index';
 
 export function getNextPlayerIndex(
   count: number,
@@ -81,6 +82,7 @@ export function advanceTurn(state: RoomState): RoomState {
     next.players[activePlayerId].hasDrawnThisTurn = false;
     next.players[activePlayerId].hasPlayedActionThisTurn = false;
     next.players[activePlayerId].bonusActionPlaysRemaining = 0;
+    next.players[activePlayerId].mustPlayActionThisTurn = false;
   }
   next.turnPhase = 'trap_placement';
   next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
@@ -201,6 +203,31 @@ export function resolvePendingWinChecks(state: RoomState, currentId: PlayerId): 
   return next;
 }
 
+/**
+ * Evaluates and consumes every RoomState.pendingActionObligations entry
+ * scheduled for `currentId` (A035 -- see RoomState.pendingActionObligations's
+ * doc comment in ./types.ts). Called on every turn transition, alongside
+ * resolvePendingWinChecks. The obligation is consumed (removed) unconditionally
+ * -- if the player holds ≥1 Action card and no table-wide no_actions
+ * restriction is active, mustPlayActionThisTurn is set for their current
+ * turn; otherwise they're silently exempt.
+ */
+export function resolvePendingActionObligations(state: RoomState, currentId: PlayerId): RoomState {
+  const pending = state.pendingActionObligations;
+  if (!pending || !pending.includes(currentId)) return state;
+
+  const next = cloneState(state);
+  next.pendingActionObligations = pending.filter((id) => id !== currentId);
+
+  const noActions = next.globalRestrictions?.some((r) => r.type === 'no_actions');
+  const hand = next.players[currentId]?.hand ?? [];
+  const hasAction = hand.some((code) => getCardById(code)?.type === 'action');
+  if (hasAction && !noActions) {
+    next.players[currentId].mustPlayActionThisTurn = true;
+  }
+  return next;
+}
+
 export function clearMuffinTimeDeclaration(state: RoomState, playerId: PlayerId): RoomState {
   const next = cloneState(state);
   if (next.players[playerId]) {
@@ -246,6 +273,7 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
     next.players[activePlayerId].hasDrawnThisTurn = false;
     next.players[activePlayerId].hasPlayedActionThisTurn = false;
     next.players[activePlayerId].bonusActionPlaysRemaining = 0;
+    next.players[activePlayerId].mustPlayActionThisTurn = false;
   }
   if (next.globalRestrictions && next.globalRestrictions.length > 0) {
     next.globalRestrictions = next.globalRestrictions.filter((r) => r.sourcePlayerId !== activePlayerId);

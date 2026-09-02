@@ -8,6 +8,7 @@ import {
   emergencyForceSkipTurn,
   finishByDeckExhaustion,
   resolvePendingWinChecks,
+  resolvePendingActionObligations,
 } from './turn';
 import type { RoomState } from './types';
 
@@ -135,6 +136,21 @@ describe('advanceTurn', () => {
     } as unknown as RoomState;
     const next = advanceTurn(state);
     expect(next.players.p2.bonusActionPlaysRemaining).toBe(0);
+  });
+
+  it('resets mustPlayActionThisTurn to false for the incoming player', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: false, mustPlayActionThisTurn: true },
+        p3: { skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    const next = advanceTurn(state);
+    expect(next.players.p2.mustPlayActionThisTurn).toBe(false);
   });
 });
 
@@ -385,6 +401,54 @@ describe('resolvePendingWinChecks', () => {
     } as unknown as RoomState;
     const next = resolvePendingWinChecks(state, 'p1');
     expect(next.pendingWinChecks).toEqual([{ sourcePlayerId: 'p2', type: 'most_hand' }]);
+  });
+});
+
+describe('resolvePendingActionObligations', () => {
+  it('is a no-op when there are no pending obligations', () => {
+    const state = { players: { p1: { hand: [] } } } as unknown as RoomState;
+    expect(resolvePendingActionObligations(state, 'p1')).toEqual(state);
+  });
+
+  it('is a no-op when the current player has no matching obligation', () => {
+    const state = {
+      players: { p1: { hand: [] }, p2: { hand: [] } },
+      pendingActionObligations: ['p2'],
+    } as unknown as RoomState;
+    const next = resolvePendingActionObligations(state, 'p1');
+    expect(next.pendingActionObligations).toEqual(['p2']);
+    expect(next.players.p1.mustPlayActionThisTurn).toBeUndefined();
+  });
+
+  it('sets mustPlayActionThisTurn when the player holds an Action card, and consumes the obligation', () => {
+    const state = {
+      players: { p1: { hand: ['A001'] } },
+      pendingActionObligations: ['p1'],
+    } as unknown as RoomState;
+    const next = resolvePendingActionObligations(state, 'p1');
+    expect(next.players.p1.mustPlayActionThisTurn).toBe(true);
+    expect(next.pendingActionObligations).toEqual([]);
+  });
+
+  it('does not set the flag when the player holds no Action card (exempt), but still consumes the obligation', () => {
+    const state = {
+      players: { p1: { hand: ['T01'] } }, // T01 is a Trap card, not an Action
+      pendingActionObligations: ['p1'],
+    } as unknown as RoomState;
+    const next = resolvePendingActionObligations(state, 'p1');
+    expect(next.players.p1.mustPlayActionThisTurn).toBeUndefined();
+    expect(next.pendingActionObligations).toEqual([]);
+  });
+
+  it('does not set the flag while a no_actions restriction is active table-wide (avoids a soft-lock)', () => {
+    const state = {
+      players: { p1: { hand: ['A001'] } },
+      pendingActionObligations: ['p1'],
+      globalRestrictions: [{ type: 'no_actions', sourcePlayerId: 'p2' }],
+    } as unknown as RoomState;
+    const next = resolvePendingActionObligations(state, 'p1');
+    expect(next.players.p1.mustPlayActionThisTurn).toBeUndefined();
+    expect(next.pendingActionObligations).toEqual([]);
   });
 });
 
