@@ -15,8 +15,8 @@ import {
   VolumeOffIcon,
   EnterDoorIcon,
   ShuffleIcon,
+  TrashIcon,
 } from '../ui/Icons';
-
 
 export function GameSettingsModal({
   isOpen,
@@ -29,6 +29,8 @@ export function GameSettingsModal({
   onOpenManualFinish,
   onOpenHostUnstick,
   hostUnstickLabel,
+  onOpenManualDiscard,
+  onOpenManualGive,
 }: {
   isOpen: boolean;
   isHost?: boolean;
@@ -40,8 +42,9 @@ export function GameSettingsModal({
   onOpenManualFinish?: () => void;
   onOpenHostUnstick?: () => void;
   hostUnstickLabel?: string;
+  onOpenManualDiscard?: () => void;
+  onOpenManualGive?: () => void;
 }) {
-
   const router = useRouter();
   const { leaveRoom } = useGameSession();
   const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx } = useAudio();
@@ -62,9 +65,9 @@ export function GameSettingsModal({
       <div className="fixed inset-0" onClick={onClose} />
 
       {/* Main Settings Modal Container */}
-      <div className="relative z-10 flex w-full max-w-md flex-col rounded-t-3xl sm:rounded-3xl border border-gray-100 bg-white p-4 shadow-2xl animate-in slide-in-from-bottom duration-200">
+      <div className="relative z-10 flex w-full max-w-md flex-col max-h-[90vh] rounded-t-3xl sm:rounded-3xl border border-gray-100 bg-white p-4 shadow-2xl animate-in slide-in-from-bottom duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-100 text-ink">
               <SettingsIcon className="h-4 w-4" />
@@ -82,7 +85,7 @@ export function GameSettingsModal({
         </div>
 
         {/* Menu Options */}
-        <div className="flex flex-col gap-1.5 py-3">
+        <div className="flex flex-col gap-1.5 py-3 overflow-y-auto">
           {/* 1. Rules (กติกาการเล่น) */}
           <button
             type="button"
@@ -209,28 +212,71 @@ export function GameSettingsModal({
             </>
           )}
 
-          {/* 5.5. Host-only: Unstick a hung turn / response window (e.g. a player left mid-game) */}
-          {isHost && onOpenHostUnstick && (
-            <>
-              <div className="my-1 border-t border-gray-100 pt-2" />
+          {/* 6. Recovery Section (แก้ไขเกม) */}
+          <div className="my-1.5 border-t border-gray-100 pt-2" />
+          <span className="px-1 text-[10px] font-black text-amber-600 uppercase tracking-wider">
+            แก้ไขเกม / Recovery
+          </span>
+
+          <div className="flex flex-col gap-1.5 mt-1">
+            {/* 6.1. Host-only Turn Recovery */}
+            {isHost && onOpenHostUnstick && (
               <button
                 type="button"
                 onClick={() => {
                   onClose();
                   onOpenHostUnstick();
                 }}
-                className="flex min-h-[44px] w-full items-center justify-between rounded-2xl border border-gray-200 bg-gray-50/70 px-3.5 text-xs font-bold text-ink-secondary hover:bg-gray-100 transition-colors active:scale-[0.98]"
+                className="flex min-h-[44px] w-full items-center justify-between rounded-2xl border border-amber-200 bg-amber-50/50 px-3.5 text-xs font-bold text-amber-900 hover:bg-amber-100/60 transition-colors active:scale-[0.98]"
               >
                 <div className="flex items-center gap-2">
-                  <span className="flex h-2 w-2 rounded-full bg-gray-400" />
-                  <span>{hostUnstickLabel ?? 'บังคับข้ามที่ค้าง'}</span>
+                  <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+                  <span>{hostUnstickLabel ?? 'บังคับข้ามที่ค้าง (แก้ไขเทิร์น)'}</span>
                 </div>
-                <span className="text-[9px] text-gray-400">ใช้เมื่อเกมค้าง</span>
+                <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800 uppercase tracking-wide">
+                  Host เท่านั้น
+                </span>
               </button>
-            </>
-          )}
+            )}
 
-          {/* 6. Leave Room */}
+            {/* 6.2. Manual Discard */}
+            {onOpenManualDiscard && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenManualDiscard();
+                }}
+                className="flex min-h-[44px] w-full items-center justify-between rounded-2xl border border-gray-200 bg-gray-50/70 px-3.5 text-xs font-bold text-ink hover:bg-gray-100 transition-colors active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-2">
+                  <TrashIcon className="h-4 w-4 text-red-500" />
+                  <span>ทิ้งไพ่เอง (Manual Discard)</span>
+                </div>
+                <span className="text-[9px] text-gray-400">เลือกทิ้งไพ่ในมือ</span>
+              </button>
+            )}
+
+            {/* 6.3. Manual Give Card */}
+            {onOpenManualGive && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenManualGive();
+                }}
+                className="flex min-h-[44px] w-full items-center justify-between rounded-2xl border border-gray-200 bg-gray-50/70 px-3.5 text-xs font-bold text-ink hover:bg-gray-100 transition-colors active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-2">
+                  <CardsIcon className="h-4 w-4 text-blue-500" />
+                  <span>ส่งไพ่ให้ผู้เล่น (Manual Give)</span>
+                </div>
+                <span className="text-[9px] text-gray-400">ย้ายไพ่ให้ผู้เล่นอื่น</span>
+              </button>
+            )}
+          </div>
+
+          {/* 7. Leave Room */}
           <div className="my-1 border-t border-gray-100 pt-2" />
           <button
             type="button"
@@ -241,8 +287,6 @@ export function GameSettingsModal({
             <span>ออกจากห้อง</span>
           </button>
         </div>
-
-
 
         {/* Leave Confirmation Overlay */}
         {showLeaveConfirm && (

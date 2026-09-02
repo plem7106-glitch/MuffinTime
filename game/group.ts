@@ -7,10 +7,12 @@ export function everyoneDraws(
   state: RoomState,
   n: number,
   excludeIds: PlayerId[] = [],
-  rng: Rng = Math.random
+  rng: Rng = Math.random,
+  targetIds?: PlayerId[]
 ): RoomState {
   let next = cloneState(state);
-  for (const playerId of Object.keys(next.players)) {
+  const targets = targetIds && targetIds.length > 0 ? targetIds : Object.keys(next.players);
+  for (const playerId of targets) {
     if (excludeIds.includes(playerId)) continue;
     next = draw(next, playerId, n, rng);
   }
@@ -22,11 +24,12 @@ export function everyoneDiscards(
   n: number,
   excludeIds: PlayerId[] = [],
   _rng: Rng = Math.random,
-  sourcePlayerId?: PlayerId
+  sourcePlayerId?: PlayerId,
+  targetIds?: PlayerId[]
 ): RoomState {
   let next = cloneState(state);
-  for (const playerId of Object.keys(next.players)) {
-    if (excludeIds.includes(playerId)) continue;
+  const targets = targetIds && targetIds.length > 0 ? targetIds : Object.keys(next.players).filter((id) => !excludeIds.includes(id));
+  for (const playerId of targets) {
     next = executeDiscard(next, playerId, n, undefined, 'clamp_to_available', sourcePlayerId).state;
   }
   return next;
@@ -43,4 +46,3 @@ export function passHands(state: RoomState, steps: number): RoomState {
   }
   return next;
 }
-

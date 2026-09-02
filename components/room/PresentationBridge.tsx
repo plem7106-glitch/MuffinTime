@@ -115,6 +115,26 @@ export function PresentationBridge({ state, viewerId }: PresentationBridgeProps)
             count: payload.count || 1,
             // ABSOLUTE PRIVACY GUARANTEE: cardCode is omitted / undefined
           });
+        } else if (ev.type === GAME_EVENT_TYPES.MANUAL_RECOVERY_DISCARD) {
+          const payload = ev.payload as any;
+          enqueuePresentationEvent({
+            type: 'CARD_DISCARDED',
+            actorId: payload.actorId || actorId,
+            actorName: state.players[payload.actorId || actorId]?.name ?? actorName,
+            count: payload.count || 1,
+            // ABSOLUTE PRIVACY GUARANTEE: cardCode is omitted / undefined
+          });
+        } else if (ev.type === GAME_EVENT_TYPES.MANUAL_RECOVERY_TRANSFER) {
+          const payload = ev.payload as any;
+          enqueuePresentationEvent({
+            type: 'CARD_TRANSFER',
+            actorId: payload.actorId || actorId,
+            actorName: state.players[payload.actorId || actorId]?.name ?? actorName,
+            targetId: payload.recipientId,
+            targetName: state.players[payload.recipientId]?.name,
+            count: payload.count || 1,
+            // ABSOLUTE PRIVACY GUARANTEE: cardCode is omitted / undefined
+          });
         }
       }
       lastProcessedEventIndexRef.current = events.length;
@@ -139,9 +159,11 @@ export function PresentationBridge({ state, viewerId }: PresentationBridgeProps)
 
       if (prevHandLen !== undefined && curHandLen > prevHandLen) {
         const diff = curHandLen - prevHandLen;
-        // Verify this wasn't a steal transfer already handled
-        const recentSteal = events.slice(lastIndex).some((e: any) => e.type === GAME_EVENT_TYPES.CARD_STOLEN);
-        if (!recentSteal) {
+        // Verify this wasn't a steal transfer or manual recovery transfer already handled
+        const recentStealOrTransfer = events.slice(lastIndex).some((e: any) =>
+          e.type === GAME_EVENT_TYPES.CARD_STOLEN || e.type === GAME_EVENT_TYPES.MANUAL_RECOVERY_TRANSFER
+        );
+        if (!recentStealOrTransfer) {
           enqueuePresentationEvent({
             type: 'CARD_DRAW',
             actorId: pid,

@@ -1,6 +1,6 @@
 'use client';
 
-import { SettingsIcon, ChevronLeftIcon } from '../ui/Icons';
+import { MenuIcon, ChevronLeftIcon } from '../ui/Icons';
 
 export function GameHeader({
   hostName,
@@ -37,14 +37,14 @@ export function GameHeader({
         </div>
       </div>
 
-      {/* Right: Settings / Gear Button */}
+      {/* Right: Hamburger Menu ☰ Button */}
       <button
         type="button"
         onClick={onOpenSettings}
-        aria-label="การตั้งค่าเกม"
+        aria-label="เมนู / แก้ไขเกม"
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-ink shadow-2xs transition-colors hover:bg-gray-50 hover:text-primary active:scale-95"
       >
-        <SettingsIcon className="h-4 w-4 stroke-[2.2]" />
+        <MenuIcon className="h-5 w-5 stroke-[2.2]" />
       </button>
     </header>
   );

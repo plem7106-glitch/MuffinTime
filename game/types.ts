@@ -79,7 +79,7 @@ export interface CardCountEvaluation {
 
 export interface PendingResponse {
   responseId: string;
-  kind: 'action' | 'trap';
+  kind: 'action' | 'trap' | 'counter';
   code: CardCode;
   actorId: PlayerId;
   triggerPlayerIds?: PlayerId[];
@@ -94,7 +94,7 @@ export interface PendingResponse {
 
 export interface LastResult {
   responseId?: string;
-  kind: 'action' | 'trap';
+  kind: 'action' | 'trap' | 'counter';
   code: CardCode;
   actorId: PlayerId;
   triggerPlayerIds?: PlayerId[];
@@ -116,6 +116,7 @@ export interface PlayerState {
   placedTrapThisTurn?: boolean;
   hasDrawnThisTurn?: boolean;
   hasPlayedActionThisTurn?: boolean;
+  trapImmunityUntilTurn?: boolean;
   /** Optional, self-reported, month-and-day only ("MM-DD") -- deliberately
    * never a full date. Used only by A037/A066/A137. A player who never sets
    * this is simply excluded from those cards' birthday comparisons. */
@@ -190,6 +191,7 @@ export interface RoomState {
   muffinTimeTarget: number;
   drawPile: CardCode[];
   discardPile: CardCode[];
+  banishedCards?: CardCode[];
   players: Record<PlayerId, PlayerState>;
   maxPlayers?: number;
   winnerId?: PlayerId;
@@ -203,6 +205,8 @@ export interface RoomState {
   sequenceNumber?: number;
   gameEvents?: import('./events').GameEvent[];
   pendingForcedDiscards?: Record<string, import('./forcedDiscard').ForcedDiscardOperation>;
+  pendingSteals?: Record<string, import('./steal').StealOperation>;
+  pendingForcedDraws?: Record<string, import('./forcedDraw').ForcedDrawOperation>;
 
   // Reaction Stack and Turn Phase
   turnPhase?: TurnPhase;

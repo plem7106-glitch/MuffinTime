@@ -70,5 +70,21 @@ export function resolveActionEffect(
 export function executeActionFrameEffect(state: RoomState, frame: StackFrame): RoomState {
   const rule = getActionRule(frame.sourceCode);
   if (!rule) return state;
+
+  if (frame.targetIds && frame.targetIds.length > 1) {
+    let next = state;
+    for (const tid of frame.targetIds) {
+      if (!next.players[tid]) continue;
+      const subFrame: StackFrame = {
+        ...frame,
+        targetIds: [tid],
+        affectedPlayerIds: [tid],
+        targetScope: 'single',
+      };
+      next = rule.executeEffect(next, subFrame);
+    }
+    return next;
+  }
+
   return rule.executeEffect(state, frame);
 }

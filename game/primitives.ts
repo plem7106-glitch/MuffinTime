@@ -159,6 +159,8 @@ export function executeDiscardDownTo(
   return { state: res.state, discardedCount: res.discardedCards.length };
 }
 
+import { resolveSteal } from './steal';
+
 /**
  * Pure random unseen steal primitive.
  */
@@ -167,38 +169,17 @@ export function executeRandomSteal(
   victimId: PlayerId,
   thiefId: PlayerId,
   count: number,
-  rng: Rng = Math.random,
+  _rng: Rng = Math.random,
   policy: UnderCountPolicy = 'clamp_to_available'
 ): { state: RoomState; evaluation: CardCountEvaluation; stolenCards: CardCode[] } {
-  const next = cloneState(state);
-  const victim = next.players[victimId];
-  const thief = next.players[thiefId];
+  const victimHand = state.players[victimId]?.hand.length ?? 0;
+  const evaluation = evaluateCardCount(count, victimHand, policy);
 
-  if (!victim || !thief) {
-    const evalResult = evaluateCardCount(count, 0, policy);
-    return { state: next, evaluation: evalResult, stolenCards: [] };
-  }
+  const resolvedState = resolveSteal(state, victimId, thiefId, count, 'random');
+  const lastEvent = resolvedState.gameEvents?.[resolvedState.gameEvents.length - 1];
+  const stolenCards = (lastEvent?.type === GAME_EVENT_TYPES.CARD_STOLEN ? (lastEvent.payload as any)?.stolenCards : undefined) ?? [];
 
-  const evaluation = evaluateCardCount(count, victim.hand.length, policy);
-  const stolen: CardCode[] = [];
-
-  for (let i = 0; i < evaluation.resolvedCount; i++) {
-    if (victim.hand.length === 0) break;
-    const index = Math.floor(rng() * victim.hand.length);
-    const [card] = victim.hand.splice(index, 1);
-    if (card) {
-      thief.hand.push(card);
-      stolen.push(card);
-    }
-  }
-
-  if (stolen.length > 0) {
-    appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.CARD_STOLEN, thiefId, {
-      victimId, thiefId, count: stolen.length, stolenCards: stolen,
-    }, [victimId]));
-  }
-
-  return { state: next, evaluation, stolenCards: stolen };
+  return { state: resolvedState, evaluation, stolenCards };
 }
 
 /**

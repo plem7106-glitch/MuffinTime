@@ -1,5 +1,5 @@
 import type { RoomState, PlayerId, CardCode, Rng, PendingResponse, PendingInteraction } from '../game/types';
-import { getPlayableCounters } from '../game/counterRules/registry';
+import { getPlayableCounters, type CounterContext } from '../game/counterRules/registry';
 import { getTrapRule, isTrapImplemented } from '../game/trapRules/registry';
 import { canActivateManualTrap } from '../game/trapRules/engine';
 import { getActionRule, getPlayableActions } from '../game/actionRules/registry';
@@ -14,7 +14,7 @@ export type BotTrapPlacementDecision =
   | { action: 'skip' };
 
 export type BotCounterDecision =
-  | { action: 'counter'; code: CardCode }
+  | { action: 'counter'; code: CardCode; customPayload?: Record<string, unknown> }
   | { action: 'skip' };
 
 const ACTION_PLAY_PROBABILITY = 0.5;
@@ -85,19 +85,34 @@ export function decideBotTurn(
 export function decideBotCounter(
   state: RoomState,
   botId: PlayerId,
-  pendingResponse: PendingResponse,
-  rng: Rng = Math.random
+  pendingResponse: PendingResponse | null,
+  contextOrRng?: CounterContext | Rng,
+  rngParam?: Rng
 ): BotCounterDecision {
+  const context = typeof contextOrRng === 'function' ? undefined : contextOrRng;
+  const rng = typeof contextOrRng === 'function' ? contextOrRng : (rngParam ?? Math.random);
+
   const player = state.players[botId];
   if (!player) return { action: 'skip' };
 
-  const validCounters = getPlayableCounters(player.hand, pendingResponse);
+  const validCounters = getPlayableCounters(player.hand, pendingResponse, context);
   if (validCounters.length === 0 || rng() > COUNTER_PLAY_PROBABILITY) {
     return { action: 'skip' };
   }
 
   const chosenCode = validCounters[Math.floor(rng() * validCounters.length)];
-  return { action: 'counter', code: chosenCode };
+  let customPayload: Record<string, unknown> | undefined;
+  if (chosenCode === 'C04' && context?.stealOp) {
+    const stealOp = context.stealOp;
+    const candidates = Object.keys(state.players).filter(
+      (pid) => pid !== stealOp.thiefId && pid !== stealOp.victimId
+    );
+    if (candidates.length > 0) {
+      const target = candidates[Math.floor(rng() * candidates.length)];
+      customPayload = { newVictimId: target };
+    }
+  }
+  return { action: 'counter', code: chosenCode, customPayload };
 }
 
 /**

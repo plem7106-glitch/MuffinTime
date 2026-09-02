@@ -98,6 +98,7 @@ export function beginTurn(state: RoomState, activePlayerId: PlayerId): RoomState
   const next = cloneState(state);
   if (next.players[activePlayerId]) {
     resetPlayerPerTurnFlags(next.players[activePlayerId]);
+    next.players[activePlayerId].trapImmunityUntilTurn = false;
   }
   next.turnPhase = 'trap_placement';
 
