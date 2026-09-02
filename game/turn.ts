@@ -314,6 +314,9 @@ export function jumpToPlayerTurn(state: RoomState, targetId: PlayerId): RoomStat
   const count = order.length;
   const targetIndex = order.indexOf(targetId);
   if (count <= 0 || targetIndex === -1) return next;
+  // A119's card text is "choose *another* player" -- targeting the current
+  // active player is a no-op, not a mid-turn redo via beginTurn.
+  if (order[next.currentTurnIndex] === targetId) return next;
 
   const dir = next.direction ?? (next.playDirection === 'counterclockwise' ? -1 : 1);
   let index = next.currentTurnIndex;
@@ -343,6 +346,8 @@ export function jumpToPlayerTurn(state: RoomState, targetId: PlayerId): RoomStat
   next.sequenceNumber = (next.sequenceNumber ?? 0) + 1;
   if (wrapped) {
     next.roundNumber = (next.roundNumber ?? 1) + 1;
+  } else if (!next.roundNumber) {
+    next.roundNumber = 1;
   }
 
   const activePlayerId = order[index];

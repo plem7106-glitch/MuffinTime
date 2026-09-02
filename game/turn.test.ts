@@ -620,6 +620,66 @@ describe('jumpToPlayerTurn (A119)', () => {
     const next = jumpToPlayerTurn(state, 'nobody');
     expect(next.currentTurnIndex).toBe(0);
   });
+
+  it('is a no-op when targetId is the currently active player (no redo)', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false, placedTrapThisTurn: true, hasDrawnThisTurn: true, hasPlayedActionThisTurn: true },
+        p2: { skipNextTurn: false },
+        p3: { skipNextTurn: false },
+      },
+      globalRestrictions: [{ type: 'no_win', sourcePlayerId: 'p1' }],
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p1');
+    expect(next.currentTurnIndex).toBe(0);
+    // Not a redo: beginTurn must not fire on the self-target, so their
+    // per-turn flags and restriction survive untouched.
+    expect(next.players.p1.placedTrapThisTurn).toBe(true);
+    expect(next.players.p1.hasDrawnThisTurn).toBe(true);
+    expect(next.players.p1.hasPlayedActionThisTurn).toBe(true);
+    expect(next.globalRestrictions).toEqual([{ type: 'no_win', sourcePlayerId: 'p1' }]);
+  });
+
+  it('walks backward when direction is -1', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3', 'p4'],
+      currentTurnIndex: 0,
+      direction: -1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: false },
+        p3: { skipNextTurn: false, hasDrawnThisTurn: true },
+        p4: { skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p3');
+    // Counterclockwise from p1: p4, p3 -- lands on p3 (index 2).
+    expect(next.currentTurnIndex).toBe(2);
+    expect(next.players.p3.hasDrawnThisTurn).toBe(false);
+  });
+
+  it('terminates and clears every flag when every other player is skip-flagged, landing back on the target', () => {
+    const state = {
+      turnOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false },
+        p2: { skipNextTurn: true },
+        p3: { skipNextTurn: true },
+      },
+    } as unknown as RoomState;
+    const next = jumpToPlayerTurn(state, 'p2');
+    // p2 (target) and p3 both skip-flagged -- loop walks p2 -> p3 -> back to
+    // p1, clearing both flags along the way, same termination advanceTurn's
+    // all-skipped test relies on.
+    expect(next.currentTurnIndex).toBe(0);
+    expect(next.players.p2.skipNextTurn).toBe(false);
+    expect(next.players.p3.skipNextTurn).toBe(false);
+  });
 });
 
 describe('canEndTurn (A035 interaction with the draw-XOR-play-Action rule)', () => {
