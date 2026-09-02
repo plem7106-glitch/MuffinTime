@@ -14,13 +14,33 @@ export function reshuffleDiscardIntoDraw(state: RoomState, rng: Rng = Math.rando
 }
 
 export function draw(state: RoomState, playerId: PlayerId, n: number, _rng?: Rng): RoomState {
-  const next = cloneState(state);
+  let next = cloneState(state);
   for (let i = 0; i < n; i++) {
     if (next.drawPile.length === 0) break;
     const card = next.drawPile.pop()!;
     next.players[playerId].hand.push(card);
+    if (card === 'A064') {
+      next = discardOthersAfterBananaPeel(next, playerId);
+    }
   }
   return next;
+}
+
+/**
+ * A064 "เปลือกกล้วย": whoever draws it keeps it (already true -- the push
+ * above puts it in their hand) and discards 3 other cards, chosen at
+ * random, excluding A064 itself. Only one physical copy of A064 exists in
+ * the whole 231-card deck, so excluding it by card code is exact -- no
+ * index-tracking needed. Clamps to however many other cards they actually
+ * hold (0-3) rather than throwing if they have fewer than 3 others.
+ */
+function discardOthersAfterBananaPeel(state: RoomState, playerId: PlayerId): RoomState {
+  const hand = state.players[playerId].hand;
+  const others = hand.filter((code) => code !== 'A064');
+  const count = Math.min(3, others.length);
+  const indices = pickRandomIndices(others.length, count, Math.random);
+  const toDiscard = indices.map((i) => others[i]);
+  return discard(state, playerId, count, toDiscard);
 }
 
 export function drawFromBottom(state: RoomState, playerId: PlayerId, n: number): RoomState {

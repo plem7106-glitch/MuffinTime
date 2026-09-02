@@ -34,6 +34,46 @@ describe('draw', () => {
     const next = draw(state, 'p1', 3);
     expect(next.players.p1.hand).toEqual([]);
   });
+
+  it('drawing A064 also discards 3 other random cards from the same hand, keeping A064', () => {
+    // pop() takes 'A064' (the last element) on the only draw.
+    const state = {
+      drawPile: ['H1', 'H2', 'H3', 'H4', 'A064'],
+      discardPile: [],
+      players: { p1: { hand: ['H5', 'H6', 'H7'] } },
+    } as unknown as RoomState;
+    const next = draw(state, 'p1', 1);
+    expect(next.players.p1.hand).toEqual(['A064']);
+    expect(next.discardPile.length).toBe(3);
+    expect(next.discardPile).not.toContain('A064');
+    expect(new Set(next.discardPile)).toEqual(new Set(['H5', 'H6', 'H7']));
+  });
+
+  it('A064 hook clamps to however many other cards are actually in hand (fewer than 3)', () => {
+    const state = {
+      drawPile: ['A064'],
+      discardPile: [],
+      players: { p1: { hand: ['H1'] } },
+    } as unknown as RoomState;
+    const next = draw(state, 'p1', 1);
+    expect(next.players.p1.hand).toEqual(['A064']);
+    expect(next.discardPile).toEqual(['H1']);
+  });
+
+  it('a multi-card draw where A064 is drawn mid-batch only discards cards already in hand at that moment -- a card drawn afterward in the same batch is untouched', () => {
+    // pop() order for this drawPile, 4 draws: 'H2', 'H1', 'A064', 'LATER2' --
+    // A064 is the 3rd draw, LATER2 the 4th (drawn strictly after A064's
+    // discard-3 trigger already ran).
+    const state = {
+      drawPile: ['LATER1', 'LATER2', 'A064', 'H1', 'H2'],
+      discardPile: [],
+      players: { p1: { hand: [] } },
+    } as unknown as RoomState;
+    const next = draw(state, 'p1', 4);
+    expect(next.players.p1.hand).toEqual(['A064', 'LATER2']);
+    expect(next.discardPile.length).toBe(2);
+    expect(new Set(next.discardPile)).toEqual(new Set(['H1', 'H2']));
+  });
 });
 
 describe('drawFromBottom', () => {
