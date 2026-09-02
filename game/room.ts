@@ -117,6 +117,21 @@ export function updatePlayDirection(state: RoomState, direction: PlayDirection):
   return next;
 }
 
+/** A118 ("steal 3 from whoever suggested this game") needs this one-time
+ * fact captured before gameplay starts -- host-only, during setup once the
+ * roster is locked (see RoomState.gameSuggesterId's doc comment). */
+export function setGameSuggester(state: RoomState, playerId: PlayerId): RoomState {
+  if (state.status !== 'setup') {
+    throw new Error('can only set the game suggester during setup');
+  }
+  if (!state.players[playerId]) {
+    throw new Error('player not in room');
+  }
+  const next = cloneState(state);
+  next.gameSuggesterId = playerId;
+  return next;
+}
+
 export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng = Math.random): RoomState {
   if (state.status !== 'lobby' && (state.status as string) !== 'setup') {
     throw new Error('game already started');

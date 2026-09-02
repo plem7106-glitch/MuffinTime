@@ -12,6 +12,7 @@ import {
   startSetup as engineStartSetup,
   updateSeatOrder as engineUpdateSeatOrder,
   updatePlayDirection as engineUpdatePlayDirection,
+  setGameSuggester as engineSetGameSuggester,
   startGame as engineStartGame,
   finishGame as engineFinishGame,
   resetForPlayAgain as engineResetForPlayAgain,
@@ -97,6 +98,7 @@ export interface GameSessionValue {
   startSetup: () => void;
   setSeatOrder: (seatOrder: PlayerId[]) => void;
   setPlayDirection: (direction: PlayDirection) => void;
+  setGameSuggester: (playerId: PlayerId) => void;
   confirmTurnOrder: () => void;
   drawCard: () => void;
   endTurn: () => void;
@@ -363,6 +365,16 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       run((state) => {
         if (myPlayerId !== state.hostId) return state;
         return engineUpdatePlayDirection(state, direction);
+      }),
+    [run, myPlayerId]
+  );
+
+  const setGameSuggesterFn = useCallback(
+    (playerId: PlayerId) =>
+      run((state) => {
+        if (myPlayerId !== state.hostId) return state;
+        if (!state.players[playerId]) return state;
+        return engineSetGameSuggester(state, playerId);
       }),
     [run, myPlayerId]
   );
@@ -933,6 +945,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     startSetup: startSetupFn,
     setSeatOrder: setSeatOrderFn,
     setPlayDirection: setPlayDirectionFn,
+    setGameSuggester: setGameSuggesterFn,
     confirmTurnOrder: confirmTurnOrderFn,
     drawCard,
     endTurn,

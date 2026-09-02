@@ -1128,3 +1128,30 @@ describe('A023/A024/A027 (deferred win checks at the actor\'s own next turn)', (
     ]);
   });
 });
+
+describe('A118 (steals 3 from whoever suggested this game)', () => {
+  it('steals up to 3 cards from gameSuggesterId to the actor', () => {
+    const state = threePlayerState();
+    state.gameSuggesterId = 'p2';
+    const next = resolveActionEffect(state, 'A118', 'me');
+    expect(next.players.p2.hand.length).toBe(0); // only had 3
+    expect(next.players.me.hand.length).toBe(4); // 1 + 3 stolen
+  });
+
+  it('is a no-op when no gameSuggesterId was ever set', () => {
+    const state = threePlayerState();
+    expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
+  });
+
+  it('is a no-op when gameSuggesterId names a player no longer in the room', () => {
+    const state = threePlayerState();
+    state.gameSuggesterId = 'someone-who-left';
+    expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
+  });
+
+  it('is a no-op when the actor is the one who suggested the game (nothing to steal from itself)', () => {
+    const state = threePlayerState();
+    state.gameSuggesterId = 'me';
+    expect(resolveActionEffect(state, 'A118', 'me')).toEqual(state);
+  });
+});

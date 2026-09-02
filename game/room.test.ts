@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRoom, addPlayer, removePlayer, startGame, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
+import { createRoom, addPlayer, removePlayer, startGame, startSetup, setGameSuggester, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
 
 describe('createRoom', () => {
   it('creates a lobby room with the host as the first player', () => {
@@ -148,6 +148,33 @@ describe('startGame', () => {
     const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
     const started = startGame(room, allCodes, () => 0);
     expect(() => startGame(started, allCodes, () => 0)).toThrow('game already started');
+  });
+});
+
+describe('setGameSuggester', () => {
+  function setupRoom() {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    return startSetup(room);
+  }
+
+  it('records the chosen player as gameSuggesterId', () => {
+    const room = setupRoom();
+    const next = setGameSuggester(room, 'p2');
+    expect(next.gameSuggesterId).toBe('p2');
+  });
+
+  it('throws for a player not in the room', () => {
+    const room = setupRoom();
+    expect(() => setGameSuggester(room, 'nobody')).toThrow('player not in room');
+  });
+
+  it('throws outside of setup status', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    expect(() => setGameSuggester(room, 'p2')).toThrow('can only set the game suggester during setup');
   });
 });
 

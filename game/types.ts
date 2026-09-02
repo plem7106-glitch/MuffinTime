@@ -166,6 +166,11 @@ export interface RoomState {
   hostId: PlayerId;
   joinOrder?: PlayerId[];
   seatOrder?: PlayerId[];
+  /** Whoever suggested playing this game, host-picked during setup once the
+   * roster is locked (game/room.ts's setGameSuggester). Optional/self-serve
+   * -- a room where the host skips this simply never has an A118 target.
+   * Used only by A118. */
+  gameSuggesterId?: PlayerId;
   playDirection?: PlayDirection;
   turnOrder: PlayerId[];
   currentTurnIndex: number;

@@ -976,12 +976,22 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state) => rosterSkipTurn(state, extremeByHandSize(state, 'max')),
   },
 
-  // The following are deliberately NOT included in this batch -- each needs
+  // The following is deliberately NOT included in this batch -- it needs
   // real new infrastructure this codebase doesn't have yet, not just a UI
   // picker like the earlier "ponytail" simplifications:
-  //  - A118 (whoever suggested playing this game): no such one-time
-  //    room-setup fact is collected or stored anywhere.
   //  - A158 (a live per-player drink-count tally): no such counter exists.
+
+  // A118: steal 3 from whoever suggested this game (RoomState.gameSuggesterId,
+  // host-picked during setup -- see game/room.ts's setGameSuggester).
+  A118: {
+    code: 'A118', name_en: 'Whose Idea?', name_th: 'ไอเดียใครเนี่ย?', kind: 'auto',
+    description_th: 'ขโมยไพ่ 3 ใบจากผู้เล่นที่เป็นคนเสนอให้เล่นเกมนี้',
+    executeEffect: (state, frame) => {
+      const suggesterId = state.gameSuggesterId;
+      if (!suggesterId || !state.players[suggesterId] || suggesterId === frame.actorId) return state;
+      return stealRandom(state, suggesterId, frame.actorId, 3);
+    },
+  },
 
   // A135: change the Muffin Time win target -- needs a free-form number from
   // the actor (see needsNumberInput's doc comment in ./types.ts).
