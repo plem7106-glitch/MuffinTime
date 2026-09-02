@@ -27,10 +27,11 @@ independently).
   this): `origin/main` contains merge commit `38d2cf8` ("Merge pull request #3 from
   plem7106-glitch/feature/birthday-cards"), whose parents are `ff09a4a` (main's prior tip)
   and `7e198d0` (this branch's tip as of the Cluster G checkpoint, i.e. *before* Cluster C).
-  **This branch's Cluster C commits (`08c97af`..`15342b6`) are NOT in that merge** — they
+  **This branch's Cluster C commits (`08c97af`..`50a6f33`) are NOT in that merge** — they
   were made after PR #3 was already merged, so they have nowhere to land automatically.
-  Don't assume you can just `git push` this branch and have it "pick up" into `main`; you
-  need a fresh PR (see the divergence note immediately below).
+  Don't assume you can just `git push` this branch and have it "pick up" into `main`; a
+  fresh PR is still needed (see the divergence note immediately below, and the "fresh PR"
+  bullet further down).
 - **`main` had diverged**: a different author (`Patyz-Hack`) pushed two large commits
   directly to `main` outside PR review — `96103b9` "Trap Fix" and `ff09a4a` "Trap and
   card" — touching the exact same core files this branch's Action-card work builds on
@@ -57,23 +58,24 @@ independently).
   - If you're picking up Group 1 Cluster C or later and haven't seen this reconciliation,
     read `game/turn.ts` and `lib/session.tsx`'s `playAction`/`drawCard`/`endTurn` fresh —
     don't assume they still look like what an earlier Cluster's spec doc described.
-- **`main` diverged a second time, discovered at the end of the Cluster C task** (this is
-  now a *pattern*, not a one-off — budget for it every time you're about to push). After PR
-  #3 merged at `38d2cf8`, the same author (`Patyz-Hack`) pushed two more large commits
-  straight to `main`, again outside PR review: `ca38dc6` "X" (39 files, +6338/-157 — a new
-  Counter-card engine: `game/counterRules/engine.ts`, `game/steal.ts`,
-  `game/forcedDiscard.ts`, `game/forcedDraw.ts`, `game/recovery.ts`, ~10 new
+- **`main` diverged a second time** (this is now a *pattern*, not a one-off — budget for it
+  every time you're about to push). After PR #3 merged at `38d2cf8`, the same author
+  (`Patyz-Hack`) pushed two more large commits straight to `main`, again outside PR review:
+  `ca38dc6` "X" (39 files, +6338/-157 — a new Counter-card engine: `game/counterRules/engine.ts`,
+  `game/steal.ts`, `game/forcedDiscard.ts`, `game/forcedDraw.ts`, `game/recovery.ts`, ~10 new
   `counterPhase*.test.ts` files, plus `ManualDiscardModal.tsx`/`ManualGiveModal.tsx`) and
   `8d4cb1e` "Counter" (a merge commit reconciling that work with the just-merged PR #3; 34
-  more files). **Real file overlap with Cluster C's changes** — not just proximity —
-  confirmed by diffing `7e198d0..feature/birthday-cards` against `38d2cf8..origin/main`:
+  more files). **This has already been reconciled**, via merge commit `73f74ba` (mirroring
+  `ec9e517`'s approach for the first divergence — a merge, not a rebase, to avoid a
+  force-push and resolve each conflict once) — `feature/birthday-cards` now contains both
+  the Counter-card engine and Cluster C. Real file overlap existed in
   `components/room/GameTable.tsx`, `game/actionRules/definitions.ts`, `game/types.ts`,
-  `lib/session.tsx` are touched by both sides. **Nothing on `feature/birthday-cards` has
-  been reconciled against this yet** — the branch still forks from `main` as of `ff09a4a`.
-  Before doing any more work, or opening a new PR: fetch `origin/main`, merge or rebase this
-  branch onto it (mirroring how `ec9e517` handled the first divergence — a merge, not a
-  rebase, to avoid a force-push and resolve each conflict once), resolve conflicts in those
-  4 files, and re-run the full test suite before pushing anything.
+  `lib/session.tsx`, but only `lib/session.tsx` had an actual line-level conflict (both
+  sides added an adjacent line to `GameSessionValue`'s interface right after
+  `respondToTrapInteraction` — this branch's `respondToDelegatedTargetPick` vs `main`'s
+  widened `playCounter` signature; resolved by keeping both). Verified post-merge: `npx
+  vitest run` → 781 passed (58 files), `npx tsc --noEmit` → clean. Pushed to
+  `origin/feature/birthday-cards` at `73f74ba`.
 - `main` only has 150/173 cards. This branch adds A037/A066/A137 (birthday-comparison cards,
   `PlayerState.birthdayMMDD`), A135/A023/A024/A027 (`RoomState.pendingWinChecks`,
   `ActionRuleDefinition.needsNumberInput`), A118/A158 (`RoomState.gameSuggesterId`,
@@ -85,29 +87,33 @@ independently).
   `PlayerState`/`RoomState` fields, both are pure refactors/new functions over the existing
   shape), and A126/A130 (`game/actionRules/delegatedTargetPick.ts` — extends the existing
   `RoomState.pendingInteraction` mechanism with a new `type`, again no new `PlayerState`/
-  `RoomState` fields) — **all of which `main` already has as of the PR #3 merge**, since
-  that merge included everything on `feature/birthday-cards` through the Cluster G
-  checkpoint. The only things `feature/birthday-cards` still has that `main` doesn't are
-  Cluster C itself (A126/A130) and this doc's own Cluster C update. **Given the second
-  divergence above, don't reflexively branch off `feature/birthday-cards` for Cluster D/E/F
-  without checking first** — reconcile Cluster C onto the new `main` (which now also has the
-  Counter-card engine `feature/birthday-cards` lacks) and decide the right base then, rather
-  than assuming `feature/birthday-cards` is still the furthest-ahead branch.
-- When your work is done and tests pass: **PR #3 is merged and closed — do not expect a
-  push to `feature/birthday-cards` to land anywhere automatically.** Reconcile against
-  `main` first (see the divergence note above), then open a **fresh** PR into `main`. Use
-  `git push` and `gh pr create` if `gh` is installed and authenticated in this environment —
-  it has NOT been consistently available across sessions on this project (present and
-  authenticated as `plem7106-glitch` in some, absent entirely — `which gh` finds nothing —
-  in others); check `which gh` and `gh auth status` yourself rather than assuming either
-  way, and if it's absent, tell the user to open/update the PR manually on GitHub.
+  `RoomState` fields). As of `73f74ba`, `feature/birthday-cards` has everything: all 167
+  cards above, plus the Counter-card engine `main` gained via `ca38dc6`/`8d4cb1e`. It is the
+  furthest-ahead branch right now — safe to branch Cluster D/E/F off it. Still worth a
+  `git fetch origin && git log --oneline main..origin/main` check before you start, though
+  (this has now happened twice — treat a third divergence as the expected case to check for,
+  not a surprise), and definitely before pushing anything.
+- **PR #3 is merged and closed — a push to `feature/birthday-cards` does not land anywhere
+  automatically.** A fresh PR into `main` is still needed for Cluster C (the merge above only
+  reconciled the branch against `main`'s divergence locally + pushed the branch; it did not
+  open a PR). `gh` has NOT been consistently available across sessions on this project
+  (present and authenticated as `plem7106-glitch` in some, absent entirely — `which gh` finds
+  nothing — in others, including the session that did this reconciliation); check `which gh`
+  and `gh auth status` yourself rather than assuming either way. If absent, open one manually:
+  `https://github.com/plem7106-glitch/MuffinTime/compare/main...feature/birthday-cards?expand=1`.
+  For whichever cluster you finish next (D/E/F), branch off the now-reconciled
+  `feature/birthday-cards` (or off `main` once this fresh PR merges, whichever is current at
+  the time) — **not** off the old, pre-merge `feature/birthday-cards` tip if you have a stale
+  local checkout from before `73f74ba`.
 - **Before pushing anything: `git fetch origin && git log --oneline main..origin/main` — if
   this has ANY output, stop and investigate before pushing, don't assume it's empty.** This
   has now happened twice on this project (see both divergence notes above); treat a third
   occurrence as the expected case to check for, not a surprise.
-- Last known-good check on this branch (post-Cluster-C checkpoint): `npx vitest run` → 628
-  passed (44 files), `npx tsc --noEmit` → clean. Run both again before you start — confirm
-  your baseline.
+- Last known-good check on this branch (post-Cluster-C checkpoint, post-merge with `main`'s
+  Counter-card engine at `73f74ba`): `npx vitest run` → 781 passed (58 files), `npx tsc
+  --noEmit` → clean. Run both again before you start — confirm your baseline. (628/44 was
+  the count before this merge — the jump to 781/58 is entirely the Counter-card engine's own
+  tests landing, not anything Cluster C added.)
 - **A card whose `executeEffect` triggers a turn transition (calling `resolveTurnArrival`
   or anything reaching `checkWinnerAtTurnStart`) must independently guard against running
   that chain on a player who didn't genuinely just have their turn begin.** Cluster B (A119)
