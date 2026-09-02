@@ -1272,4 +1272,19 @@ describe('A119 (skip play forward to a chosen player\'s next turn)', () => {
     const state = threePlayerState();
     expect(resolveActionEffect(state, 'A119', 'me')).toEqual(state);
   });
+
+  it('resolves a pending action obligation for the player it lands on', () => {
+    const state = threePlayerState();
+    state.players.p3.hand = ['A001', 'H6', 'H7'];
+    state.pendingActionObligations = ['p3'];
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'p3', {}));
+    expect(next.players.p3.mustPlayActionThisTurn).toBe(true);
+    expect(next.pendingActionObligations).toEqual([]);
+  });
+
+  it('is a no-op when the target is the actor themselves (self-targeting, currently UI-unreachable but worth pinning down)', () => {
+    const state = threePlayerState();
+    const next = executeActionFrameEffect(state, frameWithTargetAndPayload('A119', 'me', 'me', {}));
+    expect(next).toEqual(state);
+  });
 });
