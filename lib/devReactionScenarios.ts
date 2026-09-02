@@ -17,6 +17,11 @@ const hands: Record<DevReactionScenario, CardCode[][]> = {
   'c01-a063': [['A063', 'A001', 'A002', 'A003'], ['C01'], ['A004']],
 };
 
+export function createDevScenarioRoomCode(scenario: DevReactionScenario, random: () => number = Math.random): string {
+  const nonce = Math.floor(random() * 1_000_000_000).toString().padStart(9, '0');
+  return `bot-dev-${scenario}-${nonce}`;
+}
+
 export function createDevReactionScenario(scenario: DevReactionScenario, hostId: string, hostName: string): RoomState {
   if (process.env.NODE_ENV === 'production') throw new Error('development scenarios are unavailable in production');
   let state = createRoom(hostId, hostName, 3);

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createDevReactionScenario } from './devReactionScenarios';
+import { createDevReactionScenario, createDevScenarioRoomCode } from './devReactionScenarios';
 
 describe('development reaction scenarios', () => {
+  it('generates fresh scenario room codes outside the reusable bot room code space', () => {
+    const code = createDevScenarioRoomCode('r7-human-action-counter', () => 0.123456789);
+    expect(code).toBe('bot-dev-r7-human-action-counter-123456789');
+  });
+
   it('seeds a legal Human Action -> Bot Counter browser scenario without runtime reaction state', () => {
     const state = createDevReactionScenario('r7-human-action-counter', 'me', 'Tester');
     expect(state.currentTurnIndex).toBe(1);

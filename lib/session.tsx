@@ -50,7 +50,7 @@ import {
 } from '../game/trapRules/engine';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getCounterContextForActiveFrame, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds } from '../game/counterRules/registry';
-import { applyDevReactionScenario, createDevReactionScenario, type DevReactionScenario } from './devReactionScenarios';
+import { applyDevReactionScenario, createDevReactionScenario, createDevScenarioRoomCode, type DevReactionScenario } from './devReactionScenarios';
 import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { resolveSteal } from '../game/steal';
@@ -248,7 +248,9 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         state = applyDevReactionScenario(state, scenario, hostId);
       }
 
-      const code = `bot-${Math.floor(1000 + Math.random() * 9000)}`;
+      const code = scenario && process.env.NODE_ENV !== 'production'
+        ? createDevScenarioRoomCode(scenario)
+        : `bot-${Math.floor(1000 + Math.random() * 9000)}`;
       setLocalHostId(hostId);
       setRoomCode(code);
       setRoomState(state);
