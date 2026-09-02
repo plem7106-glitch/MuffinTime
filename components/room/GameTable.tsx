@@ -79,6 +79,12 @@ export function GameTable() {
   const [chosenTarget, setChosenTarget] = useState<PlayerId | null>(null);
   const [chosenTargets, setChosenTargets] = useState<PlayerId[]>([]);
 
+  // Dual-role target flow (A115: tallest, then shortest -- two sequential
+  // single-target picks, since click order in a multi-select roster can't
+  // safely disambiguate two distinct roles).
+  const [dualPickPhase, setDualPickPhase] = useState<'first' | 'second' | null>(null);
+  const [dualPickFirstId, setDualPickFirstId] = useState<PlayerId | null>(null);
+
   // Trap Open Flow State
   const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
   const [trapTargetPrompt, setTrapTargetPrompt] = useState<string>('เลือกผู้เล่นเป้าหมาย');
@@ -178,14 +184,19 @@ export function GameTable() {
     setPendingTargetCard(card);
     setChosenTarget(null);
     setChosenTargets([]);
+    const rule = getActionRule(card.code);
+    setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
+    setDualPickFirstId(null);
   };
 
   const pendingActionRule = pendingTargetCard ? getActionRule(pendingTargetCard.code) : undefined;
+  const rosterSelectionCount = pendingActionRule?.rosterSelectionCount;
 
   const handleConfirmTargetAction = () => {
     if (!pendingTargetCard) return;
     if (pendingActionRule?.needsRosterSelection) {
       if (chosenTargets.length === 0) return;
+      if (rosterSelectionCount !== undefined && chosenTargets.length !== rosterSelectionCount) return;
       playAction(pendingTargetCard.code, undefined, { rosterIds: chosenTargets });
     } else {
       if (!chosenTarget) return;
@@ -194,6 +205,28 @@ export function GameTable() {
     setPendingTargetCard(null);
     setChosenTarget(null);
     setChosenTargets([]);
+  };
+
+  const handleDualPickConfirm = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    if (dualPickPhase === 'first') {
+      setDualPickFirstId(chosenTarget);
+      setChosenTarget(null);
+      setDualPickPhase('second');
+      return;
+    }
+    playAction(pendingTargetCard.code, undefined, { firstId: dualPickFirstId, secondId: chosenTarget });
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setDualPickPhase(null);
+    setDualPickFirstId(null);
+  };
+
+  const handleDualPickCancel = () => {
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setDualPickPhase(null);
+    setDualPickFirstId(null);
   };
 
   const handleOutcomeSelect = (outcome: boolean) => {
@@ -384,7 +417,7 @@ export function GameTable() {
           when the card's rule needs a roster_select -- e.g. "who matches this
           condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
-        open={pendingTargetCard !== null && !pendingActionRule?.needsOutcomeEntry}
+        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry}
         candidates={opponentCandidates}
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
@@ -394,7 +427,11 @@ export function GameTable() {
             setChosenTarget(id);
             return;
           }
-          setChosenTargets((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+          setChosenTargets((current) => {
+            if (current.includes(id)) return current.filter((item) => item !== id);
+            if (rosterSelectionCount !== undefined && current.length >= rosterSelectionCount) return current;
+            return [...current, id];
+          });
         }}
         onConfirm={handleConfirmTargetAction}
         onCancel={() => {
@@ -404,6 +441,25 @@ export function GameTable() {
         }}
         prompt={
           (pendingActionRule?.needsRosterSelection ? pendingActionRule.rosterPrompt : pendingActionRule?.targetPrompt) ??
+          pendingTargetCard?.effect ??
+          'เลือกผู้เล่นเป้าหมาย'
+        }
+      />
+
+      {/* 10.4 Action Card Dual-Role Target Selector (A115: pick "tallest",
+          then pick "shortest" -- two sequential single-target picks so the
+          two roles can never be silently swapped by click order) */}
+      <TargetSelector
+        open={pendingTargetCard !== null && dualPickPhase !== null}
+        candidates={dualPickPhase === 'second' ? opponentCandidates.filter((c) => c.id !== dualPickFirstId) : opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={(id) => setChosenTarget(id)}
+        onConfirm={handleDualPickConfirm}
+        onCancel={handleDualPickCancel}
+        prompt={
+          (dualPickPhase === 'first'
+            ? pendingActionRule?.dualTargetPrompts?.first
+            : pendingActionRule?.dualTargetPrompts?.second) ??
           pendingTargetCard?.effect ??
           'เลือกผู้เล่นเป้าหมาย'
         }

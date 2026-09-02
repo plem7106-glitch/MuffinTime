@@ -332,9 +332,23 @@ describe('Family F batch (via resolveActionEffect)', () => {
     expect(next.players.p1.hand).toEqual(['a1']);
   });
 
+  it('A010 keeps the same player active after the rotation, not whoever now sits in the old slot', () => {
+    // p1 was active at index 0. After rotating right, p1 now sits at index 1
+    // (seatOrder becomes ['p3','p1','p2']) -- currentTurnIndex must follow
+    // p1, not stay frozen at 0 (which would silently hand the turn to p3).
+    const next = resolveActionEffect(seatedState(), 'A010', 'p1');
+    expect(next.currentTurnIndex).toBe(1);
+    expect(next.seatOrder![next.currentTurnIndex]).toBe('p1');
+  });
+
   it('A156 rotates the seat order one step left', () => {
     const next = resolveActionEffect(seatedState(), 'A156', 'p1');
     expect(next.seatOrder).toEqual(['p2', 'p3', 'p1']);
+  });
+
+  it('A156 also keeps the same player active after the rotation', () => {
+    const next = resolveActionEffect(seatedState(), 'A156', 'p1');
+    expect(next.seatOrder![next.currentTurnIndex]).toBe('p1');
   });
 
   it('A080 makes every player steal 1 card from their right-seat neighbor', () => {
@@ -917,5 +931,52 @@ describe('Family D no-target no-op', () => {
       const state = threePlayerState();
       expect(resolveActionEffect(state, code, 'me')).toEqual(state);
     }
+  });
+});
+
+describe('A115 (dual-role pick: tallest gives 3 to shortest, via executeActionFrameEffect)', () => {
+  it('moves 3 cards from firstId (tallest) to secondId (shortest)', () => {
+    const next = executeActionFrameEffect(
+      threePlayerState(),
+      frameWithPayload('A115', 'me', { firstId: 'p3', secondId: 'p2' })
+    );
+    expect(next.players.p3.hand.length).toBe(0);
+    expect(next.players.p2.hand.length).toBe(6);
+  });
+
+  it('is a no-op when either role is missing', () => {
+    const state = threePlayerState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A115', 'me', { firstId: 'p3' }))).toEqual(state);
+  });
+
+  it('is a no-op when the same player is picked for both roles', () => {
+    const state = threePlayerState();
+    expect(
+      executeActionFrameEffect(state, frameWithPayload('A115', 'me', { firstId: 'p2', secondId: 'p2' }))
+    ).toEqual(state);
+  });
+});
+
+describe('A172 (forced seat swap, exactly 2 players, via executeActionFrameEffect)', () => {
+  it('swaps the two chosen players\' seats and leaves the third alone', () => {
+    const next = executeActionFrameEffect(
+      seatedState(),
+      frameWithPayload('A172', 'p1', { rosterIds: ['p1', 'p3'] })
+    );
+    expect(next.seatOrder).toEqual(['p3', 'p2', 'p1']);
+  });
+
+  it('keeps the same player active when the active player is one of the two swapped', () => {
+    // p1 (active, index 0) swaps with p3 (index 2) -- turn must stay with p1.
+    const next = executeActionFrameEffect(
+      seatedState(),
+      frameWithPayload('A172', 'p1', { rosterIds: ['p1', 'p3'] })
+    );
+    expect(next.seatOrder![next.currentTurnIndex]).toBe('p1');
+  });
+
+  it('is a no-op when fewer than 2 players are chosen', () => {
+    const state = seatedState();
+    expect(executeActionFrameEffect(state, frameWithPayload('A172', 'p1', { rosterIds: ['p2'] }))).toEqual(state);
   });
 });

@@ -30,7 +30,8 @@ export function getCardDisplay(code: CardCode): CardDisplay {
     needsTarget: Boolean(
       getActionRule(card.id)?.needsTargetSelection ||
         getActionRule(card.id)?.needsRosterSelection ||
-        getActionRule(card.id)?.needsOutcomeEntry
+        getActionRule(card.id)?.needsOutcomeEntry ||
+        getActionRule(card.id)?.needsDualTargetSelection
     ),
   };
 }

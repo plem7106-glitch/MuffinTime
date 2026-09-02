@@ -77,9 +77,8 @@ Needs: `executeDraw(actorId, 2)` + `everyoneDraws(1, [actorId])`.
 **C1. Self draws a fixed N cards, unconditional** — 3 cards: A097, A101, A155
 **C2. Self discards own chosen cards (fixed N or free choice)** — 2 cards: A056, A127
 **C3. Self draws N cards equal to a counted/tracked game-state value** — 2 cards: A004, A091
-  A004 "จักรวาลคู่ขนาน" = current hand size (trivial). A091 "ฉันเป็นหมอ" needs a running
-  "cards lost since your last turn" counter — not currently tracked anywhere; smallest
-  addition is a per-player transient counter reset at `advanceTurn`.
+  A004 "จักรวาลคู่ขนาน" = current hand size (trivial, implemented). A091 "ฉันเป็นหมอ" moved to
+  Phase 2 (§Grand total reconciliation) — see there for why.
 
 ---
 
@@ -150,6 +149,16 @@ A128, A154, A161, A169
 
 **F1. Structural neighbor-based effect** — 6 cards: A010, A080, A087, A110, A156, A172
 (uses `seatOrder`/`turnOrder` for "left/right neighbor" — already exists on `RoomState`)
+A172 needed its own primitive (`swapSeats`, exact-2 permutation, vs. `rotateSeatOrder`'s
+whole-table shift) plus a `rosterSelectionCount` UI constraint (§types.ts) since it swaps
+exactly 2 specific players rather than everyone.
+**Bug found and fixed while adding A172:** `rotateSeatOrder` (used by A010/A156, both already
+shipped) rewrote `seatOrder` without moving `currentTurnIndex` along with it — after a
+rotation, `currentTurnIndex` pointed at whoever now sat in the *old* numeric slot, silently
+handing the active turn to a different player than the one who'd actually been mid-turn. Fixed
+by advancing `currentTurnIndex` by the same rotation `steps`; `swapSeats` applies the same
+same-active-player-follows fix for its 2-player case. Covered by regression tests in
+`game/actionRules/definitions.test.ts` (`A010`/`A156` "keeps the same player active" cases).
 
 **F2. All players' hands normalized to a fixed size** — 2 cards: A044, A129
 
@@ -170,14 +179,15 @@ return to hand, steal one trap card between players) — **no existing primitive
 
 ## Family H — Deck & discard-pile manipulation — kind: `auto`
 
-**H1.** 8 cards: A026, A046, A064, A106, A116, A117, A122, A133
+**H1.** 8 cards, 7 implemented: A026, A046, A106, A116, A117, A122, A133
 - A046 "การบ้าน" — peek top 5, keep 1
 - A122 — take fixed N most-recent cards from discard pile
-- A064 "เปลือกกล้วย" — deferred trigger: insert a face-up marker into the draw pile,
-  resolves later when someone draws it (needs a small marked-card mechanism, most complex
-  of this batch)
 Needs: `peekTopN`, `takeChosenFromPeek`, `takeTopNFromDiscard` (new `game/deckOps.ts`);
 `drawFromBottom` already exists in `game/pile.ts`.
+- A064 "เปลือกกล้วย" — moved to Phase 2 (§Grand total reconciliation): deferred trigger,
+  insert a face-up marker into the draw pile that fires an extra effect when someone later
+  draws it. No existing hook for that in `draw()` (`game/pile.ts`), the most-called primitive
+  in the game — same risk class as the other Phase 2 cards, not a definitions-only addition.
 
 ---
 
@@ -243,10 +253,15 @@ room-setup fact), A137, A158 (a live drink-count tally — needs a per-player co
 | A084 | ถือไว้นะ! | Pure 1:1 hand swap with chosen player | `swapHands` already exists |
 | A090 | ฉันอยากตาย | Discard entire hand, optional "leave game" | discard trivial; leave-game reuses existing `leaveRoom()` — confirm with user whether to build the leave option at all |
 | A109 | ไม่มีประโยชน์ | Literally nothing happens | `kind: no_op` |
-| A115 | คนแคระตัวสูง | Tallest gives 3 cards to shortest | two single-target picks (or roster twice) |
-| A166 | หมดแก้วเร็วก็รวย | "draw 3" — subject unstated in both languages | **ambiguous, confirm against physical rulebook** |
+| A115 | คนแคระตัวสูง | Tallest gives 3 cards to shortest | **implemented** — `needsDualTargetSelection`, two sequential single-target picks (tallest, then shortest); rejected reusing the multi-select roster because click order alone can't safely disambiguate two roles (a deselect-reselect fumble silently swaps them with no on-screen indication) |
 
-**Phase 2 (11 cards, deferred — need core turn/engine changes beyond a single `executeEffect`):**
+**A166 (still deferred, not Phase 1 or Phase 2):** "หมดแก้วเร็วก็รวย" / "Speed Chug Bonus" —
+checked `description_en` and `description_th` directly in `data/cards.json`; neither names who
+draws the 3 cards (the chooser or the chosen). This is a rules-ambiguity block, not a missing
+primitive — needs a call from the group/friend against the physical rulebook, not a guessed
+default.
+
+**Phase 2 (13 cards, deferred — need core turn/engine changes beyond a single `executeEffect`):**
 
 | Code | Name | Why it's deep-engine |
 |---|---|---|
@@ -254,6 +269,8 @@ room-setup fact), A137, A158 (a live drink-count tally — needs a per-player co
 | A028 | ทาเยอะไปหน่อย | Co-played with another Action card, doubles its effect — needs a "play 2 as one" UI + effect multiplier on a second frame |
 | A035 | ออกมาเล่นกันเถอะ | Forces every Action-holder to play one next turn — persistent per-player obligation flag |
 | A040 | ฉันชอบมัน! | Redirects the next 3 played Actions' post-resolution destination into your hand — persistent global redirect counter |
+| A064 | เปลือกกล้วย | Marks a card in the draw pile that fires an extra effect when later drawn — needs a hook inside `draw()` (`game/pile.ts`), the most-called primitive in the game |
+| A091 | ฉันเป็นหมอ | Draws N = cards stolen/forced-discarded from you since your last turn — needs a forced-vs-voluntary distinction the low-level primitives can't see, threaded through every call site in `transfer.ts`/`primitives.ts`/`roster.ts`/`group.ts` |
 | A092 | ฉันบ้าไปแล้ว! | Full game reset |
 | A094 | พร้อมเพรียง | Replays the most recently played Action's effect — needs an action-history log |
 | A100 | โรงงานมัฟฟิน | Grants 2 extra Action plays this turn — turn-economy exception |
@@ -269,3 +286,13 @@ room-setup fact), A137, A158 (a live drink-count tally — needs a per-player co
 Family A(18) + B(9) + C(7) + D(27) + E(35) + F(10) + G(10) + H(8) + I(12) + J(11) = 147
 grouped-pattern cards, + 26 unique (15 Phase 1 + 11 Phase 2) = **173**, matching
 `data/cards.json` exactly.
+
+**Post-implementation update (2026-09-02):** two cards originally counted inside Family
+grouped patterns (C3's A091, H1's A064) turned out to need the same class of core-engine
+change as the Phase 2 batch once actually implemented, and moved there. One originally-listed
+Phase 1 unique card (A115) shipped after adding a small dual-target-selection primitive; one
+(A166) stays deferred as a genuine rules-ambiguity, not an engine gap. Current status: **150
+of 173 implemented**, 11 Phase 2 (unchanged, all still need core turn/engine work), 2 moved
+into Phase 2 (A064, A091), 1 blocked on a rules-ambiguity call (A166). See
+`game/actionRules/definitions.ts`'s trailing comments for the up-to-date per-card reasoning —
+this doc is the historical classification pass, that file is the live source of truth.

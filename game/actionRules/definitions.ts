@@ -13,7 +13,7 @@ import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
 import { rosterDraws, rosterDiscards, rosterStolenBy, rosterSkipTurn } from '../roster';
 import type { ActionRuleDefinition } from './types';
-import { rosterIdsFromFrame, outcomeFromFrame } from './types';
+import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
@@ -103,7 +103,30 @@ function rotateSeatOrder(state: RoomState, steps: number): RoomState {
   const count = order.length;
   if (count === 0) return state;
   const rotated = order.map((_, i) => order[((i - steps) % count + count) % count]);
-  return { ...state, seatOrder: rotated };
+  // currentTurnIndex is a numeric slot in this same array (advanceTurn reads
+  // it against seatOrder once seatOrder exists) -- rotating the array without
+  // moving the index would silently hand the active turn to whoever now
+  // occupies that old slot, instead of following the player whose turn it
+  // actually is. The active player moves the same `steps` as everyone else.
+  const currentTurnIndex = ((state.currentTurnIndex + steps) % count + count) % count;
+  return { ...state, seatOrder: rotated, currentTurnIndex };
+}
+
+/** Swaps exactly two players' seats in place, leaving everyone else's
+ * position untouched (unlike rotateSeatOrder's whole-table shift). Keeps
+ * currentTurnIndex tracking the same active player if they're one of the
+ * two being swapped. */
+function swapSeats(state: RoomState, idA: PlayerId, idB: PlayerId): RoomState {
+  const order = getSeatOrder(state);
+  const posA = order.indexOf(idA);
+  const posB = order.indexOf(idB);
+  if (posA === -1 || posB === -1 || posA === posB) return state;
+  const swapped = [...order];
+  swapped[posA] = idB;
+  swapped[posB] = idA;
+  const activeId = order[state.currentTurnIndex];
+  const currentTurnIndex = activeId === idA ? posB : activeId === idB ? posA : state.currentTurnIndex;
+  return { ...state, seatOrder: swapped, currentTurnIndex };
 }
 
 /** Everyone simultaneously steals 1 card from their right-seat neighbor,
@@ -1503,29 +1526,56 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     }),
   },
 
-  // A115 ("Tall Midget" -- tallest gives 3 to shortest) intentionally NOT
-  // included: needs identifying TWO different subjective roles (tallest AND
-  // shortest) in one play; neither the single-target picker nor the
-  // multi-select roster (unordered) can express a 2-role pick. Needs a real
-  // paired-selection UI.
+  // -- Two-role paired pick and exact-count roster pick (added after the
+  // rest of the batch -- both needed small, targeted GameTable additions
+  // rather than a same-shape entry: needsDualTargetSelection for A115,
+  // rosterSelectionCount for A172. See game/actionRules/types.ts. --
 
-  // A166 ("Speed Chug Bonus") intentionally NOT included: the classification
-  // doc flags this as genuinely ambiguous in both languages -- "draw 3" never
-  // states who draws (the chooser or the chosen). Needs a rulebook check.
+  A115: {
+    code: 'A115', name_en: 'Tall Midget', name_th: 'คนแคระตัวสูง',
+    description_th: 'ผู้เล่นที่สูงที่สุดต้องมอบไพ่ 3 ใบให้ผู้เล่นที่เตี้ยที่สุด',
+    kind: 'auto',
+    needsDualTargetSelection: true,
+    dualTargetPrompts: { first: 'เลือกผู้เล่นที่สูงที่สุด', second: 'เลือกผู้เล่นที่เตี้ยที่สุด' },
+    executeEffect: (state, frame) => {
+      const { firstId: tallestId, secondId: shortestId } = dualTargetIdsFromFrame(frame);
+      if (!tallestId || !shortestId || tallestId === shortestId) return state;
+      return stealRandom(state, tallestId, shortestId, 3);
+    },
+  },
+  A172: {
+    code: 'A172', name_en: 'Forced Seat Swap', name_th: 'บังคับสลับที่',
+    description_th: 'เลือกผู้เล่น 2 คนให้สลับที่นั่งกันพร้อมแก้วของตัวเอง',
+    kind: 'roster_select', needsRosterSelection: true, rosterSelectionCount: 2,
+    rosterPrompt: 'เลือกผู้เล่น 2 คนที่จะสลับที่นั่งกัน',
+    // ponytail: "พร้อมแก้วของตัวเอง" (cups move with them) is flavor text --
+    // the game has no drink/cup state to move (see A158's deferral note).
+    executeEffect: (state, frame) => {
+      const [idA, idB] = rosterIdsFromFrame(frame);
+      if (!idA || !idB) return state;
+      return swapSeats(state, idA, idB);
+    },
+  },
+
+  // A166 ("Speed Chug Bonus") intentionally NOT included: checked both
+  // description_en and description_th in data/cards.json directly -- neither
+  // names who draws the 3 cards (the chooser or the chosen). Genuinely
+  // ambiguous, not a same-shape gap; needs a rulebook check with the group,
+  // not a guessed default.
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so
   // drawing it later fires an extra effect). No existing hook for that in
-  // the draw flow (game/pile.ts's draw / lib/session.tsx's drawCard); needs
-  // a real design, not a same-shape addition to this batch.
+  // the draw flow (game/pile.ts's draw / lib/session.tsx's drawCard) --
+  // touching draw() itself, the most-called primitive in the game, puts this
+  // in the same risk class as the Phase 2 engine batch, not a definitions-only
+  // addition. See classification doc's Phase 2 list.
 
-  // A172 "Seat Swap Chaos" (Family F1) intentionally NOT included here -- needs
-  // a "pick exactly 2 players" UI. GameTable's TargetSelector supports
-  // multiSelect but nothing enforces an exact count yet; add alongside the
-  // first real multi-select roster_select card.
-
-  // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs a
-  // "cards lost since your last turn" counter that requires touching
-  // game/turn.ts's advanceTurn (a file under active concurrent edits). Add in
-  // a dedicated follow-up once that's coordinated.
+  // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs
+  // a "cards lost since your last turn" counter, but the low-level primitives
+  // (stealRandom/stealChosen/rosterStolenBy/executeAllDiscard/etc.) don't know
+  // *why* they were called, so a forced-vs-voluntary distinction would have
+  // to be threaded through every call site in transfer.ts/primitives.ts/
+  // roster.ts/group.ts individually. Same risk class as the Phase 2 engine
+  // batch, not a definitions-only addition. See classification doc's Phase 2 list.
 };
