@@ -1776,6 +1776,16 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
+  A040: {
+    code: 'A040', name_en: 'I Love It!', name_th: 'ฉันชอบมัน!', kind: 'auto',
+    description_th: 'Action 3 ใบถัดไปที่ถูกเล่น เมื่อใช้เสร็จแล้วจะเข้ามาอยู่ในมือคุณแทนที่จะลงกองทิ้ง',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.actionRedirect = { toPlayerId: frame.actorId, remaining: 3 };
+      return next;
+    },
+  },
+
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so
   // drawing it later fires an extra effect). No existing hook for that in

@@ -1245,3 +1245,18 @@ describe('A035 (obligates every player to play an Action on their own next turn)
     expect(next.pendingActionObligations).toHaveLength(3);
   });
 });
+
+describe("A040 (redirects the next 3 played Actions into the actor's hand)", () => {
+  it('activates a 3-count redirect targeting the actor', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A040', 'me');
+    expect(next.actionRedirect).toEqual({ toPlayerId: 'me', remaining: 3 });
+  });
+
+  it('overwrites (does not stack with) an existing active redirect', () => {
+    const state = threePlayerState();
+    state.actionRedirect = { toPlayerId: 'p2', remaining: 1 };
+    const next = resolveActionEffect(state, 'A040', 'me');
+    expect(next.actionRedirect).toEqual({ toPlayerId: 'me', remaining: 3 });
+  });
+});

@@ -18,6 +18,7 @@ import {
   resetForPlayAgain as engineResetForPlayAgain,
 } from '../game/room';
 import { draw, discard, balancedShuffleDrawPile } from '../game/pile';
+import { applyActionRedirect } from '../game/turnFlow';
 import { placeTrap as enginePlaceTrap, removeTrap, skipTrapPlacement as engineSkipTrapPlacement } from '../game/trap';
 import {
   advanceTurn,
@@ -454,7 +455,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
         if ((code === 'A014' || code === 'A016') && !targetId) return state;
         if (targetId && !state.players[targetId]) return state;
-        const afterDiscard = discard(state, actorId, 1, [code]);
+        const afterDiscard = applyActionRedirect(state, actorId, code);
         if (afterDiscard.players[actorId]) {
           if (usingBonusPlay) {
             afterDiscard.players[actorId].bonusActionPlaysRemaining = (afterDiscard.players[actorId].bonusActionPlaysRemaining ?? 0) - 1;

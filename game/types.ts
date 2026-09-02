@@ -219,6 +219,11 @@ export interface RoomState {
    * mirroring PendingWinCheck/resolvePendingWinChecks's lifecycle. */
   pendingActionObligations?: PlayerId[];
 
+  /** A040: an active "next N Action plays redirect to my hand" effect.
+   * null/undefined when inactive. Cleared to null when remaining hits 0.
+   * Any player's Action play counts, not just the actor who set it up. */
+  actionRedirect?: { toPlayerId: PlayerId; remaining: number } | null;
+
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;
   lastResult?: LastResult | null;
