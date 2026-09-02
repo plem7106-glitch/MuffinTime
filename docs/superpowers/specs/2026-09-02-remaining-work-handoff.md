@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 166/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/G are done
+## Status: 167/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -57,21 +57,26 @@ independently).
   `ActionRuleDefinition.needsDrinkCheck`), A166 (`ActionRuleDefinition.needsTargetThenOutcome`),
   A100/A035/A040 (`PlayerState.bonusActionPlaysRemaining`/`mustPlayActionThisTurn`,
   `RoomState.pendingActionObligations`/`actionRedirect`), A119 (`game/turn.ts`'s
-  `jumpToPlayerTurn`/`resolveTurnArrival` — no new `PlayerState`/`RoomState` fields), and A092
+  `jumpToPlayerTurn`/`resolveTurnArrival` — no new `PlayerState`/`RoomState` fields), A092
   (`game/turn.ts`'s `resetPlayerPerTurnFlags` and `game/room.ts`'s `restartGame` — again no new
   `PlayerState`/`RoomState` fields, both are pure refactors/new functions over the existing
-  shape). **Branch your next work off `feature/birthday-cards`, not `main`**, or you'll be
-  missing that infrastructure and these 16 extra cards.
+  shape), and A126/A130 (`game/actionRules/delegatedTargetPick.ts` — extends the existing
+  `RoomState.pendingInteraction` mechanism with a new `type`, again no new `PlayerState`/
+  `RoomState` fields). **Branch your next work off `feature/birthday-cards`, not `main`**, or
+  you'll be missing that infrastructure and these 17 extra cards (167 vs `main`'s 150).
 - When your work is done and tests pass: push to this same branch if PR #3 is still open
   (it'll pick up the new commits automatically), or open a fresh PR **into `main`** if #3
-  already merged. Use `git push` and `gh pr create`/`gh pr view` — `gh` is authenticated in
-  this environment (account `plem7106-glitch`); a prior session that wrote part of this doc
-  didn't have it and used raw `curl` against `api.github.com` instead, but check `gh auth
-  status` yourself rather than assuming either way.
+  already merged. Use `git push` and `gh pr create`/`gh pr view` if `gh` is installed and
+  authenticated in this environment — it has NOT been consistently available across
+  sessions on this project (present and authenticated as `plem7106-glitch` in some, absent
+  entirely — `which gh` finds nothing — in others, including the one that wrote this
+  sentence); check `which gh` and `gh auth status` yourself rather than assuming either way,
+  and if it's absent, tell the user to update the PR description manually (link:
+  https://github.com/plem7106-glitch/MuffinTime/pull/3) rather than trying to install it.
 - Before pushing anything: `git fetch origin && git log --oneline main..origin/main` to
   check nothing new landed on `main` since you branched.
-- Last known-good check on this branch (post-Cluster-G checkpoint): `npx vitest run` → 618
-  passed (43 files), `npx tsc --noEmit` → clean. Run both again before you start — confirm
+- Last known-good check on this branch (post-Cluster-C checkpoint): `npx vitest run` → 628
+  passed (44 files), `npx tsc --noEmit` → clean. Run both again before you start — confirm
   your baseline.
 - **A card whose `executeEffect` triggers a turn transition (calling `resolveTurnArrival`
   or anything reaching `checkWinnerAtTurnStart`) must independently guard against running
@@ -138,7 +143,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 9 cards left, all in Group 1 (Group 2 and Group 3 are done)
+## What's next — 6 cards left, all in Group 1 (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -179,7 +184,7 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 — Clusters A, B & G DONE (166/173 checkpoint), 4 clusters / 8 cards remain
+### Group 1 — Clusters A, B, C & G DONE (167/173 checkpoint), 3 clusters / 6 cards remain
 
 Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
 decomposed into 7 clusters by shared mechanism during brainstorming — see
@@ -281,25 +286,108 @@ are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
   fixture in `game/room.test.ts` was already silently tripping this exact case before the fix
   — the fix's guard turned that into a loud, assertable failure instead of a latent one.
 
-**Remaining: 4 clusters, 8 cards** — `A017, A028, A064, A091, A094, A108, A126, A130`.
-Each needs its own spec (and likely its own plan) before implementation, following the
-same brainstorming → writing-plans → subagent-driven-development flow used for Clusters
-A, B, and G. Per the original decomposition:
+**Cluster C (A126, A130 — 2-hop delegated targeting) is done.** Its own plan/spec docs are
+`docs/superpowers/specs/2026-09-02-group1-cluster-c-design.md` and
+`docs/superpowers/plans/2026-09-02-group1-cluster-c.md`.
 
-- **Cluster C** (2-hop delegated targeting): `A126`, `A130`
+- Both cards break every existing `ActionRuleDefinition` pattern in a new way: in every
+  prior card, the **actor** decides everything before the frame is even pushed, and
+  `executeEffect` just reads the decision back out of `frame.customPayload`. Here, the
+  actor's target (a second, non-actor player — call them "Player 1") has to make a further
+  choice **after** the card has already resolved onto them, and nothing decides that choice
+  up front. **A126** "มือปืน" (Gunman): the actor picks Player 1 to be the gunman; Player 1
+  then picks any player to discard their entire hand. **A130** "เลื่อนตำแหน่ง" (Promotion):
+  the actor picks Player 1; Player 1 then picks a recipient for one of their own cards.
+- New module `game/actionRules/delegatedTargetPick.ts` (`initiateDelegatedTargetPick`,
+  `resolveDelegatedTargetPick`) extends the existing `RoomState.pendingInteraction`
+  mechanism — previously used only by T10's date-invite trap — with a new
+  `type: 'delegated_target_pick'`, rather than building a second "pause and wait for one
+  specific player" mechanism from scratch. This was a deliberate choice over two
+  alternatives: a nested `StackFrame` using the reaction-stack's own
+  `eligibleResponderIds`/`responses` fields (rejected — that system is for Counter-card
+  responses, and reusing it for "a targeting choice that determines what the effect even
+  does" would touch the reaction-stack's core resolution loop, exactly the surface area
+  Cluster D was split out to own); and a brand-new separate `RoomState` field like
+  `pendingDelegatedChoice` (rejected — every one of `pendingInteraction`'s existing guards,
+  `canEndTurn`, `drawCard`/`playAction`, `hostSkipTurn` → `emergencyForceSkipTurn`, and
+  `PresentationBridge.tsx`'s "waiting on X" banner, would each need a duplicate second check
+  added — the exact reset-checklist-gap risk this doc has flagged repeatedly). Extending
+  `pendingInteraction` instead needed zero changes to any of those call sites, and both
+  cards turned out to need the identical interaction shape ("Player 1 picks one other
+  player, excluding themselves") once the rulings below were applied — only the resolution
+  in `resolveDelegatedTargetPick` differs, branching on `sourceCardCode`.
+- Two rulings confirmed with the user (neither resolved by card text alone): **A126** — the
+  gunman (Player 1) may target **any player except themselves**, including the original
+  actor; matches how every other "pick a player" card in this codebase already excludes
+  self-targeting, and nothing in the text specifically protects the actor. **A130** —
+  Player 1, not the original actor, picks **both** which card to give and who receives it,
+  matching the English text's "their choice" framing; but Player 1 does **not** get a UI to
+  pick a specific card — the card given is chosen **at random** from their hand. This reuses
+  the precedent set by **A056**, which hit the identical "pick a specific card from your own
+  hand" need and deliberately punted the same way: no such UI component exists anywhere in
+  this codebase, and building one was out of scope for a single card.
+- Self-exclusion is enforced only at the UI candidate-list layer (the `TargetSelector`
+  instance offered to Player 1 excludes Player 1), not inside `executeEffect` — deliberately
+  different from Cluster B's A119, which needed an engine-level guard because
+  `checkWinnerAtTurnStart` is a *live* predicate that a self-target/no-op path could still
+  trigger. Nothing in Cluster C reaches a turn-transition or other live-predicate hazard, so
+  the same UI-only self-exclusion precedent already used elsewhere (e.g. A016) applies
+  as-is.
+- `components/modals/TargetSelector.tsx`'s `onCancel` prop became optional (backward
+  compatible — every existing caller still passes one) — there is no valid "cancel" for this
+  interaction, since the card has already been played and discarded and the game is blocked
+  on exactly this choice, so a visible Cancel button that did nothing would be actively
+  misleading at the one moment a player's input is required to unstick the table.
+- Code review (task 3's fix round, commit `50a6f33`) caught one real bug: the new
+  `GameTable.tsx` local state `delegatedPickChoice` was only cleared on a successful
+  `onConfirm`, not when `pendingInteraction` gets force-cleared out from under the modal by
+  another path — `emergencyForceSkipTurn` (the host-unstick button) unconditionally nulls
+  `pendingInteraction` regardless of `type`. A stale selected-but-not-confirmed value could
+  then pre-select and pre-enable Confirm on a later, unrelated `delegated_target_pick`
+  interaction targeting the same player. Fixed with a `useEffect` (mirroring the existing
+  trap-target auto-close effect in the same file) that clears `delegatedPickChoice` whenever
+  the current `pendingInteraction` isn't a `delegated_target_pick` targeting `myPlayerId`.
+- Zero new `PlayerState`/`RoomState` fields — the whole cluster rides on
+  `pendingInteraction`, which already existed.
+
+**Remaining: 3 clusters, 6 cards** — `A017, A028, A064, A091, A094, A108`. Each needs its
+own spec (and likely its own plan) before implementation, following the same
+brainstorming → writing-plans → subagent-driven-development flow used for Clusters A, B, C,
+and G. Per the original decomposition:
+
 - **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
   system directly): `A017`, `A028`, `A094`, `A108`
 - **Cluster E** (draw-pile hook): `A064`
 - **Cluster F** (forced-vs-voluntary loss tracking): `A091`
 
-Cluster G was the last standalone "engine-level" cluster with no dependency on the others;
-Clusters C, D, E, F all remain.
+**Confirmed next order: E → F → D** (superseding the plan's original assumption, which had
+no fixed order beyond "C first"). This was reassessed after closer inspection of E and F
+turned up two corrections to the original classification doc's risk estimates:
+
+- **Cluster E (A064) turned out simpler than expected.** It needs only a special-case check
+  for card code `'A064'` inside `draw()`, plus a small `executeEffect` that moves the card
+  from the discard pile into the draw pile at a random position — no new `RoomState`/
+  `PlayerState` field at all. Lowest-risk of the three remaining clusters, hence going
+  first.
+- **Cluster F (A091) turned out to need a forced-vs-voluntary distinction threaded through
+  dozens of existing call sites** in the `discard`/steal primitives across
+  `definitions.ts`/`transfer.ts`/`primitives.ts`/`roster.ts`/`group.ts` — comparable risk to
+  Cluster D, **not** the "lower risk" the original classification doc assumed. Still going
+  before D because its surface area, while wide, doesn't touch the reaction-stack's
+  resolution loop directly the way D does.
+- **Cluster D (A017, A028, A094, A108)** remains the hardest and goes last. Its exact
+  approach — specifically, how a forced/replayed card that itself needs further input
+  (e.g. a forced discard that turns out to be a card needing its own target) should be
+  handled — was **deliberately left undecided**; the user chose to defer that design
+  conversation until Cluster D is actually picked up, rather than speculate now. Don't
+  invent an answer to this from first principles — raise it fresh with the user when D
+  starts.
 
 Full per-card reasoning for all of these is in the classification doc's "Phase 2" table
 (`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
 these casually inside a small-batch PR — each wants its own
 `superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
-surface area, the same way Clusters A, B, and G got one.
+surface area, the same way Clusters A, B, C, and G got one.
 
 ## Known gap, not yet built (unrelated to the above)
 
