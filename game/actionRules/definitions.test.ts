@@ -1324,3 +1324,20 @@ describe('A119 (skip play forward to a chosen player\'s next turn)', () => {
     expect(next).toEqual(state);
   });
 });
+
+describe('A092 (put all cards back, reshuffle, and restart the entire game)', () => {
+  it('delegates to restartGame', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A092', 'me');
+    expect(next.status).toBe('playing');
+    expect(next.muffinTimeTarget).toBe(10);
+    expect(next.players.me.hand.length).toBe(3);
+    expect(next.players.p2.hand.length).toBe(3);
+    expect(next.players.p3.hand.length).toBe(3);
+  });
+
+  it('is a no-op when the game is not currently playing', () => {
+    const state = { ...threePlayerState(), status: 'finished' } as RoomState;
+    expect(resolveActionEffect(state, 'A092', 'me')).toEqual(state);
+  });
+});

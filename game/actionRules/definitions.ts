@@ -4,6 +4,7 @@ import { stealRandom, swapHands } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
 import { skipTurn, reverseDirection, changeMuffinTarget } from '../turnFlow';
 import { getNextPlayerId, jumpToPlayerTurn, resolveTurnArrival } from '../turn';
+import { restartGame } from '../room';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
@@ -1815,6 +1816,12 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       const currentId = jumped.turnOrder[jumped.currentTurnIndex];
       return resolveTurnArrival(jumped, currentId);
     },
+  },
+
+  A092: {
+    code: 'A092', name_en: "I'm Crazy", name_th: 'ฉันบ้าไปแล้ว!', kind: 'auto',
+    description_th: 'นำไพ่ทั้งหมดกลับเข้ากอง สับไพ่ แล้วเริ่มเกมใหม่ทั้งหมด',
+    executeEffect: (state) => restartGame(state),
   },
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
