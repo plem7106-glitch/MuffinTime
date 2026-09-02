@@ -18,7 +18,7 @@ export default function JoinRoomPage() {
   const router = useRouter();
   const params = useParams<{ code: string }>();
   const roomCode = params.code || '';
-  const { playerId, playerName, setPlayerName } = usePlayer();
+  const { playerId, playerName, setPlayerName, playerBirthday, setPlayerBirthday } = usePlayer();
   const { previewRoom, joinRoom } = useGameSession();
 
   const [previewLoading, setPreviewLoading] = useState(true);
@@ -30,6 +30,14 @@ export default function JoinRoomPage() {
   useEffect(() => {
     setNameInput(playerName);
   }, [playerName]);
+
+  // "YYYY-MM-DD" for the native date input; only the MM-DD part is ever
+  // persisted or sent anywhere (see usePlayer's playerBirthday).
+  const [birthdayInput, setBirthdayInput] = useState('');
+  useEffect(() => {
+    setBirthdayInput(playerBirthday ? `2000-${playerBirthday}` : '');
+  }, [playerBirthday]);
+  const birthdayMMDD = birthdayInput ? birthdayInput.slice(5) : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -56,10 +64,11 @@ export default function JoinRoomPage() {
     if (!canJoin || joining) return;
     const finalName = nameInput.trim() || 'ผู้เล่น';
     setPlayerName(finalName);
+    if (birthdayMMDD) setPlayerBirthday(birthdayMMDD);
     setJoining(true);
     setJoinError('');
     try {
-      await joinRoom(roomCode, finalName);
+      await joinRoom(roomCode, finalName, birthdayMMDD);
       router.push(`/room/${roomCode}`);
     } catch (err) {
       setJoinError(err instanceof Error ? err.message : 'เข้าร่วมห้องไม่สำเร็จ ลองใหม่อีกครั้ง');
@@ -118,6 +127,23 @@ export default function JoinRoomPage() {
           placeholder="กรอกชื่อของคุณ"
           maxLength={20}
           className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink placeholder:text-gray-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-primary">
+          <span>🎂</span>
+          <label htmlFor="joinBirthday" className="text-sm font-bold text-ink">
+            วันเกิด (ไม่บังคับ)
+          </label>
+        </div>
+        <p className="text-xs text-ink-secondary">ใช้กับการ์ดบางใบที่เกี่ยวกับวันเกิดเท่านั้น เก็บแค่วัน-เดือน ไม่เก็บปี</p>
+        <input
+          id="joinBirthday"
+          type="date"
+          value={birthdayInput}
+          onChange={(e) => setBirthdayInput(e.target.value)}
+          className="w-full min-h-[48px] rounded-2xl border-2 border-primary/80 bg-white px-4 text-base font-bold text-ink shadow-[0_2px_8px_rgba(0,0,0,0.02)] focus:border-primary focus:outline-none transition-colors"
         />
       </div>
 

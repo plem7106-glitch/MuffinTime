@@ -116,6 +116,18 @@ export interface PlayerState {
   placedTrapThisTurn?: boolean;
   hasDrawnThisTurn?: boolean;
   hasPlayedActionThisTurn?: boolean;
+  /** Optional, self-reported, month-and-day only ("MM-DD") -- deliberately
+   * never a full date. Used only by A037/A066/A137. A player who never sets
+   * this is simply excluded from those cards' birthday comparisons. */
+  birthdayMMDD?: string;
+  /** A100: extra Action plays available this turn, beyond the normal 1.
+   * Reset to 0 every turn by advanceTurn, same as hasPlayedActionThisTurn. */
+  bonusActionPlaysRemaining?: number;
+  /** A035: this player is obligated to play an Action before ending their
+   * current turn. Set only by resolvePendingActionObligations when it finds
+   * them holding ≥1 Action card at their obligated turn's start. Reset to
+   * false every turn by advanceTurn. */
+  mustPlayActionThisTurn?: boolean;
 }
 
 export interface PendingInteraction {
@@ -139,11 +151,34 @@ export interface GlobalRestriction {
   sourcePlayerId: PlayerId;
 }
 
+/**
+ * A win/lose evaluation deferred to sourcePlayerId's own next turn
+ * (A023/A024/A027's "by your next turn..." Action cards) -- there is no
+ * mechanism for arbitrary future-turn effects, so this is scoped narrowly to
+ * "declare a winner (or not) the moment play returns to sourcePlayerId".
+ * Pushed by the card's executeEffect, consumed exactly once (removed
+ * regardless of outcome) by game/turn.ts's resolvePendingWinChecks, which
+ * lib/session.tsx's advanceAndCheckWin calls on every turn transition --
+ * mirrors GlobalRestriction's "until your next turn" lifecycle above.
+ */
+export interface PendingWinCheck {
+  sourcePlayerId: PlayerId;
+  /** hand_nonempty: A023 (actor still holds cards) -- fewest_hand: A024
+   * (least cards wins, tie = no winner) -- most_hand: A027 (most cards
+   * wins, tie = no winner). */
+  type: 'hand_nonempty' | 'fewest_hand' | 'most_hand';
+}
+
 export interface RoomState {
   status: 'lobby' | 'setup' | 'playing' | 'ended' | 'finished';
   hostId: PlayerId;
   joinOrder?: PlayerId[];
   seatOrder?: PlayerId[];
+  /** Whoever suggested playing this game, host-picked during setup once the
+   * roster is locked (game/room.ts's setGameSuggester). Optional/self-serve
+   * -- a room where the host skips this simply never has an A118 target.
+   * Used only by A118. */
+  gameSuggesterId?: PlayerId;
   playDirection?: PlayDirection;
   turnOrder: PlayerId[];
   currentTurnIndex: number;
@@ -175,6 +210,19 @@ export interface RoomState {
 
   // Temporary table-wide rule suspensions (e.g. A019/A072/A085)
   globalRestrictions?: GlobalRestriction[];
+
+  // Win/lose checks deferred to a specific player's own next turn (A023/A024/A027)
+  pendingWinChecks?: PendingWinCheck[];
+
+  /** A035: player IDs still owed an obligation check on their own next turn.
+   * Consumed exactly once per player by resolvePendingActionObligations,
+   * mirroring PendingWinCheck/resolvePendingWinChecks's lifecycle. */
+  pendingActionObligations?: PlayerId[];
+
+  /** A040: an active "next N Action plays redirect to my hand" effect.
+   * null/undefined when inactive. Cleared to null when remaining hits 0.
+   * Any player's Action play counts, not just the actor who set it up. */
+  actionRedirect?: { toPlayerId: PlayerId; remaining: number } | null;
 
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;

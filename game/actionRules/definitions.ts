@@ -2,8 +2,9 @@ import { everyoneDraws, everyoneDiscards, passHands } from '../group';
 import { draw, discard } from '../pile';
 import { stealRandom, swapHands } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
-import { skipTurn, reverseDirection } from '../turnFlow';
-import { getNextPlayerId } from '../turn';
+import { skipTurn, reverseDirection, changeMuffinTarget } from '../turnFlow';
+import { getNextPlayerId, jumpToPlayerTurn, resolveTurnArrival } from '../turn';
+import { restartGame } from '../room';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
@@ -13,7 +14,7 @@ import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
 import { rosterDraws, rosterDiscards, rosterStolenBy, rosterSkipTurn } from '../roster';
 import type { ActionRuleDefinition } from './types';
-import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame } from './types';
+import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame, todayFromFrame, numberInputFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
@@ -40,6 +41,59 @@ function extremeByHandSize(state: RoomState, direction: 'min' | 'max'): PlayerId
   const sizes = ids.map((id) => state.players[id].hand.length);
   const extreme = direction === 'min' ? Math.min(...sizes) : Math.max(...sizes);
   return ids.filter((id) => state.players[id].hand.length === extreme);
+}
+
+/** Day-of-year for an "MM-DD" string, using a fixed leap year (2024) as the
+ * reference so Feb-29 birthdays resolve without special-casing. */
+function dayOfYear(mmdd: string): number {
+  const [month, day] = mmdd.split('-').map(Number);
+  const start = Date.UTC(2024, 0, 1);
+  const date = Date.UTC(2024, month - 1, day);
+  return Math.round((date - start) / 86400000);
+}
+
+/** Days from `todayMMDD` until the next occurrence of `birthdayMMDD`
+ * (0 if today *is* the birthday, otherwise wraps forward to next year). */
+function daysUntilBirthday(todayMMDD: string, birthdayMMDD: string): number {
+  const diff = dayOfYear(birthdayMMDD) - dayOfYear(todayMMDD);
+  return diff >= 0 ? diff : diff + 366;
+}
+
+/** Players whose birthdayMMDD is soonest from todayMMDD (ties -> all tied,
+ * same convention as extremeByHandSize/J1/J2). Players with no birthday set
+ * are excluded entirely -- birthdayMMDD is optional and self-reported, so a
+ * player who never set one simply never counts as "soonest". */
+function soonestBirthdayPlayers(state: RoomState, todayMMDD: string): PlayerId[] {
+  const withBirthday = Object.keys(state.players).filter((id) => state.players[id].birthdayMMDD);
+  if (withBirthday.length === 0) return [];
+  const distances = withBirthday.map((id) => daysUntilBirthday(todayMMDD, state.players[id].birthdayMMDD!));
+  const soonest = Math.min(...distances);
+  return withBirthday.filter((id) => daysUntilBirthday(todayMMDD, state.players[id].birthdayMMDD!) === soonest);
+}
+
+/** Every player not in `recipientIds` gives 1 random card to one of
+ * `recipientIds` (round-robin by rng when there's more than one tied
+ * recipient), for A066. */
+function everyoneGivesOneTo(state: RoomState, recipientIds: PlayerId[], rng: Rng = Math.random): RoomState {
+  let next = state;
+  for (const giverId of Object.keys(state.players)) {
+    if (recipientIds.includes(giverId)) continue;
+    const recipientId = recipientIds[Math.floor(rng() * recipientIds.length)];
+    next = stealRandom(next, giverId, recipientId, 1, rng);
+  }
+  return next;
+}
+
+/** Every player not in `targetIds` steals 1 random card from one of
+ * `targetIds`, for A137. */
+function everyoneStealsOneFrom(state: RoomState, targetIds: PlayerId[], rng: Rng = Math.random): RoomState {
+  let next = state;
+  for (const stealerId of Object.keys(state.players)) {
+    if (targetIds.includes(stealerId)) continue;
+    const targetId = targetIds[Math.floor(rng() * targetIds.length)];
+    next = stealRandom(next, targetId, stealerId, 1, rng);
+  }
+  return next;
 }
 
 /** A046/A026: peek N from the top of the draw pile and take one -- no
@@ -923,19 +977,133 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state) => rosterSkipTurn(state, extremeByHandSize(state, 'max')),
   },
 
-  // The following are deliberately NOT included in this batch -- each needs
-  // real new infrastructure this codebase doesn't have yet, not just a UI
-  // picker like the earlier "ponytail" simplifications:
-  //  - A135 (choose the new Muffin Time target number): needs a numeric-input UI.
-  //  - A024, A027, A023 (win/lose evaluated at the ACTOR's next turn, not now):
-  //    needs a scheduled/delayed check consulted by game/turn.ts's
-  //    checkWinnerAtTurnStart -- there's no "pending effect for a future
-  //    turn" mechanism to hook into.
-  //  - A037, A066, A137 (compare players' birthdates): no birthdate field
-  //    exists on PlayerState, and nothing collects one.
-  //  - A118 (whoever suggested playing this game): no such one-time
-  //    room-setup fact is collected or stored anywhere.
-  //  - A158 (a live per-player drink-count tally): no such counter exists.
+  // A158: "if you haven't drunk this round, steal 3 from whoever has drunk
+  // the most" -- no per-player drink counter exists anywhere in this
+  // codebase (or gets added here). Resolved live, honor-system, via
+  // needsDrinkCheck's two-step UI flow (outcome toggle, then a conditional
+  // target pick) -- see its doc comment in ./types.ts.
+  A158: {
+    code: 'A158', name_en: 'Sober Spy', name_th: 'ตาสว่างยามเมา', kind: 'auto',
+    needsDrinkCheck: true,
+    outcomePrompt: 'คุณดื่มไปหรือยังในรอบนี้?', outcomeYesLabel: 'ดื่มแล้ว', outcomeNoLabel: 'ยังไม่ดื่ม',
+    targetPrompt: 'ใครดื่มมากที่สุดตอนนี้?',
+    description_th: 'ถ้าคุณยังไม่ได้ดื่มเลยในรอบนี้ ขโมยไพ่ 3 ใบจากผู้เล่นที่ดื่มมากที่สุด',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+    },
+  },
+
+  // A118: steal 3 from whoever suggested this game (RoomState.gameSuggesterId,
+  // host-picked during setup -- see game/room.ts's setGameSuggester).
+  A118: {
+    code: 'A118', name_en: 'Whose Idea?', name_th: 'ไอเดียใครเนี่ย?', kind: 'auto',
+    description_th: 'ขโมยไพ่ 3 ใบจากผู้เล่นที่เป็นคนเสนอให้เล่นเกมนี้',
+    executeEffect: (state, frame) => {
+      const suggesterId = state.gameSuggesterId;
+      if (!suggesterId || !state.players[suggesterId] || suggesterId === frame.actorId) return state;
+      return stealRandom(state, suggesterId, frame.actorId, 3);
+    },
+  },
+
+  // A135: change the Muffin Time win target -- needs a free-form number from
+  // the actor (see needsNumberInput's doc comment in ./types.ts).
+  A135: {
+    code: 'A135', name_en: 'Time of Death', name_th: 'เวลาแห่งความตาย', kind: 'auto',
+    needsNumberInput: true,
+    numberInputPrompt: 'เลือกจำนวนไพ่เป้าหมายใหม่สำหรับ Muffin Time',
+    numberInputMin: 1, numberInputMax: 20,
+    description_th: 'เปลี่ยนเงื่อนไขชนะของ Muffin Time จาก 10 ใบ เป็นจำนวนไพ่ที่คุณเลือก และใช้จำนวนใหม่นี้ไปจนจบเกม',
+    executeEffect: (state, frame) => {
+      const n = numberInputFromFrame(frame);
+      if (n === undefined || n <= 0) return state;
+      return changeMuffinTarget(state, n);
+    },
+  },
+
+  // A023/A024/A027: win/lose evaluated at the ACTOR's own next turn, not
+  // immediately -- each pushes a RoomState.pendingWinChecks entry (see its
+  // doc comment in ../types.ts) consumed by game/turn.ts's
+  // resolvePendingWinChecks, which lib/session.tsx's advanceAndCheckWin
+  // calls on every turn transition.
+  A023: {
+    code: 'A023', name_en: 'Shoot Me', name_th: 'ยิงฉันสิ', kind: 'auto',
+    description_th: 'หากถึงเทิร์นถัดไปของคุณแล้วยังมีไพ่เหลืออยู่ในมือ คุณชนะเกม',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.pendingWinChecks = [...(next.pendingWinChecks ?? []), { sourcePlayerId: frame.actorId, type: 'hand_nonempty' }];
+      return next;
+    },
+  },
+  A024: {
+    code: 'A024', name_en: 'The End', name_th: 'จุดจบ', kind: 'auto',
+    description_th: 'เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือน้อยที่สุดชนะ หากเสมอกัน ให้ลองใหม่',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.pendingWinChecks = [...(next.pendingWinChecks ?? []), { sourcePlayerId: frame.actorId, type: 'fewest_hand' }];
+      return next;
+    },
+  },
+  A027: {
+    code: 'A027', name_en: '1 Year to Live', name_th: 'เหลือเวลาอีก 1 ปี', kind: 'auto',
+    description_th: 'เมื่อถึงเทิร์นถัดไปของคุณ ผู้เล่นที่มีไพ่ในมือมากที่สุดชนะ หากเสมอกัน ให้ลองใหม่',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.pendingWinChecks = [...(next.pendingWinChecks ?? []), { sourcePlayerId: frame.actorId, type: 'most_hand' }];
+      return next;
+    },
+  },
+
+  // -- Birthday cards (classification doc §I4/§J4) -- PlayerState.birthdayMMDD
+  // is optional and self-reported (game/types.ts); GameTable stamps "today"
+  // (the actor's own device clock, MM-DD) into customPayload before pushing
+  // the frame, since executeEffect must stay pure -- see needsTodayDate's
+  // doc comment in ./types.ts. --
+
+  A037: {
+    code: 'A037', name_en: 'Birthday', name_th: 'วันเกิด', kind: 'auto',
+    needsTodayDate: true,
+    description_th: 'หากวันนี้เป็นวันเกิดของคุณ คุณชนะเกมทันที!',
+    executeEffect: (state, frame) => {
+      const today = todayFromFrame(frame);
+      const birthday = state.players[frame.actorId]?.birthdayMMDD;
+      if (!today || !birthday || birthday !== today) return state;
+      // Same gate checkWinnerAtTurnStart applies for A085's "no one can win
+      // until my next turn" -- this path bypasses that turn-start check
+      // entirely (it's an instant win), so it must re-check here itself.
+      if (state.globalRestrictions?.some((r) => r.type === 'no_win')) return state;
+      // Not state.status !== 'playing' -> already finished by something
+      // else in the same resolution pass; no-op rather than clobber it.
+      // Inline (not room.ts's finishGame, which throws on this precondition)
+      // matches advanceAndCheckWin's existing win-declaration shape.
+      if (state.status !== 'playing') return state;
+      return { ...state, status: 'finished', winnerId: frame.actorId, finishReason: 'normal' };
+    },
+  },
+  A066: {
+    code: 'A066', name_en: 'Cake Day', name_th: 'วันเค้ก', kind: 'auto',
+    needsTodayDate: true,
+    description_th: 'ผู้เล่นทุกคนมอบไพ่คนละ 1 ใบให้ผู้เล่นที่มีวันเกิดใกล้จะถึงที่สุด',
+    executeEffect: (state, frame) => {
+      const today = todayFromFrame(frame);
+      if (!today) return state;
+      const recipients = soonestBirthdayPlayers(state, today);
+      if (recipients.length === 0) return state;
+      return everyoneGivesOneTo(state, recipients);
+    },
+  },
+  A137: {
+    code: 'A137', name_en: 'What Did You Get?', name_th: 'ได้อะไรมา?', kind: 'auto',
+    needsTodayDate: true,
+    description_th: 'ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่มีวันเกิดครั้งถัดไปใกล้ที่สุด',
+    executeEffect: (state, frame) => {
+      const today = todayFromFrame(frame);
+      if (!today) return state;
+      const targets = soonestBirthdayPlayers(state, today);
+      if (targets.length === 0) return state;
+      return everyoneStealsOneFrom(state, targets);
+    },
+  },
 
   // -- Family A: condition-filtered player selection (classification doc §Family A) --
   // "All players matching a real-world condition" -- the active player taps
@@ -1562,11 +1730,99 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
-  // A166 ("Speed Chug Bonus") intentionally NOT included: checked both
-  // description_en and description_th in data/cards.json directly -- neither
-  // names who draws the 3 cards (the chooser or the chosen). Genuinely
-  // ambiguous, not a same-shape gap; needs a rulebook check with the group,
-  // not a guessed default.
+  // A166 "Speed Chug Bonus": both description_en and description_th are
+  // silent on who draws the 3 cards -- a genuine rules ambiguity, not a
+  // same-shape gap. Ruling confirmed directly with the user rather than
+  // guessed: the target draws on success (beats the actor's slow count of
+  // 5), the actor draws on failure. Needs needsTargetThenOutcome's two-step
+  // flow since each outcome has a *different* recipient -- see its doc
+  // comment in ./types.ts.
+  A166: {
+    code: 'A166', name_en: 'Speed Chug Bonus', name_th: 'หมดแก้วเร็วก็รวย', kind: 'auto',
+    needsTargetThenOutcome: true,
+    targetPrompt: 'เลือกผู้เล่นที่จะให้ดื่มให้เร็วที่สุด',
+    outcomePrompt: 'เร็วกว่าที่คุณนับ 5 หรือไม่?', outcomeYesLabel: 'เร็วกว่า (ผู้เล่นที่เลือกชนะ)', outcomeNoLabel: 'ช้ากว่า (คุณชนะ)',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้ดื่มให้เร็วที่สุด ถ้าเร็วกว่าที่คุณนับ 5 จั่วไพ่ 3 ใบ',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      const outcome = outcomeFromFrame(frame);
+      if (!targetId || outcome === undefined) return state;
+      return draw(state, outcome ? targetId : frame.actorId, 3);
+    },
+  },
+
+  // -- Group 1 Cluster A (classification doc's Phase 2 batch, spec:
+  // docs/superpowers/specs/2026-09-02-group1-cluster-a-design.md) --
+
+  A100: {
+    code: 'A100', name_en: 'Muffin Factory', name_th: 'โรงงานมัฟฟิน', kind: 'auto',
+    description_th: 'คุณสามารถเล่น Action เพิ่มอีก 2 ใบในเทิร์นนี้',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      const player = next.players[frame.actorId];
+      player.bonusActionPlaysRemaining = (player.bonusActionPlaysRemaining ?? 0) + 2;
+      return next;
+    },
+  },
+
+  A035: {
+    code: 'A035', name_en: 'Come Out to Play', name_th: 'ออกมาเล่นกันเถอะ', kind: 'auto',
+    description_th: 'ในเทิร์นถัดไป ผู้เล่นทุกคนที่มี Action อยู่ในมือต้องเล่น Action',
+    executeEffect: (state) => {
+      const next = cloneState(state);
+      const existing = new Set(next.pendingActionObligations ?? []);
+      for (const id of Object.keys(next.players)) existing.add(id);
+      next.pendingActionObligations = [...existing];
+      return next;
+    },
+  },
+
+  A040: {
+    code: 'A040', name_en: 'I Love It!', name_th: 'ฉันชอบมัน!', kind: 'auto',
+    description_th: 'Action 3 ใบถัดไปที่ถูกเล่น เมื่อใช้เสร็จแล้วจะเข้ามาอยู่ในมือคุณแทนที่จะลงกองทิ้ง',
+    executeEffect: (state, frame) => {
+      const next = cloneState(state);
+      next.actionRedirect = { toPlayerId: frame.actorId, remaining: 3 };
+      return next;
+    },
+  },
+
+  A119: {
+    code: 'A119', name_en: 'Why Wait?', name_th: 'จะรอทำไม?', kind: 'auto',
+    needsTargetSelection: true,
+    targetPrompt: 'เลือกผู้เล่นที่จะข้ามไปยังเทิร์นของเขา',
+    description_th: 'เลือกผู้เล่นอีก 1 คน แล้วข้ามการเล่นไปยังเทิร์นถัดไปของผู้เล่นคนนั้น',
+    executeEffect: (state, frame) => {
+      const targetId = frame.targetIds[0];
+      if (!targetId) return state;
+      // Explicit full no-op on self-targeting OR an invalid/nonexistent
+      // target, independent of the UI's opponentCandidates filtering
+      // (bots/tests/future refactors/a stale id from a race could still
+      // call this that way). jumpToPlayerTurn no-ops in both cases too, but
+      // only skips the jump itself (and, for an invalid target, skips
+      // beginTurn) -- it still returns a state whose current player is the
+      // actor, so resolveTurnArrival would run (and re-evaluate the live
+      // checkWinnerAtTurnStart check) for them mid-turn without this check,
+      // which can end the game prematurely if they'd already declared
+      // muffin time earlier in their own turn. Validated up front against
+      // the target, not the outcome after the jump -- checking currentId
+      // against frame.actorId afterward would also wrongly block the
+      // legitimate case where every other player is skip-flagged and the
+      // jump wraps all the way back around to the actor, which SHOULD run
+      // resolveTurnArrival since beginTurn genuinely fires for them then.
+      const order = state.turnOrder?.length ? state.turnOrder : (state.seatOrder ?? []);
+      if (targetId === frame.actorId || !order.includes(targetId)) return state;
+      const jumped = jumpToPlayerTurn(state, targetId);
+      const currentId = jumped.turnOrder[jumped.currentTurnIndex];
+      return resolveTurnArrival(jumped, currentId);
+    },
+  },
+
+  A092: {
+    code: 'A092', name_en: "I'm Crazy", name_th: 'ฉันบ้าไปแล้ว!', kind: 'auto',
+    description_th: 'นำไพ่ทั้งหมดกลับเข้ากอง สับไพ่ แล้วเริ่มเกมใหม่ทั้งหมด',
+    executeEffect: (state) => restartGame(state),
+  },
 
   // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
   // deferred-trigger mechanism (mark a specific card in the draw pile so

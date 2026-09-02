@@ -22,6 +22,7 @@ import { ShuffleDrawPileOverlay } from './ShuffleDrawPileOverlay';
 import { RoundTransitionOverlay } from './RoundTransitionOverlay';
 import { TargetSelector } from '../modals/TargetSelector';
 import { OutcomeToggle } from '../modals/OutcomeToggle';
+import { NumberInputModal } from '../modals/NumberInputModal';
 import { DateInviteModal } from '../modals/DateInviteModal';
 import { canActivateManualTrap } from '../../game/trapRules/engine';
 import { getTrapRule } from '../../game/trapRules/registry';
@@ -93,6 +94,16 @@ export function GameTable() {
   const [dualPickPhase, setDualPickPhase] = useState<'first' | 'second' | null>(null);
   const [dualPickFirstId, setDualPickFirstId] = useState<PlayerId | null>(null);
 
+  // Honor-system drink-check flow (A158: outcome toggle, then -- only if
+  // "haven't drunk yet" -- a single target pick. No persistent drink
+  // tracking anywhere; resolved live at play time.)
+  const [drinkCheckPhase, setDrinkCheckPhase] = useState<'outcome' | 'target' | null>(null);
+
+  // Target-then-outcome flow (A166: pick a target, then report a binary
+  // outcome for that specific target -- each outcome has a different
+  // recipient, so both pieces of input are needed before the frame is pushed)
+  const [targetThenOutcomePhase, setTargetThenOutcomePhase] = useState<'target' | 'outcome' | null>(null);
+
   // Trap Open Flow State
   const [pendingTrapCode, setPendingTrapCode] = useState<CardCode | null>(null);
   const [trapTargetPrompt, setTrapTargetPrompt] = useState<string>('เลือกผู้เล่นเป้าหมาย');
@@ -148,6 +159,8 @@ export function GameTable() {
 
   const canAct = isMyTurn && !pendingResponse && !isFinished && !isShuffling && !isRoundTransitionActive;
   const canDeclare = !pendingResponse && !isFinished && !isShuffling && !isRoundTransitionActive && isMuffinTimeEligible(state, myPlayerId) && !me.hasCalledMuffinTime;
+  // A035 "Come Out to Play" -- blocks ending this turn until an obligated Action is played.
+  const mustPlayActionFirst = Boolean(me.mustPlayActionThisTurn) && !me.hasPlayedActionThisTurn;
 
   const isShuffleDisabled = !isHost || !!pendingResponse || isShuffling || isRoundTransitionActive || state.drawPile.length <= 1;
   const shuffleDisabledReason = pendingResponse
@@ -183,6 +196,15 @@ export function GameTable() {
   // Handlers for Hand Tray Actions
   const handlePlayActionDirect = (cardCode: CardCode) => {
     if (!canAct) return;
+    // A037/A066/A137 need "today" to resolve their birthday comparison.
+    // Stamped here (the actor's own device clock) rather than read inside
+    // executeEffect, which must stay a pure function of (state, frame).
+    if (getActionRule(cardCode)?.needsTodayDate) {
+      const now = new Date();
+      const today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      playAction(cardCode, undefined, { today });
+      return;
+    }
     playAction(cardCode);
   };
 
@@ -198,6 +220,8 @@ export function GameTable() {
     const rule = getActionRule(card.code);
     setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
     setDualPickFirstId(null);
+    setDrinkCheckPhase(rule?.needsDrinkCheck ? 'outcome' : null);
+    setTargetThenOutcomePhase(rule?.needsTargetThenOutcome ? 'target' : null);
   };
 
   const pendingActionRule = pendingTargetCard ? getActionRule(pendingTargetCard.code) : undefined;
@@ -244,6 +268,51 @@ export function GameTable() {
     if (!pendingTargetCard) return;
     playAction(pendingTargetCard.code, undefined, { outcome });
     setPendingTargetCard(null);
+  };
+
+  const handleNumberInputConfirm = (numberInput: number) => {
+    if (!pendingTargetCard) return;
+    playAction(pendingTargetCard.code, undefined, { numberInput });
+    setPendingTargetCard(null);
+  };
+
+  const handleDrinkCheckCancel = () => {
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setDrinkCheckPhase(null);
+  };
+
+  const handleDrinkOutcomeSelect = (alreadyDrunk: boolean) => {
+    if (!pendingTargetCard) return;
+    if (alreadyDrunk) {
+      playAction(pendingTargetCard.code);
+      handleDrinkCheckCancel();
+      return;
+    }
+    setDrinkCheckPhase('target');
+  };
+
+  const handleDrinkTargetConfirm = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    playAction(pendingTargetCard.code, chosenTarget);
+    handleDrinkCheckCancel();
+  };
+
+  const handleTargetThenOutcomeCancel = () => {
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setTargetThenOutcomePhase(null);
+  };
+
+  const handleTargetThenOutcomeTargetConfirm = () => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    setTargetThenOutcomePhase('outcome');
+  };
+
+  const handleTargetThenOutcomeSelect = (outcome: boolean) => {
+    if (!pendingTargetCard || !chosenTarget) return;
+    playAction(pendingTargetCard.code, chosenTarget, { outcome });
+    handleTargetThenOutcomeCancel();
   };
 
   // Handlers for Opening Active Traps
@@ -384,6 +453,13 @@ export function GameTable() {
             <span>🧁 ประกาศ MUFFIN TIME! (มีไพ่ครบ 10 ใบ)</span>
           </button>
         )}
+
+        {/* A035 "Come Out to Play" obligation banner -- blocks ending this turn */}
+        {isMyTurn && mustPlayActionFirst && (
+          <div className="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 shrink-0">
+            <span>ต้องเล่น Action ก่อนจบเทิร์นนี้ (A035)</span>
+          </div>
+        )}
       </div>
 
       {/* =================================================== */}
@@ -435,6 +511,7 @@ export function GameTable() {
         canAct={canAct}
         hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
         hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
+        hasBonusActionPlays={(me.bonusActionPlaysRemaining ?? 0) > 0}
         isTrapPlacementPhase={state.turnPhase === 'trap_placement'}
         trapsCount={me.traps.length}
         onClose={() => setIsHandTrayOpen(false)}
@@ -447,7 +524,7 @@ export function GameTable() {
           when the card's rule needs a roster_select -- e.g. "who matches this
           condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
-        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry}
+        open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput && !pendingActionRule?.needsDrinkCheck && !pendingActionRule?.needsTargetThenOutcome}
         candidates={opponentCandidates}
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
@@ -504,6 +581,58 @@ export function GameTable() {
         noLabel={pendingActionRule?.outcomeNoLabel}
         onSelect={handleOutcomeSelect}
         onCancel={() => setPendingTargetCard(null)}
+      />
+
+      {/* 10.6 Action Card Number Input (free-form number, e.g. A135's new
+          Muffin Time target) */}
+      <NumberInputModal
+        open={pendingTargetCard !== null && pendingActionRule?.needsNumberInput === true}
+        prompt={pendingActionRule?.numberInputPrompt ?? pendingTargetCard?.effect ?? ''}
+        min={pendingActionRule?.numberInputMin}
+        max={pendingActionRule?.numberInputMax}
+        onConfirm={handleNumberInputConfirm}
+        onCancel={() => setPendingTargetCard(null)}
+      />
+
+      {/* 10.7 Action Card Drink Check (A158: honor-system outcome toggle,
+          then -- only if "haven't drunk yet" -- a single target pick) */}
+      <OutcomeToggle
+        open={pendingTargetCard !== null && pendingActionRule?.needsDrinkCheck === true && drinkCheckPhase === 'outcome'}
+        prompt={pendingActionRule?.outcomePrompt ?? pendingTargetCard?.effect ?? ''}
+        yesLabel={pendingActionRule?.outcomeYesLabel}
+        noLabel={pendingActionRule?.outcomeNoLabel}
+        onSelect={handleDrinkOutcomeSelect}
+        onCancel={handleDrinkCheckCancel}
+      />
+      <TargetSelector
+        open={pendingTargetCard !== null && pendingActionRule?.needsDrinkCheck === true && drinkCheckPhase === 'target'}
+        candidates={opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={(id) => setChosenTarget(id)}
+        onConfirm={handleDrinkTargetConfirm}
+        onCancel={handleDrinkCheckCancel}
+        prompt={pendingActionRule?.targetPrompt ?? pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+
+      {/* 10.8 Action Card Target-Then-Outcome (A166: pick a target, then
+          report a binary outcome for that specific target -- each outcome
+          has a different recipient) */}
+      <TargetSelector
+        open={pendingTargetCard !== null && pendingActionRule?.needsTargetThenOutcome === true && targetThenOutcomePhase === 'target'}
+        candidates={opponentCandidates}
+        selectedId={chosenTarget}
+        onSelect={(id) => setChosenTarget(id)}
+        onConfirm={handleTargetThenOutcomeTargetConfirm}
+        onCancel={handleTargetThenOutcomeCancel}
+        prompt={pendingActionRule?.targetPrompt ?? pendingTargetCard?.effect ?? 'เลือกผู้เล่นเป้าหมาย'}
+      />
+      <OutcomeToggle
+        open={pendingTargetCard !== null && pendingActionRule?.needsTargetThenOutcome === true && targetThenOutcomePhase === 'outcome'}
+        prompt={pendingActionRule?.outcomePrompt ?? pendingTargetCard?.effect ?? ''}
+        yesLabel={pendingActionRule?.outcomeYesLabel}
+        noLabel={pendingActionRule?.outcomeNoLabel}
+        onSelect={handleTargetThenOutcomeSelect}
+        onCancel={handleTargetThenOutcomeCancel}
       />
 
       {/* 11. Trap Card Open Modal */}

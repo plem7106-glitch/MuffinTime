@@ -22,6 +22,13 @@ import {
   VolumeOffIcon,
 } from '../ui/Icons';
 
+function formatBirthdayMMDD(mmdd: string): string {
+  const [month, day] = mmdd.split('-').map(Number);
+  return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' }).format(
+    new Date(2000, month - 1, day)
+  );
+}
+
 const AVATAR_COLORS = [
   'bg-blue-100 text-blue-700 border-blue-200',
   'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -280,6 +287,11 @@ export function WaitingRoom() {
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 border border-primary/20 px-1.5 py-0.2 text-[9px] font-bold text-primary shrink-0">
                         <CrownIcon className="h-2.5 w-2.5 text-amber-500" />
                         <span>เจ้าของห้อง</span>
+                      </span>
+                    )}
+                    {player.birthdayMMDD && (
+                      <span className="rounded-full bg-[#FFF5F7] border border-[#FED7DE] px-1.5 py-0.2 text-[9px] font-bold text-primary shrink-0">
+                        🎂 {formatBirthdayMMDD(player.birthdayMMDD)}
                       </span>
                     )}
                   </div>
