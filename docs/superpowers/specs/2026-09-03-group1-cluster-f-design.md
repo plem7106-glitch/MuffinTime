@@ -71,14 +71,32 @@ the inventory tables below.
 forcedLossSinceLastTurn?: number;
 ```
 
-Reset point: `game/turn.ts`'s `resetPlayerPerTurnFlags(player)`. Add
-`player.forcedLossSinceLastTurn = 0;` there, next to the other per-turn resets
-(`placedTrapThisTurn`, `hasDrawnThisTurn`, etc.). No separate edit is needed in
-`beginTurn`, `startGame`, `resetForPlayAgain`, or `restartGame` — verified directly
-against `game/room.ts`: all three of the latter already call
-`resetPlayerPerTurnFlags(next.players[pid])` for every player (`startGame` line ~163,
-`resetForPlayAgain` line ~244, `restartGame` line ~313), and `beginTurn` calls it for the
-active player. One line in the shared function covers all four call sites automatically.
+Reset point: **end of turn, not start of turn.**
+
+> Corrected after final whole-branch review. The original spec put
+> `player.forcedLossSinceLastTurn = 0;` inside `resetPlayerPerTurnFlags` alongside
+> `placedTrapThisTurn`/`hasDrawnThisTurn`/etc. That is wrong: `resetPlayerPerTurnFlags`
+> runs via `beginTurn` for the player whose turn is *starting*, so the tally was
+> zeroed moments before A091 — played during that very turn — could read it, leaving
+> the card permanently drawing 0 in its primary scenario.
+
+Every *other* field in `resetPlayerPerTurnFlags` genuinely is start-of-turn state and
+still resets at turn start. `forcedLossSinceLastTurn` is the one exception and lives
+outside that helper, cleared by `game/turn.ts`'s `clearForcedLoss(state, playerId)` for
+the **outgoing** player at each turn transition:
+
+- `advanceTurn` — clears `order[currentTurnIndex]` before the index moves.
+- `jumpToPlayerTurn` (A119) — same, past its self-target / invalid-target no-op guards.
+- `emergencyForceSkipTurn` — same; a host force-skip still ends the stuck player's turn.
+- `startGame` / `resetForPlayAgain` / `restartGame` (`game/room.ts`) — no outgoing player
+  here, but these reuse existing `PlayerState` objects, so each per-player reset loop
+  also calls `clearForcedLoss` so a previous game's tally can't leak into the new one.
+
+**Skipped players (deliberate):** a player stepped over by `advanceTurn`'s `skipNextTurn`
+loop never becomes active, so no turn of theirs ends and their tally is *not* cleared on
+that pass. Forced losses suffered before the skip carry forward and still count when their
+turn finally comes. This matches the card's literal wording — "since your last turn" means
+since their last *real* turn — and is a chosen behaviour, not an accident.
 
 ## Instrumentation: a shared tracker, two thin wrappers, and per-site classification
 

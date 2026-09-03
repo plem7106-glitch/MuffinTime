@@ -1,5 +1,5 @@
 import { cloneState, shuffle } from './util';
-import { beginTurn, resetPlayerPerTurnFlags } from './turn';
+import { beginTurn, resetPlayerPerTurnFlags, clearForcedLoss } from './turn';
 import type { RoomState, PlayerId, CardCode, Rng, PlayDirection } from './types';
 
 export const GLOBAL_MIN_PLAYERS = 3;
@@ -162,6 +162,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   next.currentTurnIndex = 0;
   for (const pid of Object.keys(next.players)) {
     resetPlayerPerTurnFlags(next.players[pid]);
+    clearForcedLoss(next, pid); // end-of-turn field: no outgoing turn here, just don't inherit last game's tally
   }
   next.actionRedirect = null;
   next.bananaPeelArmed = false;
@@ -243,6 +244,7 @@ export function resetForPlayAgain(state: RoomState): RoomState {
   for (const pid of playerIds) {
     next.players[pid] = { ...next.players[pid], hand: [], traps: [], hasCalledMuffinTime: false, skipNextTurn: false };
     resetPlayerPerTurnFlags(next.players[pid]);
+    clearForcedLoss(next, pid); // end-of-turn field: no outgoing turn here, just don't inherit last game's tally
   }
   next.actionRedirect = null;
   next.bananaPeelArmed = false;
@@ -314,6 +316,7 @@ export function restartGame(state: RoomState, rng: Rng = Math.random): RoomState
     next.players[pid].hasCalledMuffinTime = false;
     next.players[pid].skipNextTurn = false;
     resetPlayerPerTurnFlags(next.players[pid]);
+    clearForcedLoss(next, pid); // end-of-turn field: no outgoing turn here, just don't inherit last game's tally
   }
   for (const pid of next.turnOrder) {
     for (let i = 0; i < 3; i++) {

@@ -136,8 +136,14 @@ export interface PlayerState {
    * (e.g. via A100's bonus plays), both reads see the same accumulated total
    * unless something forces a loss in between, matching the card's literal
    * "since your last turn" wording rather than "since you last played this
-   * card." Reset to 0 by resetPlayerPerTurnFlags, same as every other
-   * per-turn field on this interface. */
+   * card." Unlike every other per-turn field on this interface, this one is
+   * NOT reset by resetPlayerPerTurnFlags at turn start -- that would wipe it
+   * before A091, played during that same turn, could read it. It is cleared by
+   * clearForcedLoss (game/turn.ts) when a player's turn ENDS, from advanceTurn
+   * / jumpToPlayerTurn / emergencyForceSkipTurn, plus the game start/restart
+   * paths in game/room.ts. A player stepped over by advanceTurn's skipNextTurn
+   * loop has no turn end, so their tally deliberately carries through the skip
+   * to their next real turn. */
   forcedLossSinceLastTurn?: number;
 }
 

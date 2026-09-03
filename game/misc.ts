@@ -1,5 +1,5 @@
 import { cloneState } from './util';
-import { draw, discard } from './pile';
+import { draw, discard, forceDiscard } from './pile';
 import type { RoomState, PlayerId, CardCode, Rng } from './types';
 
 export function removeCardFromDiscard(state: RoomState, cardCode: CardCode): RoomState {
@@ -18,18 +18,31 @@ export function returnCardToHand(state: RoomState, cardCode: CardCode, toPlayerI
   return next;
 }
 
+/**
+ * Adjusts playerId's hand toward targetCount (A044, A129, ...).
+ *
+ * `actorId` is whoever played the card driving the adjustment: trimming
+ * anyone else's hand is a forced loss (A091 counts it), while the actor's own
+ * trim is the self-inflicted cost of their own card and is never tracked --
+ * the same `id === actorId ? untracked : tracked` split A034/A113 use. Omit it
+ * and nothing is tracked, which is right for a self-directed call.
+ */
 export function drawUntilCount(
   state: RoomState,
   playerId: PlayerId,
   targetCount: number,
-  rng: Rng = Math.random
+  rng: Rng = Math.random,
+  actorId?: PlayerId
 ): RoomState {
   const hand = state.players[playerId].hand;
   if (hand.length < targetCount) {
     return draw(state, playerId, targetCount - hand.length, rng);
   }
   if (hand.length > targetCount) {
-    return discard(state, playerId, hand.length - targetCount, null, rng);
+    const n = hand.length - targetCount;
+    return actorId !== undefined && actorId !== playerId
+      ? forceDiscard(state, playerId, n, null, rng)
+      : discard(state, playerId, n, null, rng);
   }
   return cloneState(state);
 }

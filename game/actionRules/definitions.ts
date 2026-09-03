@@ -350,7 +350,9 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     name_th: 'เต่าระเบิด',
     description_th: 'ผู้เล่นทุกคนทิ้งไพ่คนละ 3 ใบ',
     kind: 'auto',
-    executeEffect: (state) => everyoneDiscards(state, 3, []),
+    // actorId as sourcePlayerId: everyone discards including the actor, but the
+    // actor's own 3 are their card's cost, not a forced loss (see finalizeForcedDiscard).
+    executeEffect: (state, frame) => everyoneDiscards(state, 3, [], Math.random, frame.actorId),
   },
   A121: {
     code: 'A121',
@@ -753,9 +755,9 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     code: 'A044', name_en: 'Grow Up Fast', name_th: 'โตไว ๆ',
     description_th: 'ผู้เล่นทุกคนปรับจำนวนไพ่ในมือให้เหลือ 7 ใบ โดยถ้ามีน้อยกว่าให้จั่วเพิ่ม และถ้ามากกว่าให้ทิ้ง',
     kind: 'auto',
-    executeEffect: (state) => {
+    executeEffect: (state, frame) => {
       let next = state;
-      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 7);
+      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 7, Math.random, frame.actorId);
       return next;
     },
   },
@@ -763,9 +765,9 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     code: 'A129', name_en: 'Only One', name_th: 'เหลือแค่หนึ่ง',
     description_th: 'ผู้เล่นทุกคนทิ้งไพ่จนเหลือไพ่ในมือเพียงคนละ 1 ใบ',
     kind: 'auto',
-    executeEffect: (state) => {
+    executeEffect: (state, frame) => {
       let next = state;
-      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 1);
+      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 1, Math.random, frame.actorId);
       return next;
     },
   },
@@ -1581,7 +1583,8 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
         const pos = Math.floor(Math.random() * (next.drawPile.length + 1));
         next.drawPile.splice(pos, 0, code);
       }
-      return next;
+      // Buried, not discarded -- still a forced loss for A091's tally.
+      return trackForcedLoss(next, targetId, taken.length);
     },
   },
   A055: {
