@@ -305,6 +305,29 @@ export function getPlayableCountersForActiveFrame(state: RoomState, responderId:
   );
 }
 
+/**
+ * Who could legally play a Counter against a just-played Counter card. Used
+ * when pushing the reaction-stack frame for a played Counter, so its
+ * eligibleResponderIds starts accurate instead of defaulting to "every other
+ * player" (reactionStack.ts's createStackFrame fallback for sourceType
+ * 'counter') -- a default that's almost always wrong here, since only a
+ * handful of cards (C05/C18/C21/C29) can counter a Counter at all. Mirrors
+ * game/forcedDiscard.ts's getEligibleForcedDiscardResponders for the same
+ * reason: compute it upfront rather than relying on the async auto-skip
+ * effect to narrow an overly-broad list down to empty after the fact.
+ */
+export function getEligibleCounterResponders(state: RoomState, actorId: PlayerId, code: CardCode): PlayerId[] {
+  const eligible: PlayerId[] = [];
+  for (const pid of Object.keys(state.players)) {
+    if (pid === actorId) continue;
+    const hand = state.players[pid]?.hand ?? [];
+    if (getPlayableCounters(hand, { kind: 'counter', code }).length > 0) {
+      eligible.push(pid);
+    }
+  }
+  return eligible;
+}
+
 /** Pending responders that have no legal Counter choice on the active frame. */
 export function getZeroEligibleCounterResponderIds(state: RoomState): PlayerId[] {
   const top = state.reactionStack?.[state.reactionStack.length - 1];

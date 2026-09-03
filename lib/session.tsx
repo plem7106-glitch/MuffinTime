@@ -51,7 +51,7 @@ import {
 } from '../game/trapRules/engine';
 import { resolveDelegatedTargetPick as engineResolveDelegatedTargetPick } from '../game/actionRules/delegatedTargetPick';
 import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
-import { getCounterContextForActiveFrame, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds } from '../game/counterRules/registry';
+import { getCounterContextForActiveFrame, getEligibleCounterResponders, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds } from '../game/counterRules/registry';
 import { applyDevReactionScenario, createDevReactionScenario, createDevScenarioRoomCode, type DevReactionScenario } from './devReactionScenarios';
 import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
@@ -340,6 +340,95 @@ export function applySkipCounter(state: RoomState, responseId: string, responder
             countered: false,
           }
         : null,
+  };
+}
+
+/**
+ * Core logic for playing a Counter card against the active reaction-stack
+ * frame. Hoisted to module scope (mirrors applySkipCounter above) for the
+ * same reason: it only closes over its own parameters, so it's
+ * independently testable.
+ *
+ * The pushed child frame for the just-played Counter now passes its own
+ * eligibleResponderIds via getEligibleCounterResponders instead of leaving
+ * it unset. Leaving it unset previously fell through to
+ * reactionStack.ts's createStackFrame default for sourceType 'counter' --
+ * "every other player at the table" -- even though only a handful of cards
+ * (C05/C18/C21/C29) can ever legally counter a Counter. That meant playing
+ * ANY Counter (C03 included) pushed a phantom response window that had to
+ * wait for the async host-mediated auto-skip effect (lib/session.tsx's
+ * "Auto-skip or bot-respond to counter windows" effect) to silently resolve
+ * it one extra round trip later -- invisible and fast on a good connection,
+ * but with zero loading UI, so any latency (or the host's tab merely being
+ * backgrounded) made the game look stuck right after playing a Counter,
+ * with no indication of what anyone needed to do next.
+ */
+export function applyPlayCounter(
+  state: RoomState,
+  code: CardCode,
+  responseId: string,
+  counterActorId?: PlayerId,
+  customPayloadOverride?: Record<string, unknown>
+): RoomState {
+  const top = getTopFrame(state);
+  if (!top || top.frameId !== responseId) return state;
+  if (state.globalRestrictions?.some((r) => r.type === 'no_counters')) return state;
+  if (!counterActorId || !state.players[counterActorId]) return state;
+  const ctx = getCounterContextForActiveFrame(state, counterActorId);
+  const stealOp = ctx?.stealOp;
+
+  if (!getPlayableCountersForActiveFrame(state, counterActorId).includes(code)) return state;
+
+  if (code === 'C04') {
+    const newVictimId = customPayloadOverride?.newVictimId as string | undefined;
+    if (!stealOp || !newVictimId || !state.players[newVictimId] || newVictimId === stealOp.thiefId || newVictimId === stealOp.victimId) {
+      return state;
+    }
+  }
+
+  const afterDiscard = discard(state, counterActorId, 1, [code]);
+
+  // Submit counter response to top frame
+  let next = submitResponse(afterDiscard, responseId, counterActorId, {
+    status: 'countered',
+    counterCode: code,
+  });
+
+  // Push new child StackFrame for the played Counter card!
+  next = pushStackFrame(next, {
+    sourceType: 'counter',
+    sourceCode: code,
+    actorId: counterActorId,
+    targetIds: [top.actorId],
+    eligibleResponderIds: getEligibleCounterResponders(next, counterActorId, code),
+    customPayload: {
+      parentFrameId: responseId,
+      ...(customPayloadOverride ?? {}),
+    },
+  });
+
+  const counterEvent = createGameEvent(GAME_EVENT_TYPES.COUNTER_PLAYED, counterActorId, {
+    actorId: counterActorId,
+    counterCode: code,
+    targetFrameId: responseId,
+  }, [top.actorId]);
+  appendGameEvent(next, counterEvent);
+  next = checkAndTriggerAutomaticTraps(next, counterEvent);
+
+  next = resolveCompletedStackFrames(next);
+
+  return {
+    ...next,
+    lastResult: {
+      responseId,
+      kind: top.sourceType === 'trap' ? 'trap' : top.sourceType === 'counter' ? 'counter' : 'action',
+      code: top.sourceCode,
+      actorId: top.actorId,
+      targetId: top.targetIds[0],
+      countered: true,
+      counteredBy: counterActorId,
+      counterCode: code,
+    },
   };
 }
 
@@ -885,68 +974,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
   const playCounter = useCallback(
     (code: CardCode, responseId: string, actorIdOverride?: PlayerId, customPayloadOverride?: Record<string, unknown>) =>
-      run((state) => {
-        const top = getTopFrame(state);
-        if (!top || top.frameId !== responseId) return state;
-        if (state.globalRestrictions?.some((r) => r.type === 'no_counters')) return state;
-        const counterActorId = actorIdOverride ?? myPlayerId!;
-        if (!counterActorId || !state.players[counterActorId]) return state;
-        const ctx = getCounterContextForActiveFrame(state, counterActorId);
-        const stealOp = ctx?.stealOp;
-
-        if (!getPlayableCountersForActiveFrame(state, counterActorId).includes(code)) return state;
-
-        if (code === 'C04') {
-          const newVictimId = customPayloadOverride?.newVictimId as string | undefined;
-          if (!stealOp || !newVictimId || !state.players[newVictimId] || newVictimId === stealOp.thiefId || newVictimId === stealOp.victimId) {
-            return state;
-          }
-        }
-
-        const afterDiscard = discard(state, counterActorId, 1, [code]);
-
-        // Submit counter response to top frame
-        let next = submitResponse(afterDiscard, responseId, counterActorId, {
-          status: 'countered',
-          counterCode: code,
-        });
-
-        // Push new child StackFrame for the played Counter card!
-        next = pushStackFrame(next, {
-          sourceType: 'counter',
-          sourceCode: code,
-          actorId: counterActorId,
-          targetIds: [top.actorId],
-          customPayload: {
-            parentFrameId: responseId,
-            ...(customPayloadOverride ?? {}),
-          },
-        });
-
-        const counterEvent = createGameEvent(GAME_EVENT_TYPES.COUNTER_PLAYED, counterActorId, {
-          actorId: counterActorId,
-          counterCode: code,
-          targetFrameId: responseId,
-        }, [top.actorId]);
-        appendGameEvent(next, counterEvent);
-        next = checkAndTriggerAutomaticTraps(next, counterEvent);
-
-        next = resolveCompletedStackFrames(next);
-
-        return {
-          ...next,
-          lastResult: {
-            responseId,
-            kind: top.sourceType === 'trap' ? 'trap' : top.sourceType === 'counter' ? 'counter' : 'action',
-            code: top.sourceCode,
-            actorId: top.actorId,
-            targetId: top.targetIds[0],
-            countered: true,
-            counteredBy: counterActorId,
-            counterCode: code,
-          },
-        };
-      }),
+      run((state) => applyPlayCounter(state, code, responseId, actorIdOverride ?? myPlayerId ?? undefined, customPayloadOverride)),
     [run, myPlayerId]
   );
 

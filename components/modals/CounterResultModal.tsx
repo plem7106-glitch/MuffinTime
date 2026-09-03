@@ -23,7 +23,7 @@ export function CounterResultModal({
           <h2 className="text-lg font-bold text-ink">
             {counterActorName} เล่นการ์ด &quot;{counterCard.th}&quot;
           </h2>
-          <p className="text-sm text-ink-secondary">ผลของการ์ด/กับดักถูกยกเลิก</p>
+          <p className="text-sm text-ink-secondary">{counterCard.effect}</p>
           <PrimaryButton tone="counter" onClick={onClose}>
             ตกลง
           </PrimaryButton>

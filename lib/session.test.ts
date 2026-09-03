@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCompletedStackFrames, applyPlayDoubledAction, applySkipCounter } from './session';
+import { resolveCompletedStackFrames, applyPlayDoubledAction, applySkipCounter, applyPlayCounter } from './session';
 import { getActionRule } from '../game/actionRules/registry';
+import { resolveForcedDiscard } from '../game/forcedDiscard';
+import { getTopFrame } from '../game/reactionStack';
 import type { RoomState } from '../game/types';
 
 describe('resolveCompletedStackFrames', () => {
@@ -248,5 +250,31 @@ describe('applySkipCounter', () => {
   it('leaves lastResult null for a counter frame (unchanged behavior)', () => {
     const next = applySkipCounter(stateWithTopFrame('counter'), 'f1');
     expect(next.lastResult).toBeNull();
+  });
+});
+
+describe('applyPlayCounter', () => {
+  it('C03 resolves the forced-discard reaction immediately when nobody else can counter a Counter -- previously left the game waiting on a phantom response window (reactionStack.ts\'s createStackFrame default treated every other player as eligible to counter the Counter, when in reality only C05/C18/C21/C29 ever can), which only resolved later via a separate host-mediated auto-skip round trip', () => {
+    let state: RoomState = {
+      status: 'playing', hostId: 'p1', turnOrder: ['p1', 'p2'], currentTurnIndex: 0,
+      direction: 1, muffinTimeTarget: 10, drawPile: [], discardPile: [],
+      players: {
+        p1: { name: 'Actor', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Target', hand: ['C03', 'X1', 'X2', 'X3', 'X4'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+
+    state = resolveForcedDiscard(state, 'p2', 3, 'p1', ['X1', 'X2', 'X3']);
+    const responseId = getTopFrame(state)!.frameId;
+
+    const next = applyPlayCounter(state, 'C03', responseId, 'p2');
+
+    // The reaction stack is fully drained in this one call -- no phantom
+    // frame left waiting on someone who can never actually respond.
+    expect(next.reactionStack ?? []).toEqual([]);
+    // C03 "keep 2 of them": discard 3 requested, minus 2 kept = 1 actually discarded.
+    expect(next.players.p2.hand.sort()).toEqual(['X2', 'X3', 'X4'].sort());
+    expect(next.discardPile).toEqual(['C03', 'X1']);
+    expect(next.pendingForcedDiscards ?? {}).toEqual({});
   });
 });

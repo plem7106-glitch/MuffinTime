@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { allCards } from '../../data/cards/index';
-import { getCounterInteraction, getCounterStatus, getPlayableCounters, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds, isCounterImplemented } from './registry';
+import { getCounterInteraction, getCounterStatus, getEligibleCounterResponders, getPlayableCounters, getPlayableCountersForActiveFrame, getZeroEligibleCounterResponderIds, isCounterImplemented } from './registry';
 import { addPlayer, createRoom } from '../room';
 import { areAllResponsesComplete, pushStackFrame, submitResponse } from '../reactionStack';
 
@@ -99,5 +99,33 @@ describe('counter capability registry', () => {
   it('offers only implemented and eligible Counters', () => {
     expect(getPlayableCounters(['C41', 'C06', 'C09'], { kind: 'trap', code: 'T01' })).toEqual(['C09']);
     expect(getPlayableCounters(['C41', 'C06', 'C17'], { kind: 'action', code: 'A001' })).toEqual(['C17']);
+  });
+});
+
+describe('getEligibleCounterResponders', () => {
+  it('returns nobody when no other player holds a card that can counter a Counter (the common case for C03)', () => {
+    let state = createRoom('actor', 'Actor', 3);
+    state = addPlayer(state, 'p2', 'P2');
+    state = addPlayer(state, 'p3', 'P3');
+    state.players.p2.hand = ['X1', 'X2'];
+    state.players.p3.hand = ['C17']; // a real counter, but not eligible against pending.kind 'counter'
+    expect(getEligibleCounterResponders(state, 'actor', 'C03')).toEqual([]);
+  });
+
+  it('includes a player holding a card that CAN counter a Counter (e.g. C05)', () => {
+    let state = createRoom('actor', 'Actor', 3);
+    state = addPlayer(state, 'p2', 'P2');
+    state = addPlayer(state, 'p3', 'P3');
+    state.players.p2.hand = ['C05'];
+    state.players.p3.hand = ['X1'];
+    expect(getEligibleCounterResponders(state, 'actor', 'C03')).toEqual(['p2']);
+  });
+
+  it('excludes the actor themselves even if they hold a card that could otherwise qualify', () => {
+    let state = createRoom('actor', 'Actor', 3);
+    state = addPlayer(state, 'p2', 'P2');
+    state = addPlayer(state, 'p3', 'P3');
+    state.players.actor.hand = ['C05'];
+    expect(getEligibleCounterResponders(state, 'actor', 'C03')).toEqual([]);
   });
 });
