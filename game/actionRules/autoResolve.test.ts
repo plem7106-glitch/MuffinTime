@@ -88,6 +88,20 @@ describe('autoResolveInputFrame', () => {
     expect(result?.customPayload?.today).toBe('05-20');
   });
 
+  it('needsTargetSelection + needsTodayDate together (A017/A108): produces a real target AND the stamped today', () => {
+    // A017 ("You're Blind") and A108 ("Play That One") are the only two
+    // cards in the game that declare BOTH needsTargetSelection and
+    // needsTodayDate -- see game/actionRules/definitions.ts. Regression
+    // coverage for the bug where needsTodayDate was checked as an early
+    // return ahead of needsTargetSelection, so a card combining both lost
+    // its target whenever it was auto-resolved.
+    const result = autoResolveInputFrame(threePlayerState(), 'A017', 'me', '05-20', () => 0);
+    expect(result?.targetIds).toHaveLength(1);
+    expect(result?.targetIds[0]).not.toBe('me');
+    expect(['p2', 'p3']).toContain(result?.targetIds[0]);
+    expect(result?.customPayload?.today).toBe('05-20');
+  });
+
   it('needsNumberInput: rng() => 0 produces exactly numberInputMin', () => {
     // A135 ("Time of Death") declares numberInputMin: 1, numberInputMax: 20
     // -- see game/actionRules/definitions.ts.

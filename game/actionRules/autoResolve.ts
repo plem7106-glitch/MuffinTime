@@ -34,54 +34,64 @@ export function autoResolveInputFrame(
 
   const others = Object.keys(state.players).filter((id) => id !== actorId);
 
+  let result: AutoResolvedInput;
+
   if (rule.needsDualTargetSelection) {
-    if (others.length < 2) return { targetIds: [] };
-    const idx = pickRandomIndices(others.length, 2, rng);
-    return { targetIds: [], customPayload: { firstId: others[idx[0]], secondId: others[idx[1]] } };
-  }
-
-  if (rule.needsTargetThenOutcome) {
-    if (others.length === 0) return { targetIds: [] };
-    const idx = pickRandomIndices(others.length, 1, rng);
-    return { targetIds: [others[idx[0]]], customPayload: { outcome: rng() < 0.5 } };
-  }
-
-  if (rule.needsDrinkCheck) {
+    if (others.length < 2) {
+      result = { targetIds: [] };
+    } else {
+      const idx = pickRandomIndices(others.length, 2, rng);
+      result = { targetIds: [], customPayload: { firstId: others[idx[0]], secondId: others[idx[1]] } };
+    }
+  } else if (rule.needsTargetThenOutcome) {
+    if (others.length === 0) {
+      result = { targetIds: [] };
+    } else {
+      const idx = pickRandomIndices(others.length, 1, rng);
+      result = { targetIds: [others[idx[0]]], customPayload: { outcome: rng() < 0.5 } };
+    }
+  } else if (rule.needsDrinkCheck) {
     const alreadyDrunk = rng() < 0.5;
-    if (alreadyDrunk || others.length === 0) return { targetIds: [] };
-    const idx = pickRandomIndices(others.length, 1, rng);
-    return { targetIds: [others[idx[0]]] };
-  }
-
-  if (rule.needsOutcomeEntry) {
-    return { targetIds: [], customPayload: { outcome: rng() < 0.5 } };
-  }
-
-  if (rule.needsNumberInput) {
+    if (alreadyDrunk || others.length === 0) {
+      result = { targetIds: [] };
+    } else {
+      const idx = pickRandomIndices(others.length, 1, rng);
+      result = { targetIds: [others[idx[0]]] };
+    }
+  } else if (rule.needsOutcomeEntry) {
+    result = { targetIds: [], customPayload: { outcome: rng() < 0.5 } };
+  } else if (rule.needsNumberInput) {
     const min = rule.numberInputMin ?? 1;
     const max = rule.numberInputMax ?? Math.max(min, 5);
     const numberInput = min + Math.floor(rng() * (max - min + 1));
-    return { targetIds: [], customPayload: { numberInput } };
-  }
-
-  if (rule.needsRosterSelection) {
+    result = { targetIds: [], customPayload: { numberInput } };
+  } else if (rule.needsRosterSelection) {
     if (rule.rosterSelectionCount !== undefined) {
       const count = Math.min(rule.rosterSelectionCount, others.length);
       const idx = pickRandomIndices(others.length, count, rng);
-      return { targetIds: idx.map((i) => others[i]) };
+      result = { targetIds: idx.map((i) => others[i]) };
+    } else {
+      result = { targetIds: others };
     }
-    return { targetIds: others };
+  } else if (rule.needsTargetSelection) {
+    if (others.length === 0) {
+      result = { targetIds: [] };
+    } else {
+      const idx = pickRandomIndices(others.length, 1, rng);
+      result = { targetIds: [others[idx[0]]] };
+    }
+  } else {
+    result = { targetIds: [] };
   }
 
+  // needsTodayDate is orthogonal to the "shape" flags above -- a card can
+  // need a target/roster/etc. AND a stamped `today` date (A017, A108 are the
+  // only two that do). Merge it in after the shape is decided rather than
+  // short-circuiting past target selection (see this function's history for
+  // the bug this fixed).
   if (rule.needsTodayDate) {
-    return { targetIds: [], customPayload: { today: today ?? '01-01' } };
+    result = { ...result, customPayload: { ...result.customPayload, today: today ?? '01-01' } };
   }
 
-  if (rule.needsTargetSelection) {
-    if (others.length === 0) return { targetIds: [] };
-    const idx = pickRandomIndices(others.length, 1, rng);
-    return { targetIds: [others[idx[0]]] };
-  }
-
-  return { targetIds: [] };
+  return result;
 }

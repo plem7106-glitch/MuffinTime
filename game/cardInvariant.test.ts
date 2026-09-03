@@ -7,7 +7,7 @@ import { draw, discard } from './pile';
 import { resolveActionEffect, executeActionFrameEffect, isActionImplemented } from './actionRules/registry';
 import { placeTrap, removeTrap } from './trap';
 import { stealRandom, swapHands } from './transfer';
-import { pushStackFrame, popStackFrame } from './reactionStack';
+import { pushStackFrame, popStackFrame, removeStackFrame } from './reactionStack';
 
 function startedRoom() {
   let room = createRoom('p1', 'P1');
@@ -305,6 +305,137 @@ describe('Cluster D card conservation (A017, A108, A028, A094)', () => {
     state = executeActionFrameEffect(state, replayFrame);
     assertCardConservation(state);
     state = popStackFrame(state).state;
+    assertCardConservation(state);
+
+    const after = inspectCardConservation(state);
+    expect(after.total).toBe(before.total);
+    expect(after.isValid).toBe(true);
+  });
+
+  it('preserves every card across a two-level A017 -> A108 cross-card chain (Cluster D finding its own cards)', () => {
+    let state = startedRoom();
+
+    // A017's blind-drawn A108 lands as a nested frame actored by p2 (the
+    // player A017 targets -- see below), so autoResolveInputFrame's
+    // candidate pool for A108's own (needsTargetSelection + needsTodayDate)
+    // target is `others = all players except p2` = {p1, p3}. This call site
+    // (A108's executeEffect) invokes autoResolveInputFrame with real
+    // Math.random, so which of p1/p3 gets picked isn't seeded by this test.
+    // GLOBAL_MIN_PLAYERS is 3 (game/room.ts), so a single-candidate setup
+    // isn't achievable here -- instead, give BOTH p1 and p3 exactly one
+    // deterministic implemented Action card (different codes, since each
+    // physical card is a single instance -- see the duplicate-card check in
+    // the top-level describe block above) so the chain cascades to a third
+    // level identically no matter which of them is auto-picked, mirroring
+    // the "A108 forces a target" test above's determinism technique
+    // (relocate pre-existing implemented Action cards out, force one known
+    // one in) applied to both eligible targets.
+    const forceOneImplementedAction = (playerId: string, code: string) => {
+      const relocated: string[] = [];
+      state.players[playerId].hand = state.players[playerId].hand.filter((c) => {
+        if (isActionImplemented(c)) {
+          relocated.push(c);
+          return false;
+        }
+        return true;
+      });
+      state.drawPile.push(...relocated);
+      const idx = state.drawPile.indexOf(code);
+      state.drawPile.splice(idx, 1);
+      state.players[playerId].hand.push(code);
+    };
+    forceOneImplementedAction('p1', 'A014');
+    forceOneImplementedAction('p3', 'A006');
+
+    // Force A017 into p1's hand (after the above, so it doesn't get swept up
+    // as one of p1's "pre-existing implemented Action cards" and relocated).
+    const a017Index = state.drawPile.indexOf('A017');
+    state.drawPile.splice(a017Index, 1);
+    state.players.p1.hand.push('A017');
+
+    // Force A108 to be the very next Action card A017's blind draw will find:
+    // relocate it (still conserved, just moved) to the top of drawPile
+    // (drawPile.pop() reads the end, matching the A064-plant test's convention).
+    const a108Index = state.drawPile.indexOf('A108');
+    state.drawPile.splice(a108Index, 1);
+    state.drawPile.push('A108');
+    assertCardConservation(state);
+
+    // Simulate the normal play-a-card flow: A017 leaves p1's hand onto
+    // discardPile before its own executeEffect runs.
+    state.players.p1.hand = state.players.p1.hand.filter((c) => c !== 'A017');
+    state.discardPile.push('A017');
+    const before = inspectCardConservation(state);
+
+    // p1 plays A017 targeting p2 -- p2 is "chosen to draw and play" the
+    // blindly-found card.
+    state = resolveActionEffect(state, 'A017', 'p1', 'p2');
+    assertCardConservation(state);
+
+    const a108Frame = state.reactionStack![state.reactionStack!.length - 1];
+    const a108FrameId = a108Frame.frameId;
+    expect(a108Frame.sourceCode).toBe('A108');
+    expect(a108Frame.actorId).toBe('p2');
+    expect((a108Frame.customPayload?.chainDepth as number | undefined)).toBe(1);
+
+    // A108's own definition declares BOTH needsTargetSelection (who to force)
+    // and needsTodayDate (see autoResolveInputFrame's doc comment). FIXED (see
+    // this commit): game/actionRules/autoResolve.ts's autoResolveInputFrame
+    // used to check `rule.needsTodayDate` BEFORE `rule.needsTargetSelection`
+    // and return immediately on the first matching flag. A017 and A108 are
+    // the only two cards in the whole game with BOTH flags set simultaneously
+    // (see game/actionRules/definitions.ts lines ~1877-1878 and ~1933-1934),
+    // so whenever A017 or A108 was itself the auto-resolved nested/forced
+    // card (exactly this scenario), the needsTodayDate branch used to return
+    // `{ targetIds: [], customPayload: { today } }` and the
+    // needsTargetSelection branch below it never ran -- silently dropping the
+    // target, so A108's own executeEffect read `frame.targetIds[0]` as
+    // undefined and no-op'd (`if (!forcedPlayerId ...) return state;`), and
+    // the "real recursion between the cluster's own cards" this test exists
+    // to exercise fizzled out silently instead of cascading.
+    // autoResolveInputFrame now decides the result's "shape" (target/roster/
+    // etc.) first and merges needsTodayDate's `today` stamp into it
+    // afterward, rather than short-circuiting past target selection, so a
+    // real target is always picked here.
+    expect(a108Frame.targetIds).toHaveLength(1);
+    const forcedTargetId = a108Frame.targetIds[0];
+    expect(['p1', 'p3']).toContain(forcedTargetId);
+    const expectedForcedCode = forcedTargetId === 'p1' ? 'A014' : 'A006';
+
+    // Resolve the nested A108 frame by its specific frameId (captured above,
+    // before executing it), mirroring lib/session.tsx's
+    // resolveCompletedStackFrames -- which never blindly pops the top of the
+    // stack, but always removes the frame it just finished executing via
+    // removeStackFrame(state, frameId). That distinction matters here: A108's
+    // own executeEffect pushes a further nested frame (for whichever card it
+    // forces) while A108's own frame is still on the stack, so by the time
+    // we're done, A108's frame is no longer on top -- a naive popStackFrame
+    // would remove the wrong frame.
+    state = executeActionFrameEffect(state, a108Frame);
+    assertCardConservation(state);
+    state = removeStackFrame(state, a108FrameId).state;
+    assertCardConservation(state);
+
+    // A108 forced whichever player it auto-assigned as a target to play a
+    // real Action card out of their hand -- p1/p3 each deterministically have
+    // exactly one available (A014/A006 respectively, per
+    // forceOneImplementedAction above), so the chain reaches a second nested
+    // level regardless of which one was picked.
+    expect(state.players[forcedTargetId].hand).not.toContain(expectedForcedCode);
+
+    const forcedFrame = state.reactionStack![state.reactionStack!.length - 1];
+    const forcedFrameId = forcedFrame.frameId;
+    expect(forcedFrame.sourceCode).toBe(expectedForcedCode);
+    expect(forcedFrame.actorId).toBe(forcedTargetId);
+    expect((forcedFrame.customPayload?.chainDepth as number | undefined)).toBe(2);
+
+    // Same frame-removal-by-ID pattern again: neither A014's nor A006's own
+    // executeEffect pushes a further nested frame, so a naive pop would
+    // happen to work here too, but resolving by frameId is the correct
+    // mechanism regardless of what the executed effect did.
+    state = executeActionFrameEffect(state, forcedFrame);
+    assertCardConservation(state);
+    state = removeStackFrame(state, forcedFrameId).state;
     assertCardConservation(state);
 
     const after = inspectCardConservation(state);
