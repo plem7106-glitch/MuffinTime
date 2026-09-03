@@ -1886,7 +1886,14 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       let foundCode: CardCode | undefined;
       const totalCards = next.drawPile.length + next.discardPile.length;
       let safety = 0;
-      while (safety < totalCards + 1) {
+      // reshuffleDiscardIntoDraw always keeps the current top-of-discard card
+      // out of the reshuffle, so a target sitting at the top when a reshuffle
+      // fires survives that reshuffle untouched -- it only becomes reachable
+      // on a SECOND reshuffle, once something else has been discarded on top
+      // of it. Worst case: two full "epochs" of up to (totalCards - 1)
+      // discards each before the target is finally popped. 2 * totalCards is
+      // a safe, slightly generous bound for that worst case.
+      while (safety < 2 * totalCards) {
         safety += 1;
         if (next.drawPile.length === 0) {
           next = reshuffleDiscardIntoDraw(next);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { resolveActionEffect, executeActionFrameEffect, getActionRule } from './registry';
 import type { CardCode, PlayerId, RoomState, StackFrame } from '../types';
 
@@ -1477,5 +1477,68 @@ describe('A017', () => {
     const state = stateWithDeck(['A006']);
     const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
     expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  // Regression coverage for a code-review finding: reshuffleDiscardIntoDraw
+  // (game/pile.ts) always protects the CURRENT top-of-discardPile card from
+  // being included in its reshuffle. If the target Action card happens to be
+  // sitting at that top-of-discard position when a reshuffle fires, it
+  // survives that reshuffle untouched and only becomes reachable on a
+  // SECOND reshuffle epoch (once something else has been discarded on top of
+  // it). The old `totalCards + 1` safety bound could terminate one epoch too
+  // early, silently fizzling the effect despite a genuinely findable Action
+  // card. The fix widens the bound to `2 * totalCards`.
+
+  it('reliably finds an Action card sitting at the top of discardPile requiring two reshuffle epochs (regression for the 2x safety-bound fix)', () => {
+    const rule = getActionRule('A017')!;
+    for (let trial = 0; trial < 100; trial++) {
+      const state = stateWithDeck([], ['T01', 'C02', 'C03', 'A006']);
+      const next = rule.executeEffect(state, testFrame());
+      const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+      expect(pushed?.sourceCode).toBe('A006');
+    }
+  });
+
+  it('deterministically finds an Action card that needs the full two-epoch worst case (regression for the 2x safety-bound fix)', () => {
+    // Stubbing Math.random to a constant 0.99 forces game/util.ts's
+    // Fisher-Yates `shuffle` into an IDENTITY permutation for these small
+    // arrays: at each step `i` (counting down from length-1 to 1), the swap
+    // target is `j = floor(rng() * (i + 1))`. With rng() === 0.99 and i <= 3,
+    // 0.99 * (i + 1) always lands in [i, i + 1) (e.g. i=2 -> 0.99*3=2.97,
+    // i=1 -> 0.99*2=1.98), so floor(...) === i every time -- every "swap" is
+    // an element swapped with itself, i.e. a no-op. That makes the whole
+    // trace hand-traceable:
+    //
+    // Start: drawPile=[], discardPile=['T01','C02','C03','A006'] (A006 on top).
+    //
+    // iter1: drawPile empty -> reshuffle epoch 1. top='A006' is protected
+    //        into discardPile=['A006']; rest=['T01','C02','C03'] shuffles to
+    //        itself (identity) -> drawPile=['T01','C02','C03'].
+    //        pop() takes the LAST element -> draws 'C03' (Counter) -> discard.
+    //        discardPile=['A006','C03']
+    // iter2: pop 'C02' (Counter) -> discard. discardPile=['A006','C03','C02']
+    // iter3: pop 'T01' (Trap) -> discard. discardPile=['A006','C03','C02','T01']
+    // iter4: drawPile empty -> reshuffle epoch 2. top='T01' protected;
+    //        rest=['A006','C03','C02'] shuffles to itself (identity) ->
+    //        drawPile=['A006','C03','C02'].
+    //        pop 'C02' (Counter) -> discard.
+    // iter5: pop 'C03' (Counter) -> discard.
+    // iter6: pop 'A006' -> Action found!
+    //
+    // That's 6 while-loop iterations to reach A006: past the OLD
+    // `totalCards + 1` bound (4 + 1 = 5, which would have exited the loop
+    // after iter5 without ever finding A006), but well within the NEW
+    // `2 * totalCards` bound (8).
+    const rule = getActionRule('A017')!;
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      const state = stateWithDeck([], ['T01', 'C02', 'C03', 'A006']);
+      const next = rule.executeEffect(state, testFrame());
+      const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+      expect(pushed?.sourceCode).toBe('A006');
+      expect(next.discardPile).toEqual(expect.arrayContaining(['T01', 'C02', 'C03']));
+    } finally {
+      randomSpy.mockRestore();
+    }
   });
 });
