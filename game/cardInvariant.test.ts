@@ -3,6 +3,7 @@ import { buildCanonicalDeck } from '../data/cards/deck';
 import { addPlayer, createRoom, restartGame, startGame } from './room';
 import { inspectCardConservation, assertCardConservation } from './cardInvariant';
 import { draw, discard } from './pile';
+import { resolveActionEffect } from './actionRules/registry';
 import { placeTrap, removeTrap } from './trap';
 import { stealRandom, swapHands } from './transfer';
 import { pushStackFrame, popStackFrame } from './reactionStack';
@@ -61,6 +62,42 @@ describe('card conservation invariant', () => {
     state = stealRandom(state, 'p1', 'p2', 1, () => 0);
     assertCardConservation(state);
     state = swapHands(state, 'p1', 'p2');
+    assertCardConservation(state);
+  });
+
+  it('preserves every card through A064 being played, planted, drawn by someone else, and its own discard-3 trigger', () => {
+    let state = startedRoom();
+    // Give p1 an A064 to play, wherever it currently sits.
+    const a064Index = state.drawPile.indexOf('A064');
+    state.drawPile.splice(a064Index, 1);
+    state.players.p1.hand.push('A064');
+    assertCardConservation(state);
+
+    // Simulate the normal play-a-card flow: A064 moves to the top of discardPile
+    // (as lib/session.tsx's playAction already does for every Action card), then
+    // its own executeEffect plants it into drawPile.
+    state.players.p1.hand = state.players.p1.hand.filter((c) => c !== 'A064');
+    state.discardPile.push('A064');
+    state = resolveActionEffect(state, 'A064', 'p1');
+    assertCardConservation(state);
+    expect(state.drawPile).toContain('A064');
+
+    // Move A064 to the very top of drawPile (drawPile.pop() reads the end) so the
+    // next draw deterministically draws it, then have p2 draw it.
+    const plantedIndex = state.drawPile.indexOf('A064');
+    state.drawPile.splice(plantedIndex, 1);
+    state.drawPile.push('A064');
+    state = draw(state, 'p2', 1);
+    assertCardConservation(state);
+    expect(state.players.p2.hand).toEqual(['A064']);
+  });
+
+  it('preserves every card through restartGame with A064 sitting mid-drawPile', () => {
+    let state = startedRoom();
+    // A064 is already somewhere in drawPile from buildCanonicalDeck() -- confirm
+    // that, then restart mid-game and verify conservation still holds.
+    expect(state.drawPile).toContain('A064');
+    state = restartGame(state, () => 0.5);
     assertCardConservation(state);
   });
 

@@ -13,9 +13,11 @@ const state = (): RoomState => ({
 
 describe('production action capabilities', () => {
   it('classifies implemented demo Actions and rejects unsupported Actions', () => {
-    expect(getImplementedActions()).toEqual(expect.arrayContaining(['A001', 'A004', 'A008', 'A014', 'A016']));
-    expect(isActionImplemented('A064')).toBe(false);
-    expect(getActionStatus('A064')).toBe('not_implemented');
-    expect(resolveActionEffect(state(), 'A064', 'p1')).toEqual(state());
+    expect(getImplementedActions()).toEqual(expect.arrayContaining(['A001', 'A004', 'A008', 'A014', 'A016', 'A064']));
+    expect(isActionImplemented('A064')).toBe(true);
+    expect(getActionStatus('A064')).toBe('implemented');
+    expect(isActionImplemented('A091')).toBe(false);
+    expect(getActionStatus('A091')).toBe('not_implemented');
+    expect(resolveActionEffect(state(), 'A091', 'p1')).toEqual(state());
   });
 });

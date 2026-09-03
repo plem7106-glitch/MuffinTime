@@ -1847,13 +1847,21 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       initiateDelegatedTargetPick(state, frame, 'คุณได้รับเลื่อนตำแหน่ง! เลือกผู้เล่นที่จะได้รับไพ่ 1 ใบจากคุณ (สุ่มเลือกให้)'),
   },
 
-  // A064 "Banana Peel" (Family H1) intentionally NOT included here -- needs a
-  // deferred-trigger mechanism (mark a specific card in the draw pile so
-  // drawing it later fires an extra effect). No existing hook for that in
-  // the draw flow (game/pile.ts's draw / lib/session.tsx's drawCard) --
-  // touching draw() itself, the most-called primitive in the game, puts this
-  // in the same risk class as the Phase 2 engine batch, not a definitions-only
-  // addition. See classification doc's Phase 2 list.
+  A064: {
+    code: 'A064', name_en: 'Banana Peel', name_th: 'เปลือกกล้วย',
+    description_th: 'ใส่ไพ่ใบนี้กลับเข้าไปในกองจั่วโดยหงายหน้า ผู้เล่นที่จั่วเจอจะเก็บไพ่ใบนี้ไว้และต้องทิ้งไพ่อื่น 3 ใบ',
+    kind: 'auto',
+    executeEffect: (state) => {
+      const next = cloneState(state);
+      const i = next.discardPile.lastIndexOf('A064');
+      if (i === -1) return next;
+      next.discardPile.splice(i, 1);
+      const pos = Math.floor(Math.random() * (next.drawPile.length + 1));
+      next.drawPile.splice(pos, 0, 'A064');
+      next.bananaPeelArmed = true;
+      return next;
+    },
+  },
 
   // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs
   // a "cards lost since your last turn" counter, but the low-level primitives

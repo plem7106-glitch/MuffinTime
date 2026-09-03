@@ -232,6 +232,15 @@ export interface RoomState {
    * Any player's Action play counts, not just the actor who set it up. */
   actionRedirect?: { toPlayerId: PlayerId; remaining: number } | null;
 
+  /** A064 "เปลือกกล้วย": true only while a planted (played) copy of A064 is
+   * currently sitting in drawPile, waiting to be drawn. The card's discard-3
+   * penalty only applies to whoever draws the PLANTED copy -- a never-played
+   * A064 drawn from the original shuffled deck is an ordinary card draw.
+   * Set true by A064's own executeEffect (game/actionRules/definitions.ts)
+   * when it plants the card; cleared to false the moment draw() (game/pile.ts)
+   * pops it back out, since it's no longer "planted" once it leaves the pile. */
+  bananaPeelArmed?: boolean;
+
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;
   /** Development-only deterministic scenario marker; never set by normal rooms. */

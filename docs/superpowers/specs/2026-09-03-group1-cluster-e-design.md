@@ -24,6 +24,29 @@ just compare the literal card code `'A064'`, and the "where is it currently sitt
 question is already fully answered by wherever `drawPile`/`discardPile`/hands already put
 it — no separate position-tracking state to add, update, or forget to reset.
 
+**Update (post final-review fix wave):** "only one physical copy exists" answers card
+*identity* (which card code to match on) but not whether that copy is currently *armed*
+(planted) — a genuinely separate question the original pass conflated. The final review
+caught that `draw()`'s hook fired on `card === 'A064'` alone, which also fires the very
+first time A064 is drawn straight out of the initial shuffled deck, before anyone has ever
+played it — contradicting the card's own text, which only penalizes drawing the *planted*
+copy. The fix adds exactly one new field, `RoomState.bananaPeelArmed?: boolean`: set `true`
+by A064's own `executeEffect` when it plants the card into `drawPile`, read (and cleared
+back to `false`) by `draw()`'s hook when it pops the planted copy back out, and reset to
+`false` in `startGame`, `resetForPlayAgain`, and `restartGame` alongside the other
+per-game/per-match reset fields (next to `actionRedirect = null` in each). So the "zero new
+fields" framing above was wrong in the way described here — one boolean field was in fact
+necessary, for arming state rather than position tracking.
+
+**Update (post final-review fix wave):** `executeEffect` originally located A064 by
+assuming it sat exactly on top of `discardPile` (`discardPile[discardPile.length - 1]`) and
+silently no-oped otherwise. That assumption is unsafe: an automatic-state trap (e.g.
+T45/T46/T09) can push its own card onto `discardPile` between A064 being discarded and its
+`executeEffect` actually resolving, leaving A064 buried rather than on top and causing the
+plant to silently fail. The fix uses `discardPile.lastIndexOf('A064')` to find the single
+physical copy anywhere in the pile and splice it out from there, rather than assuming
+position.
+
 ## Rulings confirmed with the user (not resolved by card text alone)
 
 - **Insertion position**: random, matching the existing precedent already in this codebase
@@ -36,6 +59,10 @@ it — no separate position-tracking state to add, update, or forget to reset.
   new UI work disproportionate to what the card needs, the same kind of scope call already
   made for A056's card-picker deferral. If a future card needs real draw-announcement UI,
   that's a separate scoping decision, not blocked or precluded by this one.
+- **"discards 3 other cards" is a random selection, not player-chosen**: matches the broad
+  existing convention across most "discard N cards" Action cards in this codebase that
+  don't have a dedicated card-picker UI (e.g. the discard side of A057/A061/A151/A152/A162
+  and others) — the drawer doesn't get to choose which 3 cards go.
 
 ## Approach
 

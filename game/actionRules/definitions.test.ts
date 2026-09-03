@@ -1363,3 +1363,41 @@ describe('A126 and A130 (Group 1 Cluster C -- 2-hop delegated targeting)', () =>
     expect(next.pendingInteraction?.prompt).toBe('คุณได้รับเลื่อนตำแหน่ง! เลือกผู้เล่นที่จะได้รับไพ่ 1 ใบจากคุณ (สุ่มเลือกให้)');
   });
 });
+
+describe('A064 (plant Banana Peel face-up in the draw pile)', () => {
+  it('moves the card from the top of discardPile into drawPile at a random position', () => {
+    const state = threePlayerState();
+    state.discardPile = ['H1', 'A064'];
+    const before = state.drawPile.length;
+    const next = resolveActionEffect(state, 'A064', 'me');
+    expect(next.discardPile).toEqual(['H1']);
+    expect(next.drawPile.length).toBe(before + 1);
+    expect(next.drawPile).toContain('A064');
+  });
+
+  it('finds and plants A064 anywhere in discardPile, not just the top (e.g. a trap card landed on top of it first)', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A064', 'H1'];
+    const next = resolveActionEffect(state, 'A064', 'me');
+    expect(next.discardPile).toEqual(['H1']);
+    expect(next.drawPile.length).toBe(state.drawPile.length + 1);
+    expect(next.drawPile).toContain('A064');
+    expect(next.bananaPeelArmed).toBe(true);
+  });
+
+  it('genuinely no-ops when A064 is not in discardPile at all (e.g. A040 redirected the play into a hand instead)', () => {
+    const state = threePlayerState();
+    state.discardPile = ['H1', 'H2'];
+    const next = resolveActionEffect(state, 'A064', 'me');
+    expect(next.discardPile).toEqual(['H1', 'H2']);
+    expect(next.drawPile).toEqual(state.drawPile);
+    expect(next.bananaPeelArmed).toBeUndefined();
+  });
+
+  it('sets bananaPeelArmed when it successfully plants the card', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A064'];
+    const next = resolveActionEffect(state, 'A064', 'me');
+    expect(next.bananaPeelArmed).toBe(true);
+  });
+});

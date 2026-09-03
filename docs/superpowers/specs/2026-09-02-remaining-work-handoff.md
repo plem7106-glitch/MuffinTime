@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 167/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G are done
+## Status: 168/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G/E are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -30,6 +30,14 @@ independently).
 - Last known-good check, on `main` at `43d0d40`, verified directly (not just assumed from
   CI): `npx vitest run` → **808 passed (60 files)**, `npx tsc --noEmit` → clean. Run both
   again before you start — confirm your baseline hasn't drifted.
+- **Group 1 Cluster E (A064) shipped on branch `feature/group1-cluster-e`**, forked from
+  `main` at `3f3a0e9` — two docs-only commits past Cluster C's merge `43d0d40`
+  (`e3a91f5` and `3f3a0e9` itself: this cluster's own handoff-doc update and design spec,
+  not unrelated drift; no code changed). `main` has not moved since the fork —
+  `git log --oneline main..origin/main` was empty right before push — so the branch is a
+  strict descendant of `main`'s tip and merges as a fast-forward. Final verification on that
+  branch, after the final-review fix wave (commits `8d7d34a`, `e7f54b3` — see below):
+  `npx vitest run --reporter=dot` → **818 passed (60 files)**, `npx tsc --noEmit` → clean.
 - **History, briefly** (full blow-by-blow no longer actionable, kept only for context): this
   branch's life involved reconciling with `main` twice while Cluster C was in flight — once
   before Cluster C started (a large trap/presentation subsystem landed on `main` directly,
@@ -49,14 +57,18 @@ independently).
   merged (`43d0d40`) — **not** via a careful manual reconciliation like the first two times,
   since the merge had no textual conflicts. Verified post-merge (see the test/tsc line
   above) that nothing is obviously broken, but nobody has actually *read* those 4 commits'
-  diff. **Before starting Cluster D/E/F, and definitely before opening a PR for one:**
+  diff. **Before starting Cluster F/D, and definitely before opening a PR for one:**
   `git fetch origin && git log --oneline main..origin/main` — if this has ANY output, don't
   assume it's empty and don't assume it's safe just because tests pass; skim the commits
   and their diff stat before building on top of or reconciling with them.
 - No PR is currently open. If you finish a cluster and `gh` isn't available (`which gh` has
-  been unavailable in most sessions on this project so far — check yourself, don't assume
-  either way), open one manually via the compare URL:
+  been unavailable in most sessions on this project so far, this one included — check
+  yourself, don't assume either way), open one manually via the compare URL:
   `https://github.com/plem7106-glitch/MuffinTime/compare/main...<your-branch>?expand=1`.
+  **`feature/group1-cluster-e` has been pushed to origin but still needs this manual PR
+  step** — nobody has opened it yet. If you're picking up Cluster F next, fork from `main`
+  (which does not yet include Cluster E's work), not from `feature/group1-cluster-e` — don't
+  assume E has merged by the time you start.
 - **Cluster C's final whole-branch review found two real, Important-severity bugs from
   extending `RoomState.pendingInteraction` to a second producer/consumer** (previously only
   T10's date-invite trap used it) — both fixed in commit `daab350`, both worth knowing about
@@ -145,7 +157,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 6 cards left, all in Group 1 (Group 2 and Group 3 are done)
+## What's next — 5 cards left, all in Group 1 (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -186,7 +198,7 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 — Clusters A, B, C & G DONE (167/173 checkpoint), 3 clusters / 6 cards remain
+### Group 1 — Clusters A, B, C, G & E DONE (168/173 checkpoint), 2 clusters / 5 cards remain
 
 Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
 decomposed into 7 clusters by shared mechanism during brainstorming — see
@@ -288,6 +300,107 @@ are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
   fixture in `game/room.test.ts` was already silently tripping this exact case before the fix
   — the fix's guard turned that into a loud, assertable failure instead of a latent one.
 
+**Cluster E (A064, draw-pile deferred trigger, standalone) is done.** Its own plan/spec docs
+are `docs/superpowers/specs/2026-09-03-group1-cluster-e-design.md` and
+`docs/superpowers/plans/2026-09-03-group1-cluster-e.md`.
+
+- **A064** "เปลือกกล้วย" (Banana Peel) — planted face-up back into the draw pile; whoever
+  draws the *planted* copy keeps it and discards 3 other cards, chosen at random.
+  `game/pile.ts`'s `draw()` gained a hook that fires after every card lands in a hand,
+  regardless of what triggered the draw — a player's own manual draw, another card's forced
+  multi-draw, a bot's draw, all funnel through this one function, so no separate hook was
+  needed anywhere else. A064's `executeEffect` (`game/actionRules/definitions.ts`) finds and
+  removes the card from `discardPile` (wherever it sits — see the `lastIndexOf` fix below,
+  not just the top) and splices it into `drawPile` at a random position, matching A043's
+  existing inline random-splice pattern (`Math.random()` called directly, same established
+  precedent as A007's coin flip). `kind: 'auto'`, no target, no new UI.
+- **Turned out simpler than the classification doc originally feared, but not quite as
+  simple as the first implementation pass believed.** That doc flagged this as needing a
+  hook inside `draw()`, "the most-called primitive in the game," and grouped it with the
+  riskiest Phase 2 batch on that basis. The hook is real, and `data/cards.json`'s single
+  listing per code + `buildCanonicalDeck()`'s 1:1 build confirms **only one physical copy of
+  A064 exists in the whole deck** — but the first pass concluded from that alone that "zero
+  new fields" were needed at all, which the final whole-branch review found to be wrong:
+  "only one copy exists" answers card *identity* (which code to match on), not whether that
+  copy is currently *armed* (planted). **One new field was added as a result:
+  `RoomState.bananaPeelArmed?: boolean`** — set `true` by `executeEffect` when it plants the
+  card, cleared to `false` the moment `draw()`'s hook consumes the planted copy, and reset to
+  `false` in `startGame`/`resetForPlayAgain`/`restartGame` (next to each function's
+  `actionRedirect = null` reset line). Without this gate, drawing A064 straight out of the
+  original, never-played shuffled deck would incorrectly trigger the discard-3 penalty —
+  caught only by the final review, not by any of the four per-task reviews, since each task
+  reviewed its own slice correctly in isolation and the bug lived in the *premise* connecting
+  them. **Lesson for a future card with a deferred/delayed trigger**: ask explicitly what
+  arms it, what disarms it, and what else can mutate the state it reads between a card being
+  played and its effect actually resolving — not just "where does this card live."
+- **A second final-review Critical fix**: `executeEffect`'s original guard assumed A064 sat
+  exactly on top of `discardPile` and silently no-oped otherwise. That's unsafe — an
+  `automatic_state` trap (e.g. T45/T46/T09) can push its own card onto `discardPile` between
+  A064 being discarded and its `executeEffect` resolving (via
+  `checkAndTriggerAutomaticTraps`), burying A064 and silently failing the plant with the turn
+  and card both consumed for nothing. Fixed with `discardPile.lastIndexOf('A064')` — finds
+  the single physical copy anywhere in the pile rather than assuming position; only
+  genuinely no-ops when A064 isn't in `discardPile` at all (the real A040-redirect case,
+  where the card went into a hand instead).
+- **A known, documented, non-blocking gap left by the `bananaPeelArmed` fix**: the flag is
+  only kept in sync by `game/pile.ts`'s `draw()`. Two other code paths pull cards directly
+  out of `drawPile` without going through `draw()`: `executeDraw` (`game/primitives.ts`,
+  used by traps **T45**/**T53**) and `takeChosenFromPeek` (`game/deckOps.ts`, used by
+  **A046**/**A026**'s "peek N, take one at random"). If the armed A064 is swept up by either
+  path, the discard-3 penalty simply doesn't fire for that draw (no worse than before this
+  cluster existed) — but `bananaPeelArmed` is left stuck `true` even though the card left
+  `drawPile`. If that same A064 later gets discarded normally and cycles back into `drawPile`
+  via `reshuffleDiscardIntoDraw`, a subsequent *ordinary, unplanted* draw through the real
+  `draw()` path would incorrectly retrigger the penalty — reopening the first Critical bug
+  above through a narrower side door. Reachable but requires a specific sequence (armed A064
+  lands in a T45/T53/A046/A026 draw window, then cycles back through discard → reshuffle →
+  a normal draw) — found during the final review's scoped re-review of the fix, and
+  deliberately parked rather than triggering a second fix wave (this project's process caps
+  a final review's fix-and-re-review at one round; a load-bearing residual would stop the
+  branch, but nothing else in this plan depends on this, so it's parked and documented
+  instead). **Whoever picks this up**: route `executeDraw`/`takeChosenFromPeek` through
+  `draw()`'s `bananaPeelArmed` handling, or more generally clear the flag wherever a card can
+  leave `drawPile` by any path, not just `draw()` itself.
+- **`draw()`'s `rng` parameter is now real, not decorative.** It used to be `_rng?: Rng`
+  (accepted, ignored). The final review caught that `discardOthersAfterBananaPeel` hardcoding
+  `Math.random()` would make any seeded test whose draw happens to hit A064 nondeterministic,
+  silently breaking the contract every existing seeded caller (`rosterDraws`, `everyoneDraws`,
+  `drawUntilCount`) already assumed. Now `rng: Rng = Math.random`, threaded through to
+  `discard()`'s own `rng` parameter — fully backward compatible for every caller that never
+  passed one.
+- Three rulings confirmed with the user (neither the first two nor the third resolved by card
+  text alone): **insertion position** is random (matching A043's existing precedent — not
+  fixed top or bottom). **"หงายหน้า" (face-up)** is flavor text only, no new UI — this
+  codebase has no existing mechanism anywhere that announces which card a player just drew
+  (checked: no such event/toast in `game/events.ts` or `lib/presentation/`), so building one
+  here would be new UI work disproportionate to what the card needs — the same scope call
+  already made for A056's card-picker deferral. **"discards 3 other cards" is random, not
+  player-chosen** — matches the broad existing convention across most "discard N cards"
+  Action cards in this codebase that don't have a dedicated card-picker UI (flagged as an
+  undocumented gap by the final review, since this specific card's discard-3 wasn't
+  explicitly surfaced as a ruling in the original design pass the way the other two were).
+- Checked, not a gap: interaction with A040 "ฉันชอบมัน!"'s `actionRedirect` (Cluster A) — if
+  A040 is active when A064 is played, the played card is redirected into A040's target's
+  hand instead of `discardPile`, and A064's own plant-into-deck effect correctly no-ops
+  (the `lastIndexOf` guard above catches this — the card genuinely isn't in `discardPile`)
+  instead of planting the wrong card. Interaction with `restartGame` (Cluster G) — a
+  planted-but-undrawn A064 just gets swept into `restartGame`'s pool-and-reshuffle like
+  every other card, and `bananaPeelArmed` is reset to `false` there too, so no stale-flag
+  risk survives a restart specifically.
+- Task 2 also fixed a small, unrelated stale gap noticed in passing: updating
+  `game/actionRules/registry.test.ts` for A064 left its one test with no remaining
+  negative-path (`not_implemented`) assertion — fixed by asserting that against A091 (still
+  genuinely unimplemented), restoring the suite's only coverage of that status path. Not an
+  A064 behavior change, just a test-file drive-by fix, called out separately in commit
+  `886c4d6`.
+- Card-conservation tests added in `game/cardInvariant.test.ts` cover A064's full lifecycle
+  (played → planted → drawn by someone else → its own discard-3 trigger) and its interaction
+  with `restartGame` while sitting mid-`drawPile` at reset time.
+- Final state on `feature/group1-cluster-e`: `npx vitest run` → 818 passed (60 files), `npx
+  tsc --noEmit` → clean. Design spec updated in place (`docs/superpowers/specs/2026-09-03-
+  group1-cluster-e-design.md`, commit `e7f54b3`) to reflect all of the above — read it fresh
+  rather than trusting only this summary.
+
 **Cluster C (A126, A130 — 2-hop delegated targeting) is done.** Its own plan/spec docs are
 `docs/superpowers/specs/2026-09-02-group1-cluster-c-design.md` and
 `docs/superpowers/plans/2026-09-02-group1-cluster-c.md`.
@@ -352,25 +465,23 @@ are `docs/superpowers/specs/2026-09-02-group1-cluster-b-design.md` and
 - Zero new `PlayerState`/`RoomState` fields — the whole cluster rides on
   `pendingInteraction`, which already existed.
 
-**Remaining: 3 clusters, 6 cards** — `A017, A028, A064, A091, A094, A108`. Each needs its
-own spec (and likely its own plan) before implementation, following the same
-brainstorming → writing-plans → subagent-driven-development flow used for Clusters A, B, C,
-and G. Per the original decomposition:
+**Remaining: 2 clusters, 5 cards** — `A017, A028, A091, A094, A108`. Each needs its own spec
+(and likely its own plan) before implementation, following the same brainstorming →
+writing-plans → subagent-driven-development flow used for Clusters A, B, C, G, and E. Per
+the original decomposition:
 
 - **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
   system directly): `A017`, `A028`, `A094`, `A108`
-- **Cluster E** (draw-pile hook): `A064`
 - **Cluster F** (forced-vs-voluntary loss tracking): `A091`
 
-**Confirmed next order: E → F → D** (superseding the plan's original assumption, which had
-no fixed order beyond "C first"). This was reassessed after closer inspection of E and F
-turned up two corrections to the original classification doc's risk estimates:
+**Confirmed order: E → F → D** (superseding the plan's original assumption, which had no
+fixed order beyond "C first"). **E is done** (see above); **F is next, D last**. This order
+was set after closer inspection of E and F turned up two corrections to the original
+classification doc's risk estimates:
 
-- **Cluster E (A064) turned out simpler than expected.** It needs only a special-case check
-  for card code `'A064'` inside `draw()`, plus a small `executeEffect` that moves the card
-  from the discard pile into the draw pile at a random position — no new `RoomState`/
-  `PlayerState` field at all. Lowest-risk of the three remaining clusters, hence going
-  first.
+- **Cluster E (A064) turned out simpler than expected** — see its full write-up above.
+  Lowest-risk of the three remaining clusters at the time, which is exactly why it went
+  first; that assessment held up in practice (zero new state fields, no design surprises).
 - **Cluster F (A091) turned out to need a forced-vs-voluntary distinction threaded through
   dozens of existing call sites** in the `discard`/steal primitives across
   `definitions.ts`/`transfer.ts`/`primitives.ts`/`roster.ts`/`group.ts` — comparable risk to
@@ -389,7 +500,7 @@ Full per-card reasoning for all of these is in the classification doc's "Phase 2
 (`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
 these casually inside a small-batch PR — each wants its own
 `superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
-surface area, the same way Clusters A, B, C, and G got one.
+surface area, the same way Clusters A, B, C, G, and E got one.
 
 ## Known gap, not yet built (unrelated to the above)
 
