@@ -66,6 +66,12 @@ export function executeDraw(
     const card = next.drawPile.pop();
     if (card) {
       next.players[playerId].hand.push(card);
+      // ponytail: A064's discard-3 penalty only fires through game/pile.ts's
+      // draw() -- this path just has to stop the flag from staying stuck
+      // true, or a later ordinary draw() could wrongly retrigger it.
+      if (card === 'A064' && next.bananaPeelArmed) {
+        next.bananaPeelArmed = false;
+      }
     }
   }
   return next;

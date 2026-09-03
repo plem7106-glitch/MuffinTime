@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCompletedStackFrames, applyPlayDoubledAction } from './session';
+import { resolveCompletedStackFrames, applyPlayDoubledAction, applySkipCounter } from './session';
 import { getActionRule } from '../game/actionRules/registry';
 import type { RoomState } from '../game/types';
 
@@ -210,5 +210,43 @@ describe('playDoubledAction', () => {
     expect(pushed?.sourceCode).toBe('A077');
     expect(pushed?.targetIds).toEqual(['p2']);
     expect(pushed?.customPayload?.doubled).toBe(true);
+  });
+});
+
+describe('applySkipCounter', () => {
+  function stateWithTopFrame(sourceType: 'action' | 'trap' | 'counter'): RoomState {
+    return {
+      status: 'playing', hostId: 'me', turnOrder: ['me', 'p2'], currentTurnIndex: 0,
+      direction: 1, muffinTimeTarget: 10, drawPile: [], discardPile: [],
+      players: {
+        me: { name: 'Me', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      reactionStack: [{
+        frameId: 'f1', parentFrameId: null, sourceType, sourceCode: sourceType === 'trap' ? 'T01' : 'A127',
+        actorId: 'me', targetIds: ['p2'], targetScope: 'single', eligibleResponderIds: [], responses: {},
+        modifiers: [], status: 'pending_responses',
+        turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      }],
+    } as unknown as RoomState;
+  }
+
+  it('sets lastResult with kind "action" once an uncontested Action play\'s response window resolves -- previously left lastResult null, so nobody but the actor\'s own flying-card animation ever saw a plain Action play resolve', () => {
+    const next = applySkipCounter(stateWithTopFrame('action'), 'f1');
+    expect(next.lastResult).toEqual({
+      responseId: 'f1', kind: 'action', code: 'A127', actorId: 'me', targetId: 'p2', countered: false,
+    });
+  });
+
+  it('still sets lastResult with kind "trap" for a trap frame (unchanged behavior after extracting this into a hoisted function)', () => {
+    const next = applySkipCounter(stateWithTopFrame('trap'), 'f1');
+    expect(next.lastResult).toEqual({
+      responseId: 'f1', kind: 'trap', code: 'T01', actorId: 'me', targetId: 'p2', countered: false,
+    });
+  });
+
+  it('leaves lastResult null for a counter frame (unchanged behavior)', () => {
+    const next = applySkipCounter(stateWithTopFrame('counter'), 'f1');
+    expect(next.lastResult).toBeNull();
   });
 });

@@ -182,6 +182,13 @@ export function removePlayer(state: RoomState, playerId: PlayerId): RoomState {
   if (!state.players[playerId]) {
     return state;
   }
+  // ponytail: deleting a player mid-game would destroy their hand and desync
+  // turnOrder/currentTurnIndex for everyone else. Leave them in place (their
+  // seat just goes idle) -- the host-unstick flow already exists to recover
+  // a stalled turn/response without deleting anyone's cards.
+  if (state.status === 'playing') {
+    return state;
+  }
   const next = cloneState(state);
   delete next.players[playerId];
 
@@ -213,6 +220,19 @@ export function removePlayer(state: RoomState, playerId: PlayerId): RoomState {
     next.currentTurnIndex = 0;
   }
 
+  return next;
+}
+
+/** Self-service correction for a mistyped or never-entered birthday. Only
+ * ever read by A037/A066/A137's soonest-birthday lookup, so it's safe to
+ * allow at any room status -- unlike removePlayer, this never touches
+ * turn/hand/trap state. */
+export function updatePlayerBirthday(state: RoomState, playerId: PlayerId, birthdayMMDD: string): RoomState {
+  if (!state.players[playerId]) {
+    return state;
+  }
+  const next = cloneState(state);
+  next.players[playerId].birthdayMMDD = birthdayMMDD;
   return next;
 }
 

@@ -36,6 +36,7 @@ import { TrapAlertModal } from '../modals/TrapAlertModal';
 import { CounterModal } from '../modals/CounterModal';
 import { TrapResultModal } from '../modals/TrapResultModal';
 import { CounterResultModal } from '../modals/CounterResultModal';
+import { ActionResultModal } from '../modals/ActionResultModal';
 import { DiscardPileModal } from '../modals/DiscardPileModal';
 import { HostSkipConfirmModal } from './HostSkipConfirmModal';
 import { PresentationProvider } from '../../lib/presentation/presentationContext';
@@ -1091,6 +1092,13 @@ export function GameTable() {
         onClose={clearLastResult}
       />
 
+      <ActionResultModal
+        result={lastResult}
+        actorName={lastResult ? state.players[lastResult.actorId]?.name ?? '' : ''}
+        targetName={lastResult?.targetId ? state.players[lastResult.targetId]?.name : undefined}
+        onClose={clearLastResult}
+      />
+
       <CounterResultModal
         result={lastResult}
         counterActorName={lastResult?.counteredBy ? state.players[lastResult.counteredBy]?.name ?? '' : ''}
@@ -1227,7 +1235,8 @@ export function GameTable() {
           <div className="w-full max-w-xs rounded-3xl bg-white p-5 text-center shadow-2xl">
             <h3 className="text-base font-black text-ink">ออกจากห้องเกม?</h3>
             <p className="text-xs text-ink-secondary mt-1">
-              คุณต้องการออกจากห้องเกมนี้และกลับสู่หน้าหลักใช่หรือไม่?
+              คุณจะกลับสู่หน้าหลัก แต่ที่นั่งของคุณยังอยู่ในเกมจนกว่าโฮสต์จะกด "บังคับข้ามที่ค้าง"
+              เพื่อไม่ให้ไพ่ในมือของคุณหายไปกลางเกม
             </p>
             <div className="mt-4 flex w-full gap-2">
               <button

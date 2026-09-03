@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSession } from '../../lib/session';
+import { usePlayer } from '../../lib/player';
 import { useAudio } from '../../lib/audio';
 import {
   SettingsIcon,
@@ -46,12 +47,28 @@ export function GameSettingsModal({
   onOpenManualGive?: () => void;
 }) {
   const router = useRouter();
-  const { leaveRoom } = useGameSession();
+  const { leaveRoom, updateMyBirthday } = useGameSession();
+  const { playerBirthday, setPlayerBirthday } = usePlayer();
   const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx } = useAudio();
   const [showRules, setShowRules] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
+  // "YYYY-MM-DD" for the native date input; only the MM-DD part is ever
+  // persisted or sent anywhere (mirrors app/create's birthday input).
+  const [birthdayInput, setBirthdayInput] = useState('');
+  useEffect(() => {
+    setBirthdayInput(playerBirthday ? `2000-${playerBirthday}` : '');
+  }, [playerBirthday]);
+
   if (!isOpen) return null;
+
+  const handleBirthdayChange = (value: string) => {
+    setBirthdayInput(value);
+    const birthdayMMDD = value ? value.slice(5) : '';
+    if (!birthdayMMDD) return;
+    setPlayerBirthday(birthdayMMDD);
+    updateMyBirthday(birthdayMMDD);
+  };
 
   const handleConfirmLeave = () => {
     leaveRoom();
@@ -114,6 +131,22 @@ export function GameSettingsModal({
             </div>
             <span className="text-[10px] text-ink-secondary">ค้นหาการ์ด →</span>
           </button>
+
+          {/* 2.5. Birthday (for A037/A066/A137's "soonest birthday" cards) */}
+          <div className="my-1 border-t border-gray-100 pt-2" />
+          <label className="flex items-center justify-between gap-2.5 rounded-2xl border border-gray-100 bg-gray-50/50 p-3 text-xs font-bold text-ink">
+            <span className="flex items-center gap-2.5 shrink-0">
+              <span className="text-base leading-none">🎂</span>
+              <span>วันเกิดของฉัน</span>
+            </span>
+            <input
+              type="date"
+              value={birthdayInput}
+              onChange={(e) => handleBirthdayChange(e.target.value)}
+              className="min-w-0 rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-ink"
+              aria-label="วันเกิดของฉัน (ใช้กับไพ่บางใบเท่านั้น)"
+            />
+          </label>
 
           {/* 3. Audio Controls */}
           <div className="my-1 border-t border-gray-100 pt-2" />
@@ -293,7 +326,8 @@ export function GameSettingsModal({
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-3xl bg-white p-5 text-center shadow-xl animate-in fade-in duration-150">
             <h3 className="text-base font-black text-ink">ยืนยันการออกจากห้อง?</h3>
             <p className="text-xs text-ink-secondary mt-1">
-              การออกจากห้องจะทำให้คุณออกจากการเล่นในรอบนี้ทันที
+              คุณจะกลับสู่หน้าหลัก แต่ที่นั่งของคุณยังอยู่ในเกมจนกว่าโฮสต์จะกด "บังคับข้ามที่ค้าง"
+              เพื่อไม่ให้ไพ่ในมือของคุณหายไปกลางเกม
             </p>
             <div className="mt-4 flex w-full gap-2">
               <button

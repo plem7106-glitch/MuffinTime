@@ -26,6 +26,12 @@ describe('finalizeSteal forced-loss tracking', () => {
     expect(next.players.p1.forcedLossSinceLastTurn).toBeUndefined();
   });
 
+  it('does not track forced loss on a self-target steal (victimId === thiefId) -- the cards never actually leave their hand', () => {
+    const operation = prepareSteal(state(), 'p1', 'p1', 2);
+    const next = finalizeSteal(state(), operation, () => 0);
+    expect(next.players.p1.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
   it('tracks the thief\'s forced loss when stealing C19 triggers its passive discard-hand', () => {
     let seeded = state();
     seeded.players.p1.hand = ['C19'];

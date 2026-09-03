@@ -16,6 +16,7 @@ import {
   startGame as engineStartGame,
   finishGame as engineFinishGame,
   resetForPlayAgain as engineResetForPlayAgain,
+  updatePlayerBirthday as engineUpdatePlayerBirthday,
 } from '../game/room';
 import { draw, discard, balancedShuffleDrawPile } from '../game/pile';
 import { applyActionRedirect } from '../game/turnFlow';
@@ -96,6 +97,11 @@ export interface ActiveRoom {
 
 export interface GameSessionValue {
   activeRoom: ActiveRoom | null;
+  /** Player ids currently connected to this room's realtime channel, per
+   * Supabase Presence. `null` until the first presence sync arrives (or
+   * always, for bot rooms, which have no realtime channel) -- callers
+   * should treat `null` as "unknown", not "nobody online". */
+  onlinePlayerIds: Set<PlayerId> | null;
   myPlayerId: PlayerId | null;
   pendingResponse: PendingResponse | null;
   lastResult: LastResult | null;
@@ -111,6 +117,7 @@ export interface GameSessionValue {
   setSeatOrder: (seatOrder: PlayerId[]) => void;
   setPlayDirection: (direction: PlayDirection) => void;
   setGameSuggester: (playerId: PlayerId) => void;
+  updateMyBirthday: (birthdayMMDD: string) => void;
   confirmTurnOrder: () => void;
   drawCard: () => void;
   endTurn: () => void;
@@ -296,6 +303,47 @@ export function resolveCompletedStackFrames(state: RoomState): RoomState {
 }
 
 /**
+ * Records a responder's decision not to play a Counter against the top
+ * reaction-stack frame, then resolves the stack if that was the last
+ * outstanding response. Hoisted to module scope (mirrors
+ * resolveCompletedStackFrames above) for the same reason: it only closes
+ * over its own parameters, not component state, so it's independently
+ * testable. Sets `lastResult` for both trap AND action frames (not just
+ * trap) so every connected client's TrapResultModal/ActionResultModal can
+ * show the "what just happened" summary -- a plain, uncontested Action play
+ * previously left `lastResult` null here, so nobody but the actor's own
+ * small flying-card animation ever saw it resolve.
+ */
+export function applySkipCounter(state: RoomState, responseId: string, responderId?: PlayerId): RoomState {
+  const top = getTopFrame(state);
+  if (!top || top.frameId !== responseId) return state;
+
+  let next = state;
+  if (responderId && top.eligibleResponderIds.includes(responderId)) {
+    next = submitResponse(next, responseId, responderId, {
+      status: 'skipped',
+    });
+  }
+
+  next = resolveCompletedStackFrames(next);
+
+  return {
+    ...next,
+    lastResult:
+      top.sourceType === 'trap' || top.sourceType === 'action'
+        ? {
+            responseId,
+            kind: top.sourceType,
+            code: top.sourceCode,
+            actorId: top.actorId,
+            targetId: top.targetIds[0],
+            countered: false,
+          }
+        : null,
+  };
+}
+
+/**
  * Core logic for playing A028 "ทาเยอะไปหน่อย" (Bad Spread) together with a
  * qualifying partner Action card. Unlike every other Action, A028 is never
  * itself the sourceCode of a pushed StackFrame -- playing it discards BOTH
@@ -374,6 +422,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissedResponseId, setDismissedResponseId] = useState<string | null>(null);
+  const [onlinePlayerIds, setOnlinePlayerIds] = useState<Set<PlayerId> | null>(null);
 
   const isBotRoom = roomCode?.startsWith('bot-') ?? false;
   const myPlayerId = isBotRoom ? (localHostId || playerId || 'host-me') : playerId;
@@ -392,15 +441,23 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       unsubscribeFromRoom(channelRef.current);
       channelRef.current = null;
     }
+    setOnlinePlayerIds(null);
     const row = await fetchRoom(supabase, code);
     setRoomCode(code);
     setRoomState(row.state);
-    channelRef.current = subscribeToRoom(supabase, code, setRoomState, (status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        setError('การเชื่อมต่อแบบเรียลไทม์มีปัญหา ลองรีเฟรชหน้านี้อีกครั้ง');
-      }
-    });
-  }, []);
+    channelRef.current = subscribeToRoom(
+      supabase,
+      code,
+      setRoomState,
+      (status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setError('การเชื่อมต่อแบบเรียลไทม์มีปัญหา ลองรีเฟรชหน้านี้อีกครั้ง');
+        }
+      },
+      setOnlinePlayerIds,
+      playerId ?? undefined
+    );
+  }, [playerId]);
 
   const run = useCallback(
     async (updater: (state: RoomState) => RoomState) => {
@@ -579,6 +636,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     setRoomCode(null);
     setRoomState(null);
     setError(null);
+    setOnlinePlayerIds(null);
   }, [roomCode, myPlayerId]);
 
   const startSetupFn = useCallback(
@@ -617,6 +675,15 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         if (myPlayerId !== state.hostId) return state;
         if (!state.players[playerId]) return state;
         return engineSetGameSuggester(state, playerId);
+      }),
+    [run, myPlayerId]
+  );
+
+  const updateMyBirthdayFn = useCallback(
+    (birthdayMMDD: string) =>
+      run((state) => {
+        if (!myPlayerId) return state;
+        return engineUpdatePlayerBirthday(state, myPlayerId, birthdayMMDD);
       }),
     [run, myPlayerId]
   );
@@ -885,35 +952,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
   const skipCounter = useCallback(
     (responseId: string, responderIdOverride?: PlayerId) =>
-      run((state) => {
-        const top = getTopFrame(state);
-        if (!top || top.frameId !== responseId) return state;
-
-        let next = state;
-        const responderId = responderIdOverride ?? myPlayerId;
-        if (responderId && top.eligibleResponderIds.includes(responderId)) {
-          next = submitResponse(next, responseId, responderId, {
-            status: 'skipped',
-          });
-        }
-
-        next = resolveCompletedStackFrames(next);
-
-        return {
-          ...next,
-          lastResult:
-            top.sourceType === 'trap'
-              ? {
-                  responseId,
-                  kind: 'trap',
-                  code: top.sourceCode,
-                  actorId: top.actorId,
-                  targetId: top.targetIds[0],
-                  countered: false,
-                }
-              : null,
-        };
-      }),
+      run((state) => applySkipCounter(state, responseId, responderIdOverride ?? myPlayerId ?? undefined)),
     [run, myPlayerId]
   );
 
@@ -1216,6 +1255,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
   const value: GameSessionValue = {
     activeRoom: roomCode && roomState ? { code: roomCode, state: roomState } : null,
+    onlinePlayerIds,
     myPlayerId,
     pendingResponse: roomState?.pendingResponse ?? null,
     lastResult,
@@ -1231,6 +1271,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     setSeatOrder: setSeatOrderFn,
     setPlayDirection: setPlayDirectionFn,
     setGameSuggester: setGameSuggesterFn,
+    updateMyBirthday: updateMyBirthdayFn,
     confirmTurnOrder: confirmTurnOrderFn,
     drawCard,
     endTurn,

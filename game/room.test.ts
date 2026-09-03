@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRoom, addPlayer, removePlayer, startGame, startSetup, setGameSuggester, resetForPlayAgain, restartGame, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
+import { createRoom, addPlayer, removePlayer, startGame, startSetup, setGameSuggester, resetForPlayAgain, restartGame, updatePlayerBirthday, GLOBAL_MIN_PLAYERS, GLOBAL_MAX_PLAYERS } from './room';
 import type { RoomState } from './types';
 
 describe('createRoom', () => {
@@ -263,6 +263,37 @@ describe('setGameSuggester', () => {
   });
 });
 
+describe('updatePlayerBirthday', () => {
+  it('sets a birthday a player never entered at signup', () => {
+    const room = createRoom('host1', 'P1', 4);
+    const next = updatePlayerBirthday(room, 'host1', '03-15');
+    expect(next.players.host1.birthdayMMDD).toBe('03-15');
+  });
+
+  it('overwrites a mistyped birthday', () => {
+    const room = createRoom('host1', 'P1', 4, '01-01');
+    const next = updatePlayerBirthday(room, 'host1', '12-25');
+    expect(next.players.host1.birthdayMMDD).toBe('12-25');
+  });
+
+  it('is a no-op when the player is not in the room', () => {
+    const room = createRoom('host1', 'P1', 4);
+    const next = updatePlayerBirthday(room, 'nobody', '03-15');
+    expect(next).toEqual(room);
+  });
+
+  it('works mid-game too, since it only affects birthday-card lookups, not turn/hand state', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 15 }, (_, i) => `A${i + 1}`);
+    const playing = startGame(room, allCodes, () => 0);
+    const next = updatePlayerBirthday(playing, 'p2', '07-04');
+    expect(next.players.p2.birthdayMMDD).toBe('07-04');
+    expect(next.status).toBe('playing');
+  });
+});
+
 describe('removePlayer', () => {
   it('removes a non-host player and leaves the host unchanged', () => {
     let room = createRoom('host1', 'Ploy', 4);
@@ -287,6 +318,16 @@ describe('removePlayer', () => {
     const room = createRoom('host1', 'Ploy', 4);
     const next = removePlayer(room, 'nobody');
     expect(next).toEqual(room);
+  });
+
+  it('is a no-op while a game is in progress, to avoid destroying a departed player\'s hand and corrupting turnOrder/currentTurnIndex for everyone still playing', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 15 }, (_, i) => `A${i + 1}`);
+    const playing = startGame(room, allCodes, () => 0);
+    const next = removePlayer(playing, 'p2');
+    expect(next).toEqual(playing);
   });
 });
 

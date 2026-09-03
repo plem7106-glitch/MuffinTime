@@ -43,6 +43,13 @@ describe('takeChosenFromPeek', () => {
     const state = baseState();
     expect(takeChosenFromPeek(state, 'p1', 'ZZZ')).toEqual(state);
   });
+
+  it('picking a planted A064 clears bananaPeelArmed, so a later ordinary draw cannot wrongly retrigger the discard-3 penalty', () => {
+    const state = { ...baseState(), drawPile: ['A064', ...baseState().drawPile], bananaPeelArmed: true };
+    const next = takeChosenFromPeek(state, 'p1', 'A064');
+    expect(next.players.p1.hand).toEqual(['A064']);
+    expect(next.bananaPeelArmed).toBe(false);
+  });
 });
 
 describe('takeTopNFromDiscard', () => {

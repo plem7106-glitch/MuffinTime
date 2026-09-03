@@ -72,6 +72,13 @@ describe('Insufficient-Card Policy & Effect Primitives', () => {
       expect(next.players.p2.hand.length).toBe(3);
       expect(next.players.p3.hand.length).toBe(2);
     });
+
+    it('sweeping up a planted A064 clears bananaPeelArmed (no discard-3 penalty here -- only game/pile.ts draw() applies that -- but the flag must not stay stuck true, or an ordinary later draw would wrongly retrigger it)', () => {
+      const state = { ...createMockRoom(), drawPile: ['D1', 'A064'], bananaPeelArmed: true };
+      const next = executeDraw(state, 'p1', 1);
+      expect(next.players.p1.hand).toContain('A064');
+      expect(next.bananaPeelArmed).toBe(false);
+    });
   });
 
   describe('executeDiscard & executeAllDiscard', () => {

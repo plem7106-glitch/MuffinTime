@@ -40,7 +40,7 @@ const AVATAR_COLORS = [
 
 export function WaitingRoom() {
   const router = useRouter();
-  const { activeRoom, myPlayerId, leaveRoom, startSetup } = useGameSession();
+  const { activeRoom, myPlayerId, onlinePlayerIds, leaveRoom, startSetup } = useGameSession();
   const { isMusicEnabled, isSfxEnabled, toggleMusic, toggleSfx, playGameStart } = useAudio();
   const [copied, setCopied] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -261,6 +261,10 @@ export function WaitingRoom() {
             const isMe = id === myPlayerId;
             const colorClass = AVATAR_COLORS[index % AVATAR_COLORS.length];
             const initial = player.name.charAt(0).toUpperCase() || 'P';
+            // null onlinePlayerIds = presence not established yet (or a bot
+            // room, which has no realtime channel at all) -- treat as online
+            // rather than flashing everyone offline for a moment.
+            const isOnline = onlinePlayerIds === null || onlinePlayerIds.has(id);
 
             return (
               <div
@@ -298,9 +302,17 @@ export function WaitingRoom() {
                 </div>
 
                 {/* Right: Online Status */}
-                <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 shrink-0">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>ออนไลน์</span>
+                <div
+                  className={`flex items-center gap-1 text-[11px] font-bold shrink-0 ${
+                    isOnline ? 'text-emerald-600' : 'text-gray-400'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'
+                    }`}
+                  />
+                  <span>{isOnline ? 'ออนไลน์' : 'ออฟไลน์'}</span>
                 </div>
               </div>
             );

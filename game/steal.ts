@@ -238,7 +238,11 @@ export function finalizeSteal(state: RoomState, operation: StealOperation, rng: 
       [operation.victimId]
     );
     appendGameEvent(next, event);
-    const tracked = trackForcedLoss(next, operation.victimId, stolen.length);
+    // A self-target steal (thiefId === victimId) never actually removes the
+    // cards from that player's hand -- mirrors finalizeForcedDiscard's own
+    // selfInflicted guard.
+    const selfTarget = operation.thiefId === operation.victimId;
+    const tracked = selfTarget ? next : trackForcedLoss(next, operation.victimId, stolen.length);
 
     // C19 passive trigger: If C19 was stolen from victim, thief discards their entire hand
     if (stolen.includes('C19')) {

@@ -21,6 +21,11 @@ export function takeChosenFromPeek(state: RoomState, playerId: PlayerId, cardCod
   if (pos === -1) return next;
   next.drawPile.splice(pos, 1);
   next.players[playerId].hand.push(cardCode);
+  // ponytail: same as executeDraw -- just clear the flag, don't apply the
+  // discard-3 penalty (that only fires through game/pile.ts's draw()).
+  if (cardCode === 'A064' && next.bananaPeelArmed) {
+    next.bananaPeelArmed = false;
+  }
   return next;
 }
 
