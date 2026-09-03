@@ -13,11 +13,19 @@ const state = (): RoomState => ({
 
 describe('production action capabilities', () => {
   it('classifies implemented demo Actions and rejects unsupported Actions', () => {
-    expect(getImplementedActions()).toEqual(expect.arrayContaining(['A001', 'A004', 'A008', 'A014', 'A016', 'A064', 'A091']));
+    // All 173/173 Action cards are implemented as of the Cluster D + Cluster F
+    // merge, so there is no longer any real card code to use as a "not
+    // implemented" negative example -- 'A999' below is a synthetic code that
+    // doesn't appear in data/cards.json at all.
+    expect(getImplementedActions()).toEqual(expect.arrayContaining(['A001', 'A004', 'A008', 'A014', 'A016', 'A064', 'A017', 'A091']));
     expect(isActionImplemented('A064')).toBe(true);
     expect(getActionStatus('A064')).toBe('implemented');
-    expect(isActionImplemented('A017')).toBe(false);
-    expect(getActionStatus('A017')).toBe('not_implemented');
-    expect(resolveActionEffect(state(), 'A017', 'p1')).toEqual(state());
+    expect(isActionImplemented('A017')).toBe(true);
+    expect(getActionStatus('A017')).toBe('implemented');
+    expect(isActionImplemented('A091')).toBe(true);
+    expect(getActionStatus('A091')).toBe('implemented');
+    expect(isActionImplemented('A999')).toBe(false);
+    expect(getActionStatus('A999')).toBe('not_implemented');
+    expect(resolveActionEffect(state(), 'A999', 'p1')).toEqual(state());
   });
 });
