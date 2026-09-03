@@ -1,4 +1,4 @@
-import type { Rng } from './types';
+import type { PlayerId, Rng, RoomState } from './types';
 
 export function cloneState<T>(state: T): T {
   return JSON.parse(JSON.stringify(state));
@@ -19,4 +19,12 @@ export function pickRandomIndices(length: number, n: number, rng: Rng = Math.ran
     rng
   );
   return indices.slice(0, Math.min(n, length));
+}
+
+export function trackForcedLoss(state: RoomState, victimId: PlayerId, count: number): RoomState {
+  if (count <= 0) return state;
+  const next = cloneState(state);
+  const player = next.players[victimId];
+  if (player) player.forcedLossSinceLastTurn = (player.forcedLossSinceLastTurn ?? 0) + count;
+  return next;
 }

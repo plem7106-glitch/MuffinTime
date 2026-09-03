@@ -44,6 +44,12 @@ describe('forced discard foundation', () => {
     expect(pending.reactionStack?.[0]?.customPayload?.forcedDiscardOperationId).toBe(operationId);
     setPreDiscardReactionResolver(null);
   });
+  it('tracks the victim\'s forced loss with the actual moved count', () => {
+    const prepared = prepareForcedDiscard(state(), 'p2', 2, 'p1', 'op-track');
+    const completed = completeForcedDiscard(prepared);
+    const next = finalizeForcedDiscard(state(), completed, completed.finalDestination);
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(2);
+  });
   it('resumes a linked pending operation when its reaction frame completes', () => {
     const operation = prepareForcedDiscard(state(), 'p2', 2, 'p1', 'op-linked');
     let pending = preparePendingForcedDiscard(state(), { ...operation, causalFrameId: 'frame-link' }, 'frame-link');

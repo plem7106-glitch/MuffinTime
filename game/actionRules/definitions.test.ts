@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveActionEffect, executeActionFrameEffect } from './registry';
+import { advanceTurn } from '../turn';
 import type { PlayerId, RoomState, StackFrame } from '../types';
 
 /** Builds a minimal StackFrame carrying customPayload, for roster_select/
@@ -1399,5 +1400,134 @@ describe('A064 (plant Banana Peel face-up in the draw pile)', () => {
     state.discardPile = ['A064'];
     const next = resolveActionEffect(state, 'A064', 'me');
     expect(next.bananaPeelArmed).toBe(true);
+  });
+});
+
+describe('forced-loss tracking (A091 support)', () => {
+  it('A038 (target discards) tracks the target\'s forced loss, not the actor\'s', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const next = resolveActionEffect(state, 'A038', 'me', 'p2');
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(3);
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A056 (self-discard) does not track any forced loss', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A056', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A034 (everyone discards a trap) tracks every player except the actor', () => {
+    const state = threePlayerState();
+    state.players.me.traps = ['T001'];
+    state.players.p2.traps = ['T002'];
+    state.players.p3.traps = ['T003'];
+    const next = resolveActionEffect(state, 'A034', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(1);
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(1);
+  });
+
+  it('A029-style steal (target loses to actor) tracks the target\'s forced loss', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A029', 'me', 'p2');
+    expect(next.players.p2.forcedLossSinceLastTurn).toBeGreaterThan(0);
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A014 (actor chooses to have their own hand stolen from) does not track forced loss', () => {
+    const next = resolveActionEffect(baseState(), 'A014', 'me', 'bot-1');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A080 (everyone steals from their right neighbor) does not track the actor\'s own loss', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A080', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    // p2/p3 are each some other seat's right neighbor -- at least one of them lost a card.
+    const totalTracked = (next.players.p2.forcedLossSinceLastTurn ?? 0) + (next.players.p3.forcedLossSinceLastTurn ?? 0);
+    expect(totalTracked).toBeGreaterThan(0);
+  });
+
+  it('A099 (everyone discards 3, actor included) tracks everyone except the actor', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['H1', 'Ha', 'Hb', 'Hc'];
+    const next = resolveActionEffect(state, 'A099', 'me');
+    expect(next.players.me.hand.length).toBe(1); // the actor really did lose 3
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(3);
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(3);
+  });
+
+  it('A043 (whole hand buried in the draw pile) tracks the target\'s forced loss', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A043', 'me', 'p2');
+    expect(next.players.p2.hand).toEqual([]);
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(3);
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A129 (everyone down to 1) tracks the trimmed players except the actor', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['H1', 'Ha', 'Hb', 'Hc'];
+    const next = resolveActionEffect(state, 'A129', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(2);
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(2);
+  });
+
+  it('A044 (everyone to 7) tracks only the non-actors it trims, not those it tops up', () => {
+    const state = threePlayerState();
+    state.players.me.hand = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']; // 9 -> discards 2, self-inflicted
+    state.players.p2.hand = ['j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r']; // 9 -> forced to discard 2
+    const next = resolveActionEffect(state, 'A044', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(2);
+    expect(next.players.p3.hand.length).toBe(7); // topped up, not a loss
+    expect(next.players.p3.forcedLossSinceLastTurn).toBeUndefined();
+  });
+});
+
+describe('A091', () => {
+  it('A091 draws 0 cards when the actor has no tracked forced loss', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(1);
+  });
+
+  it('A091 draws exactly forcedLossSinceLastTurn cards', () => {
+    const state = threePlayerState();
+    state.players.me.forcedLossSinceLastTurn = 3;
+    const next = resolveActionEffect(state, 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(4);
+  });
+
+  // The regression test for the final-review C1 bug: the tally used to be zeroed
+  // by beginTurn at the START of the victim's turn, so A091 always saw 0 here.
+  it('A091 still sees a loss suffered on someone else\'s turn, across real advanceTurn calls', () => {
+    const state = threePlayerState();
+    state.currentTurnIndex = 1; // p2 is the active player
+    state.players.me.hand = ['H1', 'Ha', 'Hb', 'Hc'];
+    // p2 forces "me" to discard 3 during p2's own turn.
+    const robbed = resolveActionEffect(state, 'A038', 'p2', 'me');
+    expect(robbed.players.me.forcedLossSinceLastTurn).toBe(3);
+    expect(robbed.players.me.hand.length).toBe(1);
+
+    // Play comes back around to "me" through the real turn machinery.
+    const atP3 = advanceTurn(robbed);
+    const atMe = advanceTurn(atP3);
+    expect(atMe.turnOrder[atMe.currentTurnIndex]).toBe('me');
+    expect(atMe.players.me.forcedLossSinceLastTurn).toBe(3);
+    expect(atMe.players.p2.forcedLossSinceLastTurn).toBe(0); // p2's turn ended
+
+    const next = resolveActionEffect(atMe, 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(1 + 3);
+  });
+
+  it('A091 clamps to however many cards remain in the draw pile', () => {
+    const state = threePlayerState();
+    state.drawPile = ['A001', 'A002'];
+    state.players.me.forcedLossSinceLastTurn = 5;
+    const next = resolveActionEffect(state, 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(1 + 2);
+    expect(next.drawPile).toEqual([]);
   });
 });

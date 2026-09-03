@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   advanceTurn,
   resetPlayerPerTurnFlags,
+  beginTurn,
   isMuffinTimeEligible,
   declareMuffinTime,
   checkWinnerAtTurnStart,
@@ -17,11 +18,11 @@ import {
 import type { RoomState, PlayerState } from './types';
 
 describe('resetPlayerPerTurnFlags', () => {
-  it('resets all five per-turn fields on the given player object, in place', () => {
+  it('resets all five start-of-turn fields on the given player object, in place', () => {
     const player: PlayerState = {
       name: 'P', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false,
       placedTrapThisTurn: true, hasDrawnThisTurn: true, hasPlayedActionThisTurn: true,
-      bonusActionPlaysRemaining: 2, mustPlayActionThisTurn: true,
+      bonusActionPlaysRemaining: 2, mustPlayActionThisTurn: true, forcedLossSinceLastTurn: 4,
     };
     resetPlayerPerTurnFlags(player);
     expect(player.placedTrapThisTurn).toBe(false);
@@ -29,6 +30,68 @@ describe('resetPlayerPerTurnFlags', () => {
     expect(player.hasPlayedActionThisTurn).toBe(false);
     expect(player.bonusActionPlaysRemaining).toBe(0);
     expect(player.mustPlayActionThisTurn).toBe(false);
+    // A091's tally is end-of-turn state, cleared by clearForcedLoss, not here.
+    expect(player.forcedLossSinceLastTurn).toBe(4);
+  });
+});
+
+describe('beginTurn', () => {
+  it('leaves forcedLossSinceLastTurn alone -- A091 must still see it during this turn', () => {
+    const state = {
+      turnOrder: ['p1', 'p2'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false, forcedLossSinceLastTurn: 3 },
+        p2: { skipNextTurn: false, forcedLossSinceLastTurn: 5 },
+      },
+    } as unknown as RoomState;
+    const next = beginTurn(state, 'p1');
+    expect(next.players.p1.forcedLossSinceLastTurn).toBe(3);
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(5);
+  });
+});
+
+describe('forcedLossSinceLastTurn turn-boundary lifecycle', () => {
+  const threePlayers = (overrides: Record<string, unknown> = {}) =>
+    ({
+      turnOrder: ['p1', 'p2', 'p3'],
+      seatOrder: ['p1', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false, forcedLossSinceLastTurn: 3 },
+        p2: { skipNextTurn: false, forcedLossSinceLastTurn: 5 },
+        p3: { skipNextTurn: false, forcedLossSinceLastTurn: 7 },
+      },
+      ...overrides,
+    }) as unknown as RoomState;
+
+  it('advanceTurn clears the OUTGOING player only, leaving the incoming tally intact', () => {
+    const next = advanceTurn(threePlayers());
+    expect(next.players.p1.forcedLossSinceLastTurn).toBe(0); // outgoing, turn ended
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(5); // incoming, A091 must see this
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(7);
+  });
+
+  it('carries a skipped player\'s tally forward through the skip', () => {
+    const state = threePlayers();
+    state.players.p2.skipNextTurn = true;
+    const next = advanceTurn(state);
+    expect(next.players.p1.forcedLossSinceLastTurn).toBe(0);
+    // p2 was stepped over -- no turn of theirs ended, so the tally is still owed.
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(5);
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(7);
+  });
+
+  it('jumpToPlayerTurn and emergencyForceSkipTurn also clear the outgoing player', () => {
+    const jumped = jumpToPlayerTurn(threePlayers(), 'p3');
+    expect(jumped.players.p1.forcedLossSinceLastTurn).toBe(0);
+    expect(jumped.players.p3.forcedLossSinceLastTurn).toBe(7);
+
+    const skipped = emergencyForceSkipTurn(threePlayers());
+    expect(skipped.players.p1.forcedLossSinceLastTurn).toBe(0);
+    expect(skipped.players.p2.forcedLossSinceLastTurn).toBe(5);
   });
 });
 

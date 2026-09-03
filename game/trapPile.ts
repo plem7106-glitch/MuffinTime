@@ -1,4 +1,4 @@
-import { cloneState, pickRandomIndices } from './util';
+import { cloneState, pickRandomIndices, trackForcedLoss } from './util';
 import type { CardCode, PlayerId, Rng, RoomState } from './types';
 
 /**
@@ -42,6 +42,24 @@ export function discardAllTraps(state: RoomState, playerId: PlayerId): RoomState
   next.discardPile.push(...traps);
   next.players[playerId].traps = [];
   return next;
+}
+
+export function forceDiscardTraps(
+  state: RoomState,
+  victimId: PlayerId,
+  n: number,
+  cardCodes: CardCode[] | null = null,
+  rng: Rng = Math.random
+): RoomState {
+  const before = state.players[victimId]?.traps.length ?? 0;
+  const discarded = discardTraps(state, victimId, n, cardCodes, rng);
+  const after = discarded.players[victimId]?.traps.length ?? 0;
+  return trackForcedLoss(discarded, victimId, before - after);
+}
+
+export function forceDiscardAllTraps(state: RoomState, victimId: PlayerId): RoomState {
+  const count = state.players[victimId]?.traps.length ?? 0;
+  return trackForcedLoss(discardAllTraps(state, victimId), victimId, count);
 }
 
 export function returnTrapsToHand(

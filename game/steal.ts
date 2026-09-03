@@ -1,11 +1,11 @@
-import { cloneState } from './util';
+import { cloneState, trackForcedLoss } from './util';
 import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 import type { CardCode, PlayerId, RoomState, Rng } from './types';
 import { pushStackFrame, getStackFrame } from './reactionStack';
 import type { CreateFrameParams } from './reactionStack';
 import { checkAndTriggerAutomaticTraps } from './trapRules/engine';
 import { getPlayableCounters } from './counterRules/registry';
-import { discard } from './pile';
+import { forceDiscard } from './pile';
 
 export interface StealOperation {
   operationId: string;
@@ -238,12 +238,14 @@ export function finalizeSteal(state: RoomState, operation: StealOperation, rng: 
       [operation.victimId]
     );
     appendGameEvent(next, event);
+    const tracked = trackForcedLoss(next, operation.victimId, stolen.length);
 
     // C19 passive trigger: If C19 was stolen from victim, thief discards their entire hand
     if (stolen.includes('C19')) {
-      const thiefHand = [...next.players[operation.thiefId].hand];
-      return discard(next, operation.thiefId, thiefHand.length, thiefHand);
+      const thiefHand = [...tracked.players[operation.thiefId].hand];
+      return forceDiscard(tracked, operation.thiefId, thiefHand.length, thiefHand);
     }
+    return tracked;
   }
 
   return next;
