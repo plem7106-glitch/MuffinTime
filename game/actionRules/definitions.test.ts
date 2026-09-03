@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveActionEffect, executeActionFrameEffect, getActionRule } from './registry';
+import { resolveActionEffect, executeActionFrameEffect, getActionRule, isActionImplemented } from './registry';
 import type { CardCode, PlayerId, RecentActionPlay, RoomState, StackFrame } from '../types';
 
 /** Builds a minimal StackFrame carrying customPayload, for roster_select/
@@ -1711,5 +1711,11 @@ describe('A094', () => {
     const pushed = next.reactionStack?.[next.reactionStack.length - 1];
     expect(pushed?.customPayload?.outcome).toBe(true);
     expect(pushed?.customPayload?.chainDepth).toBe(1);
+  });
+});
+
+describe('A028', () => {
+  it('is registered as an implemented Action card', () => {
+    expect(isActionImplemented('A028')).toBe(true);
   });
 });

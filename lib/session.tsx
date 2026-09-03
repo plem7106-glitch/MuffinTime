@@ -56,6 +56,7 @@ import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { resolveSteal } from '../game/steal';
 import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
+import { isQuantityEffectCard } from '../game/actionRules/quantityCards';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult, RecentActionPlay } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
 import { executeManualRecoveryDiscard, executeManualRecoveryGive } from '../game/recovery';
@@ -115,6 +116,7 @@ export interface GameSessionValue {
   endTurn: () => void;
   hostSkipTurn: () => void;
   playAction: (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => void;
+  playDoubledAction: (partnerCode: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => void;
   placeTrapCard: (code: CardCode) => void;
   skipTrapPlacement: () => void;
   openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
@@ -291,6 +293,77 @@ export function resolveCompletedStackFrames(state: RoomState): RoomState {
   }
 
   return next;
+}
+
+/**
+ * Core logic for playing A028 "ทาเยอะไปหน่อย" (Bad Spread) together with a
+ * qualifying partner Action card. Unlike every other Action, A028 is never
+ * itself the sourceCode of a pushed StackFrame -- playing it discards BOTH
+ * A028 and the chosen partner card, then pushes exactly ONE frame for the
+ * PARTNER's code with customPayload.doubled = true (consumed by
+ * resolveCompletedStackFrames above, which invokes the partner's effect
+ * twice when that flag is set).
+ *
+ * Hoisted to module scope as a pure function of (state, myPlayerId, ...) --
+ * mirroring resolveCompletedStackFrames above -- so it's independently
+ * testable outside of React; the `playDoubledAction` useCallback inside
+ * GameSessionProvider is a thin wrapper that supplies `myPlayerId` and
+ * dispatches the result through `run`.
+ */
+export function applyPlayDoubledAction(
+  state: RoomState,
+  myPlayerId: PlayerId,
+  partnerCode: CardCode,
+  targetId?: PlayerId,
+  customPayload?: Record<string, unknown>
+): RoomState {
+  if (state.reactionStack && state.reactionStack.length > 0) return state;
+  if (state.pendingResponse || state.pendingInteraction) return state;
+  if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
+  if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
+  const actorId = myPlayerId;
+  const player = state.players[actorId];
+  // Same "Main Choice" rule as playAction -- see its comment above.
+  if (player?.hasDrawnThisTurn) return state;
+  const usingBonusPlay = Boolean(player?.hasPlayedActionThisTurn) && (player?.bonusActionPlaysRemaining ?? 0) > 0;
+  if (player?.hasPlayedActionThisTurn && !usingBonusPlay) return state;
+  if (!player?.hand.includes('A028')) return state;
+  if (!isQuantityEffectCard(partnerCode) || partnerCode === 'A028') return state;
+  if (!player.hand.includes(partnerCode)) return state;
+  if (!isActionImplemented(partnerCode) || !getPlayableActions(state, actorId).includes(partnerCode)) return state;
+  if (targetId && !state.players[targetId]) return state;
+
+  let next = state;
+  if (next.turnPhase === 'trap_placement' || !next.turnPhase) {
+    next = engineSkipTrapPlacement(next, actorId);
+  }
+  if (next.turnPhase !== 'main') return state;
+
+  let afterDiscard = applyActionRedirect(next, actorId, 'A028');
+  afterDiscard = applyActionRedirect(afterDiscard, actorId, partnerCode);
+  if (afterDiscard.players[actorId]) {
+    if (usingBonusPlay) {
+      afterDiscard.players[actorId].bonusActionPlaysRemaining = (afterDiscard.players[actorId].bonusActionPlaysRemaining ?? 0) - 1;
+    } else {
+      afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+    }
+    afterDiscard.players[actorId].hasDrawnThisTurn = false;
+  }
+  const stackState = pushStackFrame(afterDiscard, {
+    sourceType: 'action',
+    sourceCode: partnerCode,
+    actorId,
+    targetIds: targetId ? [targetId] : [],
+    customPayload: { ...(customPayload ?? {}), doubled: true },
+  });
+  const actionEvent = createGameEvent(
+    GAME_EVENT_TYPES.ACTION_PLAYED,
+    actorId,
+    { actorId, actionCode: partnerCode, targetId },
+    [targetId ?? actorId]
+  );
+  appendGameEvent(stackState, actionEvent);
+  return checkAndTriggerAutomaticTraps(stackState, actionEvent);
 }
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
@@ -666,6 +739,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         appendGameEvent(stackState, actionEvent);
         return checkAndTriggerAutomaticTraps(stackState, actionEvent);
       }),
+    [run, myPlayerId]
+  );
+
+  const playDoubledAction = useCallback(
+    (partnerCode: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) =>
+      run((state) => applyPlayDoubledAction(state, myPlayerId!, partnerCode, targetId, customPayload)),
     [run, myPlayerId]
   );
 
@@ -1157,6 +1236,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     endTurn,
     hostSkipTurn,
     playAction,
+    playDoubledAction,
     placeTrapCard,
     skipTrapPlacement,
     openTrapCard,

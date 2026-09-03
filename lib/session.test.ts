@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCompletedStackFrames } from './session';
+import { resolveCompletedStackFrames, applyPlayDoubledAction } from './session';
 import { getActionRule } from '../game/actionRules/registry';
 import type { RoomState } from '../game/types';
 
@@ -139,5 +139,76 @@ describe('resolveCompletedStackFrames', () => {
     } as unknown as Parameters<typeof a094Rule.executeEffect>[1]);
     const pushedFrame = replayed.reactionStack?.[replayed.reactionStack.length - 1];
     expect(pushedFrame?.customPayload?.doubled).toBeFalsy();
+  });
+});
+
+describe('playDoubledAction', () => {
+  function readyState(overrides: Partial<RoomState> = {}): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      turnPhase: 'main',
+      drawPile: [],
+      discardPile: [],
+      players: {
+        me: {
+          name: 'Me',
+          hand: ['A028'],
+          traps: [],
+          connected: true,
+          hasCalledMuffinTime: false,
+          skipNextTurn: false,
+          hasDrawnThisTurn: false,
+          hasPlayedActionThisTurn: false,
+        },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      ...overrides,
+    } as unknown as RoomState;
+  }
+
+  it('does nothing when the partner code is not a qualifying quantity card', () => {
+    // A119 is confirmed excluded from QUANTITY_EFFECT_CARDS.
+    const state = readyState();
+    state.players.me.hand = ['A028', 'A119'];
+    const next = applyPlayDoubledAction(state, 'me', 'A119');
+    expect(next).toEqual(state);
+    expect(next.players.me.hand).toEqual(expect.arrayContaining(['A028', 'A119']));
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('discards both A028 and the partner card, pushing one frame with doubled: true', () => {
+    // A127 "My Lemons" discards a fixed 4 cards from the actor, no target needed.
+    const rule = getActionRule('A127')!;
+    expect(rule).toBeTruthy();
+    const state = readyState();
+    state.players.me.hand = ['A028', 'A127'];
+    const next = applyPlayDoubledAction(state, 'me', 'A127');
+    expect(next.players.me.hand).not.toContain('A028');
+    expect(next.players.me.hand).not.toContain('A127');
+    expect(next.reactionStack?.length).toBe(1);
+    const pushed = next.reactionStack?.[0];
+    expect(pushed?.sourceCode).toBe('A127');
+    expect(pushed?.customPayload?.doubled).toBe(true);
+  });
+
+  it('supports a targeted partner card, passing the target through', () => {
+    // A077 "Got Your Nose" steals 1 card from another player -- needsTargetSelection.
+    const rule = getActionRule('A077')!;
+    expect(rule).toBeTruthy();
+    const state = readyState();
+    state.players.me.hand = ['A028', 'A077'];
+    const next = applyPlayDoubledAction(state, 'me', 'A077', 'p2');
+    expect(next.players.me.hand).not.toContain('A028');
+    expect(next.players.me.hand).not.toContain('A077');
+    expect(next.reactionStack?.length).toBe(1);
+    const pushed = next.reactionStack?.[0];
+    expect(pushed?.sourceCode).toBe('A077');
+    expect(pushed?.targetIds).toEqual(['p2']);
+    expect(pushed?.customPayload?.doubled).toBe(true);
   });
 });

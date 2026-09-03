@@ -1986,6 +1986,20 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
+  A028: {
+    code: 'A028',
+    name_en: 'Bad Spread',
+    name_th: 'ทาเยอะไปหน่อย',
+    description_th: 'เล่นไพ่ใบนี้พร้อมกับ Action อีก 1 ใบ เพื่อเพิ่ม Effect ของ Action ใบนั้นเป็น 2 เท่า',
+    kind: 'no_op',
+    // A028 is never itself the sourceCode of a pushed StackFrame -- playing
+    // it goes through the dedicated playDoubledAction session method
+    // (lib/session.tsx), which pushes a frame for the PAIRED card with
+    // customPayload.doubled = true. This executeEffect exists only so the
+    // registry has a complete entry; it should be unreachable in practice.
+    executeEffect: (state) => state,
+  },
+
   // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs
   // a "cards lost since your last turn" counter, but the low-level primitives
   // (stealRandom/stealChosen/rosterStolenBy/executeAllDiscard/etc.) don't know
