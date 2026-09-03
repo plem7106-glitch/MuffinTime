@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { skipTurn, reverseDirection, changeMuffinTarget, applyActionRedirect } from './turnFlow';
+import { skipTurn, reverseDirection, changeMuffinTarget, applyActionRedirect, resolvePostPlayDestination } from './turnFlow';
 import type { RoomState } from './types';
 
 describe('skipTurn', () => {
@@ -82,5 +82,52 @@ describe('applyActionRedirect', () => {
     expect(next!.players.p1.hand).toEqual([]);
     expect(next!.discardPile).toEqual(['A001']);
     expect(next!.actionRedirect).toBeNull();
+  });
+});
+
+function baseState(overrides: Partial<RoomState> = {}): RoomState {
+  return {
+    status: 'playing',
+    hostId: 'p1',
+    turnOrder: ['p1', 'p2'],
+    currentTurnIndex: 0,
+    direction: 1,
+    muffinTimeTarget: 10,
+    drawPile: [],
+    discardPile: [],
+    players: {
+      p1: { name: 'One', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+    },
+    actionRedirect: null,
+    ...overrides,
+  } as unknown as RoomState;
+}
+
+describe('resolvePostPlayDestination', () => {
+  it('places the card on discardPile when no redirect is active', () => {
+    const next = resolvePostPlayDestination(baseState(), 'A006');
+    expect(next.discardPile).toEqual(['A006']);
+  });
+
+  it('redirects the card into the active redirect target hand instead, decrementing remaining', () => {
+    const state = baseState({ actionRedirect: { toPlayerId: 'p2', remaining: 2 } });
+    const next = resolvePostPlayDestination(state, 'A006');
+    expect(next.discardPile).toEqual([]);
+    expect(next.players.p2.hand).toEqual(['A006']);
+    expect(next.actionRedirect).toEqual({ toPlayerId: 'p2', remaining: 1 });
+  });
+
+  it('clears actionRedirect once remaining hits 0', () => {
+    const state = baseState({ actionRedirect: { toPlayerId: 'p2', remaining: 1 } });
+    const next = resolvePostPlayDestination(state, 'A006');
+    expect(next.actionRedirect).toBeNull();
+  });
+
+  it('falls back to discardPile when the redirect target no longer exists in the room', () => {
+    const state = baseState({ actionRedirect: { toPlayerId: 'ghost', remaining: 2 } });
+    const next = resolvePostPlayDestination(state, 'A006');
+    expect(next.discardPile).toEqual(['A006']);
+    expect(next.actionRedirect).toBeNull();
   });
 });

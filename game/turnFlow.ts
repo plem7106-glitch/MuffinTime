@@ -50,3 +50,26 @@ export function applyActionRedirect(state: RoomState, actorId: PlayerId, code: C
   next.actionRedirect = redirect.remaining - 1 > 0 ? { ...redirect, remaining: redirect.remaining - 1 } : null;
   return next;
 }
+
+/**
+ * A lighter sibling of applyActionRedirect for a card that never sat in a
+ * hand to begin with -- A017's blind-drawn card comes straight out of
+ * drawPile, so there is no hand to remove it from before deciding its
+ * post-play destination. Still respects an active A040 redirect (Cluster
+ * A's ruling: applies to ANY player's Action play, not just the original
+ * actor who set it up), same as applyActionRedirect, just without the
+ * hand-removal step.
+ */
+export function resolvePostPlayDestination(state: RoomState, code: CardCode): RoomState {
+  const redirect = state.actionRedirect;
+  if (!redirect || redirect.remaining <= 0 || !state.players[redirect.toPlayerId]) {
+    const next = cloneState(state);
+    next.discardPile.push(code);
+    if (redirect) next.actionRedirect = null;
+    return next;
+  }
+  const next = cloneState(state);
+  next.players[redirect.toPlayerId].hand.push(code);
+  next.actionRedirect = redirect.remaining - 1 > 0 ? { ...redirect, remaining: redirect.remaining - 1 } : null;
+  return next;
+}
