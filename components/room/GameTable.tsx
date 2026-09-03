@@ -26,7 +26,7 @@ import { NumberInputModal } from '../modals/NumberInputModal';
 import { DateInviteModal } from '../modals/DateInviteModal';
 import { canActivateManualTrap } from '../../game/trapRules/engine';
 import { getTrapRule } from '../../game/trapRules/registry';
-import { getActionRule } from '../../game/actionRules/registry';
+import { getActionRule, getPlayableActions } from '../../game/actionRules/registry';
 import { getSocialCounterConfig, isSocialCounter } from '../../game/socialCounter';
 
 import { TrapModal } from '../modals/TrapModal';
@@ -215,15 +215,18 @@ export function GameTable() {
   }, [seatOrder, myPlayerId, state.players]);
 
   // Handlers for Hand Tray Actions
+  const todayMMDD = () => {
+    const now = new Date();
+    return `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
   const handlePlayActionDirect = (cardCode: CardCode) => {
     if (!canAct) return;
     // A037/A066/A137 need "today" to resolve their birthday comparison.
     // Stamped here (the actor's own device clock) rather than read inside
     // executeEffect, which must stay a pure function of (state, frame).
     if (getActionRule(cardCode)?.needsTodayDate) {
-      const now = new Date();
-      const today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      playAction(cardCode, undefined, { today });
+      playAction(cardCode, undefined, { today: todayMMDD() });
       return;
     }
     playAction(cardCode);
@@ -250,13 +253,14 @@ export function GameTable() {
 
   const handleConfirmTargetAction = () => {
     if (!pendingTargetCard) return;
+    const todayPayload = pendingActionRule?.needsTodayDate ? { today: todayMMDD() } : undefined;
     if (pendingActionRule?.needsRosterSelection) {
       if (chosenTargets.length === 0) return;
       if (rosterSelectionCount !== undefined && chosenTargets.length !== rosterSelectionCount) return;
-      playAction(pendingTargetCard.code, undefined, { rosterIds: chosenTargets });
+      playAction(pendingTargetCard.code, undefined, { rosterIds: chosenTargets, ...todayPayload });
     } else {
       if (!chosenTarget) return;
-      playAction(pendingTargetCard.code, chosenTarget);
+      playAction(pendingTargetCard.code, chosenTarget, todayPayload);
     }
     setPendingTargetCard(null);
     setChosenTarget(null);
@@ -558,7 +562,11 @@ export function GameTable() {
           condition" cards like the Family A / classification-doc examples) */}
       <TargetSelector
         open={pendingTargetCard !== null && dualPickPhase === null && !pendingActionRule?.needsOutcomeEntry && !pendingActionRule?.needsNumberInput && !pendingActionRule?.needsDrinkCheck && !pendingActionRule?.needsTargetThenOutcome}
-        candidates={opponentCandidates}
+        candidates={
+          pendingTargetCard?.code === 'A108'
+            ? opponentCandidates.filter((c) => getPlayableActions(state, c.id).length > 0)
+            : opponentCandidates
+        }
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}
         requiredCount={rosterSelectionCount}
