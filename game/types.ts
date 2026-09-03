@@ -129,6 +129,16 @@ export interface PlayerState {
    * them holding ≥1 Action card at their obligated turn's start. Reset to
    * false every turn by advanceTurn. */
   mustPlayActionThisTurn?: boolean;
+  /** A091: cards involuntarily lost (stolen from you, or forced-discarded by
+   * someone else's card/trap/counter) since your last turn began. Incremented
+   * by trackForcedLoss (game/util.ts) at every forced-loss site; read (not
+   * reset) by A091's own executeEffect -- if A091 is played twice in one turn
+   * (e.g. via A100's bonus plays), both reads see the same accumulated total
+   * unless something forces a loss in between, matching the card's literal
+   * "since your last turn" wording rather than "since you last played this
+   * card." Reset to 0 by resetPlayerPerTurnFlags, same as every other
+   * per-turn field on this interface. */
+  forcedLossSinceLastTurn?: number;
 }
 
 export interface PendingInteraction {

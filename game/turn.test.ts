@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   advanceTurn,
   resetPlayerPerTurnFlags,
+  beginTurn,
   isMuffinTimeEligible,
   declareMuffinTime,
   checkWinnerAtTurnStart,
@@ -17,11 +18,11 @@ import {
 import type { RoomState, PlayerState } from './types';
 
 describe('resetPlayerPerTurnFlags', () => {
-  it('resets all five per-turn fields on the given player object, in place', () => {
+  it('resets all six per-turn fields on the given player object, in place', () => {
     const player: PlayerState = {
       name: 'P', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false,
       placedTrapThisTurn: true, hasDrawnThisTurn: true, hasPlayedActionThisTurn: true,
-      bonusActionPlaysRemaining: 2, mustPlayActionThisTurn: true,
+      bonusActionPlaysRemaining: 2, mustPlayActionThisTurn: true, forcedLossSinceLastTurn: 4,
     };
     resetPlayerPerTurnFlags(player);
     expect(player.placedTrapThisTurn).toBe(false);
@@ -29,6 +30,24 @@ describe('resetPlayerPerTurnFlags', () => {
     expect(player.hasPlayedActionThisTurn).toBe(false);
     expect(player.bonusActionPlaysRemaining).toBe(0);
     expect(player.mustPlayActionThisTurn).toBe(false);
+    expect(player.forcedLossSinceLastTurn).toBe(0);
+  });
+});
+
+describe('beginTurn', () => {
+  it('resets forcedLossSinceLastTurn only for the player starting their turn', () => {
+    const state = {
+      turnOrder: ['p1', 'p2'],
+      currentTurnIndex: 0,
+      direction: 1,
+      players: {
+        p1: { skipNextTurn: false, forcedLossSinceLastTurn: 3 },
+        p2: { skipNextTurn: false, forcedLossSinceLastTurn: 5 },
+      },
+    } as unknown as RoomState;
+    const next = beginTurn(state, 'p1');
+    expect(next.players.p1.forcedLossSinceLastTurn).toBe(0);
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(5);
   });
 });
 

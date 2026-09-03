@@ -86,6 +86,7 @@ export function resetPlayerPerTurnFlags(player: PlayerState): void {
   player.hasPlayedActionThisTurn = false;
   player.bonusActionPlaysRemaining = 0;
   player.mustPlayActionThisTurn = false;
+  player.forcedLossSinceLastTurn = 0;
 }
 
 /**
