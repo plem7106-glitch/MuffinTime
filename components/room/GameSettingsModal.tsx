@@ -22,6 +22,7 @@ import {
 export function GameSettingsModal({
   isOpen,
   isHost = false,
+  canActAsHost,
   onClose,
   onOpenCardGallery,
   onOpenShuffleConfirm,
@@ -35,6 +36,10 @@ export function GameSettingsModal({
 }: {
   isOpen: boolean;
   isHost?: boolean;
+  /** Gates the "unstick" escape hatch only. Normally the same as isHost, but
+   * stays true for the deputy when the host has gone offline -- otherwise a
+   * vanished host takes the only way out of a frozen table with them. */
+  canActAsHost?: boolean;
   onClose: () => void;
   onOpenCardGallery: () => void;
   onOpenShuffleConfirm?: () => void;
@@ -253,7 +258,7 @@ export function GameSettingsModal({
 
           <div className="flex flex-col gap-1.5 mt-1">
             {/* 6.1. Host-only Turn Recovery */}
-            {isHost && onOpenHostUnstick && (
+            {(canActAsHost ?? isHost) && onOpenHostUnstick && (
               <button
                 type="button"
                 onClick={() => {

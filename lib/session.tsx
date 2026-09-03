@@ -102,6 +102,13 @@ export interface GameSessionValue {
    * always, for bot rooms, which have no realtime channel) -- callers
    * should treat `null` as "unknown", not "nobody online". */
   onlinePlayerIds: Set<PlayerId> | null;
+  /** True when you may use the host-only "unstick" escape hatch: either you ARE
+   * the host, or the host has dropped off presence and you are the first player
+   * in turn order who is still online. Without the fallback, a host who closes
+   * their phone mid-response-window leaves the table permanently frozen --
+   * `removePlayer` (which would migrate the host) only runs on a deliberate
+   * "leave room" tap, never on a closed tab or a dead network. */
+  canActAsHost: boolean;
   myPlayerId: PlayerId | null;
   pendingResponse: PendingResponse | null;
   lastResult: LastResult | null;
@@ -159,6 +166,33 @@ function advanceAndCheckWin(room: RoomState): RoomState {
  * dependency array, i.e. it never closed over component state/props -- which
  * also makes it independently testable outside of React.
  */
+/**
+ * Everything a player can actually SEE on the table, and nothing else --
+ * reaction-stack bookkeeping, sequence numbers and event logs are deliberately
+ * excluded, because those move on every resolution whether or not the card did
+ * anything. Comparing this across a resolve is how `LastResult.hadNoEffect` is
+ * decided, so a card whose condition wasn't met can say so instead of showing
+ * the same popup as a card that worked.
+ */
+export function visibleFingerprint(state: RoomState): string {
+  return JSON.stringify({
+    draw: state.drawPile.length,
+    discard: state.discardPile,
+    banished: state.banishedCards?.length ?? 0,
+    turnIndex: state.currentTurnIndex,
+    direction: state.direction,
+    muffinTarget: state.muffinTimeTarget,
+    status: state.status,
+    winner: state.winnerId ?? null,
+    redirect: state.actionRedirect ?? null,
+    restrictions: state.globalRestrictions ?? [],
+    players: Object.keys(state.players).sort().map((id) => {
+      const p = state.players[id];
+      return [id, p.hand.length, p.traps.length, p.skipNextTurn === true, p.hasCalledMuffinTime === true];
+    }),
+  });
+}
+
 export function resolveCompletedStackFrames(state: RoomState): RoomState {
   let next = state;
   let currentTop = getTopFrame(next);
@@ -325,6 +359,7 @@ export function applySkipCounter(state: RoomState, responseId: string, responder
     });
   }
 
+  const beforeResolve = visibleFingerprint(next);
   next = resolveCompletedStackFrames(next);
 
   return {
@@ -338,6 +373,7 @@ export function applySkipCounter(state: RoomState, responseId: string, responder
             actorId: top.actorId,
             targetId: top.targetIds[0],
             countered: false,
+            hadNoEffect: visibleFingerprint(next) === beforeResolve,
           }
         : null,
   };
@@ -512,9 +548,28 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [dismissedResponseId, setDismissedResponseId] = useState<string | null>(null);
   const [onlinePlayerIds, setOnlinePlayerIds] = useState<Set<PlayerId> | null>(null);
+  const canActAsHostRef = useRef(false);
+
+
 
   const isBotRoom = roomCode?.startsWith('bot-') ?? false;
   const myPlayerId = isBotRoom ? (localHostId || playerId || 'host-me') : playerId;
+
+  // The host normally owns the unstick button. If they vanish without tapping
+  // "leave room" (closed tab, dead network) the host never migrates, so hand
+  // the button to the first still-online player in turn order instead -- one
+  // deterministic deputy, so several clients can't all fire it at once.
+  // `onlinePlayerIds === null` means presence hasn't reported yet: treat that as
+  // "unknown", never as "the host is gone".
+  const hostIsOffline =
+    !!roomState && onlinePlayerIds !== null && !onlinePlayerIds.has(roomState.hostId);
+  const deputyHostId = hostIsOffline
+    ? (roomState!.turnOrder ?? []).find((id) => onlinePlayerIds!.has(id) && roomState!.players[id])
+    : undefined;
+  const canActAsHost =
+    !!myPlayerId && !!roomState &&
+    (myPlayerId === roomState.hostId || (hostIsOffline && myPlayerId === deputyHostId));
+  canActAsHostRef.current = canActAsHost;
 
   const channelRef = useRef<ReturnType<typeof subscribeToRoom> | null>(null);
   const isWritingRef = useRef(false);
@@ -575,7 +630,17 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       isWritingRef.current = true;
       setError(null);
       try {
-        await updateRoomWithRetry(supabase, roomCode, updater);
+        // Apply our own committed write locally instead of waiting for the
+        // Realtime echo to hand it back. The write itself is plain HTTP and
+        // succeeds even when the Realtime channel is down; without this the
+        // actor's screen keeps rendering pre-write state, which strands them:
+        // e.g. the server has recorded their draw (hasDrawnThisTurn = true, so
+        // it rejects a second one) while their UI still shows "not drawn yet"
+        // and therefore leaves End Turn disabled -- no legal move left but a
+        // manual refresh. The bot-room branch above already does this; only the
+        // online path relied on the echo.
+        const committed = await updateRoomWithRetry(supabase, roomCode, updater);
+        setRoomState(committed);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
       } finally {
@@ -841,7 +906,9 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const hostSkipTurn = useCallback(
     () =>
       run((state) => {
-        if (myPlayerId !== state.hostId) return state;
+        // Not `myPlayerId !== state.hostId`: an absent host must not be able to
+        // freeze the table (see canActAsHost).
+        if (!canActAsHostRef.current) return state;
         if (state.status !== 'playing') return state;
         return emergencyForceSkipTurn(state);
       }),
@@ -1078,7 +1145,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const pendingResponse = roomState?.pendingResponse;
     if (!pendingResponse || !myPlayerId || !roomState) return;
-    if (myPlayerId !== roomState.hostId) return;
+    // One client drives the auto-skips. Normally the host; if the host has
+    // dropped off presence, the deputy (see canActAsHost) takes over, otherwise
+    // a window waiting on a zero-eligible responder never advances.
+    if (!canActAsHost) return;
 
     const top = getTopFrame(roomState);
     if (!top || top.frameId !== pendingResponse.responseId) return;
@@ -1151,7 +1221,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     // Multiplayer uses the same authoritative top frame and per-responder
     // eligibility. Players with any legal Counter remain pending for UI input.
     skipFirstZeroEligibleResponder();
-  }, [roomState, myPlayerId, skipCounter, roomCode, playCounter]);
+  }, [roomState, myPlayerId, canActAsHost, skipCounter, roomCode, playCounter]);
 
   // Auto-play bot turns in local bot rooms
   useEffect(() => {
@@ -1284,6 +1354,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   const value: GameSessionValue = {
     activeRoom: roomCode && roomState ? { code: roomCode, state: roomState } : null,
     onlinePlayerIds,
+    canActAsHost,
     myPlayerId,
     pendingResponse: roomState?.pendingResponse ?? null,
     lastResult,
