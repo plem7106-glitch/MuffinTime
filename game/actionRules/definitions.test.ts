@@ -1401,3 +1401,29 @@ describe('A064 (plant Banana Peel face-up in the draw pile)', () => {
     expect(next.bananaPeelArmed).toBe(true);
   });
 });
+
+describe('forced-loss tracking (A091 support)', () => {
+  it('A038 (target discards) tracks the target\'s forced loss, not the actor\'s', () => {
+    const state = threePlayerState();
+    state.players.p2.hand = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const next = resolveActionEffect(state, 'A038', 'me', 'p2');
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(3);
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A056 (self-discard) does not track any forced loss', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A056', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A034 (everyone discards a trap) tracks every player except the actor', () => {
+    const state = threePlayerState();
+    state.players.me.traps = ['T001'];
+    state.players.p2.traps = ['T002'];
+    state.players.p3.traps = ['T003'];
+    const next = resolveActionEffect(state, 'A034', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    expect(next.players.p2.forcedLossSinceLastTurn).toBe(1);
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(1);
+  });
+});

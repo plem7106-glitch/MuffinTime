@@ -1,5 +1,5 @@
 import { everyoneDraws, everyoneDiscards, passHands } from '../group';
-import { draw, discard } from '../pile';
+import { draw, discard, forceDiscard } from '../pile';
 import { stealRandom, swapHands } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
 import { skipTurn, reverseDirection, changeMuffinTarget } from '../turnFlow';
@@ -9,7 +9,7 @@ import { initiateDelegatedTargetPick } from './delegatedTargetPick';
 import { drawUntilCount } from '../misc';
 import { cloneState, shuffle } from '../util';
 import { getCardById } from '../../data/cards/index';
-import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand } from '../trapPile';
+import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand, forceDiscardTraps, forceDiscardAllTraps } from '../trapPile';
 import { drawFromBottom } from '../pile';
 import { returnCardToHand } from '../misc';
 import { peekTopN, takeChosenFromPeek, takeTopNFromDiscard } from '../deckOps';
@@ -238,7 +238,7 @@ function discardAllOfType(state: RoomState, playerId: PlayerId, type: 'action' |
   const hand = state.players[playerId].hand;
   const matching = hand.filter((code) => getCardById(code)?.type === type);
   if (matching.length === 0) return state;
-  return discard(state, playerId, matching.length, matching);
+  return forceDiscard(state, playerId, matching.length, matching);
 }
 
 /**
@@ -307,7 +307,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
-      return discard(state, targetId, state.players[targetId].hand.length);
+      return forceDiscard(state, targetId, state.players[targetId].hand.length);
     },
   },
 
@@ -554,7 +554,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       const count = 3 * (Number(frame.customPayload?.numericMultiplier ?? 1));
-      return targetId ? discard(state, targetId, count) : state;
+      return targetId ? forceDiscard(state, targetId, count) : state;
     },
   },
   A039: {
@@ -565,7 +565,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     // only lists opponents right now, so this always targets an opponent.
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 5) : state;
+      return targetId ? forceDiscard(state, targetId, 5) : state;
     },
   },
   A041: {
@@ -575,7 +575,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const afterSelf = discard(state, frame.actorId, 3);
       const targetId = frame.targetIds[0];
-      return targetId ? discard(afterSelf, targetId, 3) : afterSelf;
+      return targetId ? forceDiscard(afterSelf, targetId, 3) : afterSelf;
     },
   },
   A045: {
@@ -585,7 +585,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
-      const discarded = discard(state, targetId, state.players[targetId].hand.length);
+      const discarded = forceDiscard(state, targetId, state.players[targetId].hand.length);
       return resolveForcedDraw(discarded, targetId, 3, frame.actorId, frame.sourceCode, frame.frameId);
     },
   },
@@ -807,7 +807,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นให้ทิ้ง Trap ที่วางไว้ทั้งหมด',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discardAllTraps(state, targetId) : state;
+      return targetId ? forceDiscardAllTraps(state, targetId) : state;
     },
   },
   A025: {
@@ -831,9 +831,9 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     code: 'A034', name_en: 'Cannonball', name_th: 'ลูกปืนใหญ่!',
     description_th: 'ผู้เล่นทุกคนทิ้ง Trap ที่วางไว้คนละ 1 ใบ',
     kind: 'auto',
-    executeEffect: (state) => {
+    executeEffect: (state, frame) => {
       let next = state;
-      for (const id of Object.keys(next.players)) next = discardTraps(next, id, 1);
+      for (const id of Object.keys(next.players)) next = id === frame.actorId ? discardTraps(next, id, 1) : forceDiscardTraps(next, id, 1);
       return next;
     },
   },
@@ -865,9 +865,9 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     code: 'A113', name_en: 'Suddenly Pineapples', name_th: 'จู่ ๆ ก็สับปะรด',
     description_th: 'ทิ้ง Trap ที่วางอยู่ทั้งหมด',
     kind: 'auto',
-    executeEffect: (state) => {
+    executeEffect: (state, frame) => {
       let next = state;
-      for (const id of Object.keys(next.players)) next = discardAllTraps(next, id);
+      for (const id of Object.keys(next.players)) next = id === frame.actorId ? discardAllTraps(next, id) : forceDiscardAllTraps(next, id);
       return next;
     },
   },
@@ -1355,7 +1355,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครแยกไม่ได้? (ถ้าแยกได้ ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 3) : state;
+      return targetId ? forceDiscard(state, targetId, 3) : state;
     },
   },
   A061: {
@@ -1364,7 +1364,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครพูดผิด? (ถ้าไม่มีใครพูดผิด ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 3) : state;
+      return targetId ? forceDiscard(state, targetId, 3) : state;
     },
   },
   A151: {
@@ -1373,7 +1373,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำแก้วหล่น/วางลง? (ถ้าไม่มี ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 3) : state;
+      return targetId ? forceDiscard(state, targetId, 3) : state;
     },
   },
   A152: {
@@ -1382,7 +1382,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครปฏิเสธ? (ถ้าร้องหมด ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 4) : state;
+      return targetId ? forceDiscard(state, targetId, 4) : state;
     },
   },
   A162: {
@@ -1391,7 +1391,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครขยับก่อน? (ถ้าไม่มี ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 3) : state;
+      return targetId ? forceDiscard(state, targetId, 3) : state;
     },
   },
 
@@ -1473,7 +1473,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าเมาสุด?',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 3) : state;
+      return targetId ? forceDiscard(state, targetId, 3) : state;
     },
   },
   A173: {
@@ -1482,7 +1482,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าน่าอายที่สุด?',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? discard(state, targetId, 4) : state;
+      return targetId ? forceDiscard(state, targetId, 4) : state;
     },
   },
 
