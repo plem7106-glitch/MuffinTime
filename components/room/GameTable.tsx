@@ -265,6 +265,17 @@ export function GameTable() {
       .map((id) => ({ id, player: state.players[id] }));
   }, [seatOrder, myPlayerId, state.players]);
 
+  // The whole table, actor included, in the same seat order. Used only by rules
+  // that set includeSelfAsCandidate -- a mini-game the actor is competing in
+  // ("who won the staring contest?") or a factual question about everyone
+  // ("who is oldest?"). Handing those the opponents-only list doesn't hide an
+  // option, it fixes the answer: the actor could never win their own duel.
+  const tableCandidates = useMemo(() => {
+    return seatOrder
+      .filter((id) => state.players[id] !== undefined)
+      .map((id) => ({ id, player: state.players[id] }));
+  }, [seatOrder, state.players]);
+
   // Handlers for Hand Tray Actions
   const todayMMDD = () => {
     const now = new Date();
@@ -792,7 +803,9 @@ export function GameTable() {
         candidates={
           pendingTargetCard?.code === 'A108'
             ? opponentCandidates.filter((c) => getPlayableActions(state, c.id).length > 0)
-            : opponentCandidates
+            : pendingActionRule?.includeSelfAsCandidate
+              ? tableCandidates
+              : opponentCandidates
         }
         selectedId={chosenTarget}
         multiSelect={pendingActionRule?.needsRosterSelection === true}

@@ -10,6 +10,22 @@ export interface ActionRuleDefinition {
   kind: ActionResolutionKind;
   needsTargetSelection?: boolean;
   targetPrompt?: string;
+  /**
+   * Put the actor in their own picker.
+   *
+   * The default candidate list is opponents only, which is right for "choose a
+   * victim" cards but wrong for two shapes: a mini-game the actor is COMPETING
+   * in ("who won the staring contest?" -- the actor can win), and a factual
+   * question about the whole table ("who is oldest?" -- the actor may be the
+   * answer). Excluding them there doesn't just hide an option, it decides the
+   * outcome: the actor could never win their own duel, and was permanently
+   * immune to every "the most X loses cards" card.
+   *
+   * Only set this where the actor is genuinely a valid answer. Cards that say
+   * "another player" (A166) or that move cards TO the actor (A158) must keep
+   * the default.
+   */
+  includeSelfAsCandidate?: boolean;
   needsRosterSelection?: boolean;
   rosterPrompt?: string;
   /** Roster picks must number exactly this many before confirm is allowed

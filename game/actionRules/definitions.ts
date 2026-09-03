@@ -1254,7 +1254,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A006: {
     code: 'A006', name_en: 'Showdown', name_th: 'ดวลสายตา',
     description_th: 'Mini-Game: แข่งจ้องตากับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะการดวลตา?',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะการดวลตา?', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => {
       const winnerId = frame.targetIds[0];
       return winnerId ? draw(state, winnerId, 3) : state;
@@ -1263,7 +1263,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A067: {
     code: 'A067', name_en: "Can't Breathe", name_th: 'หายใจไม่ออก',
     description_th: 'Mini-Game: แข่งกลั้นหายใจ ผู้เล่นที่กลั้นได้นานที่สุดจั่วไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครกลั้นหายใจได้นานที่สุด?',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครกลั้นหายใจได้นานที่สุด?', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => {
       const winnerId = frame.targetIds[0];
       return winnerId ? draw(state, winnerId, 3) : state;
@@ -1272,7 +1272,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A096: {
     code: 'A096', name_en: 'Joust Time', name_th: 'ถึงเวลาดวล!',
     description_th: 'Mini-Game: เป่ายิ้งฉุบกับผู้เล่นอีก 1 คน ผู้ชนะจั่วไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะเป่ายิ้งฉุบ?',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะเป่ายิ้งฉุบ?', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => {
       const winnerId = frame.targetIds[0];
       return winnerId ? draw(state, winnerId, 3) : state;
@@ -1281,7 +1281,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A114: {
     code: 'A114', name_en: 'Take It Outside', name_th: 'ไปเคลียร์กันข้างนอก!',
     description_th: 'Mini-Game: ท้าอีก 1 คนงัดข้อหรือเล่นสงครามนิ้วโป้ง ผู้ชนะจั่วไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะ?',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครชนะ?', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => {
       const winnerId = frame.targetIds[0];
       return winnerId ? draw(state, winnerId, 3) : state;
@@ -1458,7 +1458,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A104: {
     code: 'A104', name_en: 'Okay, Draw!', name_th: 'โอเค ชักปืน!',
     description_th: 'Mini-Game: ผู้เล่นทุกคนทำมือเป็นปืนแล้วเล็งใส่กัน ผู้เล่นที่ถูกเล็งมากที่สุดทิ้งไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง',
-    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ถูกเล็งมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ถูกเล็งมากที่สุด (เลือกได้หลายคนถ้าเสมอ)', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
   },
   A134: {
@@ -1493,7 +1493,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A173: {
     code: 'A173', name_en: 'Vote to Roast', name_th: 'โหวตไล่ล่า',
     description_th: 'ทุกคนโหวตว่าใครทำตัวน่าอายที่สุดในรอบนี้ คนนั้นทิ้งไพ่ 4 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าน่าอายที่สุด?',
+    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าน่าอายที่สุด?', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       return targetId ? forceDiscard(state, targetId, 4) : state;
@@ -1660,31 +1660,31 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A031: {
     code: 'A031', name_en: 'Big Baby', name_th: 'เด็กยักษ์',
     description_th: 'ผู้เล่นที่อายุมากที่สุดต้องทิ้งไพ่ 3 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อายุมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อายุมากที่สุด (เลือกได้หลายคนถ้าเสมอ)', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
   },
   A058: {
     code: 'A058', name_en: 'Little Baby', name_th: 'เด็กน้อย',
     description_th: 'ผู้เล่นที่อายุน้อยที่สุดต้องทิ้งไพ่ 3 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อายุน้อยที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อายุน้อยที่สุด (เลือกได้หลายคนถ้าเสมอ)', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
   },
   A054: {
     code: 'A054', name_en: 'Jewellery', name_th: 'เครื่องประดับ',
     description_th: 'ผู้เล่นที่สวมเครื่องประดับมากที่สุดทิ้งไพ่ 2 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดทิ้ง',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมเครื่องประดับมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมเครื่องประดับมากที่สุด (เลือกได้หลายคนถ้าเสมอ)', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
   },
   A095: {
     code: 'A095', name_en: 'Johnny Big Feet', name_th: 'จอห์นนี่เท้าใหญ่',
     description_th: 'ผู้เล่นที่มีเท้าใหญ่ที่สุดจั่วไพ่ 3 ใบ หากเสมอกันให้ผู้เล่นที่เสมอกันทั้งหมดจั่ว',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เท้าใหญ่ที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เท้าใหญ่ที่สุด (เลือกได้หลายคนถ้าเสมอ)', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
   },
   A070: {
     code: 'A070', name_en: 'Desmond The Moon Bear', name_th: 'เดสมอนด์ หมีแห่งดวงจันทร์',
     description_th: 'ผู้เล่นที่อยู่ไกลจากบ้านของตัวเองมากที่สุด จั่วไพ่ 3 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อยู่ไกลจากบ้านมากที่สุด (เลือกได้หลายคนถ้าเสมอ)',
+    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่อยู่ไกลจากบ้านมากที่สุด (เลือกได้หลายคนถ้าเสมอ)', includeSelfAsCandidate: true,
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
   },
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decideBotTurn } from './botTurn';
+import { decideBotTurn, fillBotActionInputs } from './botTurn';
 import type { RoomState } from '../game/types';
 
 function baseState(): RoomState {
@@ -37,11 +37,19 @@ describe('decideBotTurn', () => {
     expect(decision).toEqual({ action: 'play', code: 'A014', targetId: 'me' });
   });
 
-  it('plays a no-target action without picking a targetId', () => {
+  it('plays a roster card WITH a filled roster instead of an empty payload', () => {
+    // A001 is roster_select. A bot used to push a frame carrying no payload at
+    // all, so rosterIdsFromFrame came back empty and the card resolved into
+    // nothing -- the same silent no-op that hit every roster/outcome/number
+    // card a bot could draw (A063 among them).
     const state = baseState();
     state.players['bot-1'].hand = ['A001'];
     const decision = decideBotTurn(state, 'bot-1', () => 0);
-    expect(decision).toEqual({ action: 'play', code: 'A001' });
+    expect(decision.action).toBe('play');
+    expect(decision).toMatchObject({ code: 'A001' });
+    expect((decision as { targetId?: string }).targetId).toBeUndefined();
+    expect((decision as { customPayload?: { rosterIds?: string[] } }).customPayload?.rosterIds)
+      .toEqual(['me']);
   });
 
   it('falls back to draw when there is nobody eligible to target', () => {
@@ -86,7 +94,7 @@ describe('decideBotTurn', () => {
     // whichever candidate sorts first -- with only A001 left after
     // filtering, this must always resolve to A001.
     const decision = decideBotTurn(state, 'bot-1', () => 0);
-    expect(decision).toEqual({ action: 'play', code: 'A001' });
+    expect(decision).toMatchObject({ action: 'play', code: 'A001' });
   });
 
   it('handles bot vs bot targeting when no humans remain in candidates', () => {
@@ -103,5 +111,55 @@ describe('decideBotTurn', () => {
       expect(decision.code).toBe('A014');
       expect(['bot-2', 'bot-3']).toContain(decision.targetId);
     }
+  });
+});
+
+describe('fillBotActionInputs — bots must answer every question the UI would ask', () => {
+  function table(): RoomState {
+    const s = baseState();
+    s.turnOrder = ['me', 'bot-1', 'bot-2'];
+    s.players['bot-2'] = { name: 'Joe', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false };
+    return s;
+  }
+
+  it('A063 gets a non-empty roster — the reported "no card and no player to pick" case', () => {
+    const filled = fillBotActionInputs(table(), 'bot-1', 'A063', () => 0.5);
+    const roster = filled?.customPayload?.rosterIds as string[] | undefined;
+    expect(roster).toBeDefined();
+    expect(roster!.length).toBeGreaterThan(0);
+    expect(roster).not.toContain('bot-1'); // A063 steals TO the actor
+  });
+
+  it('fills an outcome for the cards that read one (A148/A150)', () => {
+    // Note A006 is kind: 'outcome_entry' but does NOT set needsOutcomeEntry --
+    // its winner pick IS the outcome, so it wants targetIds, not `outcome`.
+    for (const code of ['A148', 'A150']) {
+      const filled = fillBotActionInputs(table(), 'bot-1', code, () => 0.5);
+      expect(typeof filled?.customPayload?.outcome, code).toBe('boolean');
+    }
+  });
+
+  it('lets a bot pick itself for a card it could genuinely win', () => {
+    // A006 is includeSelfAsCandidate: a bot competing in its own staring
+    // contest must be allowed to be the winner.
+    const picks = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const r = fillBotActionInputs(table(), 'bot-1', 'A006', () => i / 40);
+      if (r?.targetId) picks.add(r.targetId);
+    }
+    expect(picks.has('bot-1')).toBe(true);
+  });
+
+  it('draws instead of playing when the table cannot satisfy the card', () => {
+    const solo = baseState();
+    solo.turnOrder = ['bot-1'];
+    solo.players = { 'bot-1': solo.players['bot-1'] };
+    expect(fillBotActionInputs(solo, 'bot-1', 'A063', () => 0.5)).toBeNull();
+  });
+
+  it('leaves payload undefined for a card that needs no input at all', () => {
+    const filled = fillBotActionInputs(table(), 'bot-1', 'A036', () => 0.5);
+    expect(filled).not.toBeNull();
+    expect(filled?.customPayload).toBeUndefined();
   });
 });

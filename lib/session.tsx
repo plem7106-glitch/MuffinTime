@@ -68,6 +68,7 @@ import {
   decideBotCounter,
   decideBotInteraction,
   decideBotManualTrapActivation,
+  fillBotActionInputs,
 } from './botTurn';
 
 export const BOT_NAME_POOL = [
@@ -1282,8 +1283,17 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         const forced = process.env.NODE_ENV !== 'production' && state.devScenario && state.devForcedBotAction && currentBotId === 'bot-1'
           ? state.devForcedBotAction
           : null;
+        // A forced dev-scenario action names only a code and a targetId, which
+        // is not enough for a roster/outcome/number card (c01-a063 forces
+        // A063, a roster_select). Run the normal chooser's payload logic for
+        // the forced code so the frame still carries what executeEffect needs.
         const decision = forced
-          ? { action: 'play' as const, code: forced.code, targetId: forced.targetId }
+          ? {
+              action: 'play' as const,
+              code: forced.code,
+              targetId: forced.targetId,
+              customPayload: fillBotActionInputs(state, currentBotId, forced.code)?.customPayload,
+            }
           : decideBotTurn(state, currentBotId);
         if (decision.action === 'draw') {
           let next = draw(state, currentBotId, 1);
@@ -1315,6 +1325,10 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           sourceCode: decision.code,
           actorId: currentBotId,
           targetIds: decision.targetId ? [decision.targetId] : [],
+          // Carries the bot's roster/outcome/number answers. Omitting this is
+          // what made every roster_select card a bot played resolve into
+          // nothing -- executeEffect read an empty payload and bailed.
+          customPayload: decision.customPayload,
         });
         if (forced) next.devForcedBotAction = undefined;
         return next;

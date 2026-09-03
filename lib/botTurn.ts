@@ -7,7 +7,7 @@ import { getCardsByType } from '../data/cards/index';
 
 export type BotDecision =
   | { action: 'draw' }
-  | { action: 'play'; code: CardCode; targetId?: PlayerId };
+  | { action: 'play'; code: CardCode; targetId?: PlayerId; customPayload?: Record<string, unknown> };
 
 export type BotTrapPlacementDecision =
   | { action: 'place'; code: CardCode }
@@ -71,19 +71,73 @@ export function decideBotTurn(
   }
 
   const code = playableActions[Math.floor(rng() * playableActions.length)];
-  const needsTarget = getActionRule(code)?.needsTargetSelection === true;
-  if (!needsTarget) {
-    return { action: 'play', code };
-  }
+  const filled = fillBotActionInputs(state, botId, code, rng);
+  if (!filled) return { action: 'draw' };
+  return { action: 'play', code, targetId: filled.targetId, customPayload: filled.customPayload };
+}
 
+/**
+ * Answers, on a bot's behalf, every question the UI would ask a human before
+ * this card can resolve -- the roster picker, the outcome toggle, the dual
+ * pick, the number input, the date stamp.
+ *
+ * Without this a bot pushed a frame carrying nothing but a code and a targetId,
+ * so `rosterIdsFromFrame` came back empty and the card resolved into a no-op.
+ * That silently applied to every roster/outcome/number card a bot could draw
+ * (A063 "steal from any number of players" among them): the card was discarded,
+ * the turn moved on, and nothing happened.
+ *
+ * Returns null when the table cannot satisfy the card (too few players for a
+ * fixed-size roster or a dual pick) -- the caller should draw instead.
+ */
+export function fillBotActionInputs(
+  state: RoomState,
+  botId: PlayerId,
+  code: CardCode,
+  rng: Rng = Math.random
+): { targetId?: PlayerId; customPayload?: Record<string, unknown> } | null {
+  const rule = getActionRule(code);
   const otherIds = Object.keys(state.players).filter((id) => id !== botId);
   const humanIds = otherIds.filter((id) => !id.startsWith('bot-'));
   const candidates = humanIds.length > 0 ? humanIds : otherIds;
-  if (candidates.length === 0) {
-    return { action: 'draw' };
+  // A bot can legitimately be the answer to its own mini-game or superlative.
+  const pickPool = rule?.includeSelfAsCandidate ? [botId, ...candidates] : candidates;
+
+  const payload: Record<string, unknown> = {};
+
+  if (rule?.needsRosterSelection) {
+    const pool = rule.includeSelfAsCandidate ? pickPool : candidates;
+    if (pool.length === 0) return null;
+    const want = rule.rosterSelectionCount ?? 1 + Math.floor(rng() * pool.length);
+    if (rule.rosterSelectionCount !== undefined && pool.length < rule.rosterSelectionCount) {
+      return null; // not enough players to satisfy a fixed-size roster
+    }
+    const shuffled = [...pool].sort(() => rng() - 0.5);
+    payload.rosterIds = shuffled.slice(0, Math.min(want, pool.length));
   }
-  const targetId = candidates[Math.floor(rng() * candidates.length)];
-  return { action: 'play', code, targetId };
+  if (rule?.needsOutcomeEntry || rule?.needsDrinkCheck || rule?.needsTargetThenOutcome) {
+    payload.outcome = rng() < 0.5;
+  }
+  if (rule?.needsDualTargetSelection) {
+    if (candidates.length < 2) return null;
+    const shuffled = [...candidates].sort(() => rng() - 0.5);
+    payload.firstId = shuffled[0];
+    payload.secondId = shuffled[1];
+  }
+  if (rule?.needsNumberInput) {
+    const min = rule.numberInputMin ?? 1;
+    const max = rule.numberInputMax ?? min + 9;
+    payload.numberInput = min + Math.floor(rng() * (max - min + 1));
+  }
+  if (rule?.needsTodayDate) {
+    const now = new Date();
+    payload.today = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  const customPayload = Object.keys(payload).length > 0 ? payload : undefined;
+  if (rule?.needsTargetSelection !== true) return { customPayload };
+  if (pickPool.length === 0) return null;
+  return { targetId: pickPool[Math.floor(rng() * pickPool.length)], customPayload };
 }
 
 /**

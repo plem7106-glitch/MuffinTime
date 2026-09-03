@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveActionEffect, executeActionFrameEffect, getActionRule, isActionImplemented } from './registry';
+import { resolveActionEffect, executeActionFrameEffect, getActionRule, isActionImplemented, getImplementedActions } from './registry';
 import { advanceTurn } from '../turn';
 import type { CardCode, PlayerId, RecentActionPlay, RoomState, StackFrame } from '../types';
 
@@ -1847,5 +1847,37 @@ describe('A091', () => {
     const next = resolveActionEffect(state, 'A091', 'me');
     expect(next.players.me.hand.length).toBe(1 + 2);
     expect(next.drawPile).toEqual([]);
+  });
+});
+
+describe('includeSelfAsCandidate — the actor must be a valid answer to their own card', () => {
+  /**
+   * Two shapes need the actor in their own picker: a mini-game the actor is
+   * competing in, and a factual superlative about the whole table. Leaving them
+   * out of the opponents-only default silently decided outcomes -- the actor
+   * could never win a staring contest they started (A006), and was permanently
+   * immune to every "the most X loses cards" card (A031/A054/A058/A104/A173).
+   */
+  const MUST_INCLUDE_SELF = [
+    'A006', 'A067', 'A096', 'A114', // mini-games the actor plays in
+    'A031', 'A054', 'A058', 'A070', 'A095', 'A104', 'A173', // table-wide superlatives
+  ];
+
+  it.each(MUST_INCLUDE_SELF)('%s lets the actor pick themselves', (code) => {
+    expect(getActionRule(code)?.includeSelfAsCandidate).toBe(true);
+  });
+
+  it('does NOT leak the flag onto cards that say "another player" or steal to the actor', () => {
+    // A166 is worded "เลือกผู้เล่นอีก 1 คน"; A158 moves the cards to the actor,
+    // so a self-pick would be a no-op steal from yourself.
+    expect(getActionRule('A166')?.includeSelfAsCandidate).toBeUndefined();
+    expect(getActionRule('A158')?.includeSelfAsCandidate).toBeUndefined();
+  });
+
+  it('is the complete set — a new self-inclusive card must be added here deliberately', () => {
+    const flagged = getImplementedActions()
+      .filter((code) => getActionRule(code)?.includeSelfAsCandidate)
+      .sort();
+    expect(flagged).toEqual([...MUST_INCLUDE_SELF].sort());
   });
 });
