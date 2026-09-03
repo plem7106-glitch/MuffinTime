@@ -79,6 +79,11 @@ export function canEndTurn(state: RoomState, playerId: PlayerId): boolean {
  * game/room.ts's startGame/resetForPlayAgain, and restartGame (A092) --
  * extracted so a future caller of "start this player's turn fresh" doesn't
  * need a fifth copy of this list.
+ *
+ * Deliberately NOT in this list: forcedLossSinceLastTurn. Every field above is
+ * start-of-turn state; that one is end-of-turn state (see clearForcedLoss
+ * below) -- resetting it here would wipe it moments before A091, played during
+ * the very turn it describes, can read it. Don't re-add it by habit.
  */
 export function resetPlayerPerTurnFlags(player: PlayerState): void {
   player.placedTrapThisTurn = false;
@@ -86,6 +91,19 @@ export function resetPlayerPerTurnFlags(player: PlayerState): void {
   player.hasPlayedActionThisTurn = false;
   player.bonusActionPlaysRemaining = 0;
   player.mustPlayActionThisTurn = false;
+}
+
+/**
+ * A091's forced-loss tally clears when a player's turn ENDS, not when it
+ * begins -- A091 ("draw 1 per card taken from you since your last turn") is
+ * played during that turn and must still see the losses it suffered while
+ * waiting for it. Mutates in place; callers already hold a cloned state.
+ * Also used by game/room.ts's game-start/restart paths, which reuse existing
+ * player objects and would otherwise carry a stale tally into the new game.
+ */
+export function clearForcedLoss(state: RoomState, playerId: PlayerId): void {
+  const player = state.players[playerId];
+  if (player) player.forcedLossSinceLastTurn = 0;
 }
 
 /**
@@ -123,6 +141,11 @@ export function advanceTurn(state: RoomState): RoomState {
   const order = next.turnOrder && next.turnOrder.length > 0 ? next.turnOrder : (next.seatOrder ?? []);
   const count = order.length;
   if (count <= 0) return next;
+
+  // Only the outgoing player's turn actually ends here; a player the skip loop
+  // below steps over never has a turn, so their tally survives the skip and is
+  // still owed to them at their next real turn ("since your last turn").
+  clearForcedLoss(next, order[next.currentTurnIndex]);
 
   let index = next.currentTurnIndex;
   let attempts = 0;
@@ -336,6 +359,9 @@ export function jumpToPlayerTurn(state: RoomState, targetId: PlayerId): RoomStat
   // active player is a no-op, not a mid-turn redo via beginTurn.
   if (order[next.currentTurnIndex] === targetId) return next;
 
+  // Past the no-op guards the actor's turn genuinely ends here, same as advanceTurn.
+  clearForcedLoss(next, order[next.currentTurnIndex]);
+
   const dir = next.direction ?? (next.playDirection === 'counterclockwise' ? -1 : 1);
   let index = next.currentTurnIndex;
   let wrapped = false;
@@ -409,6 +435,8 @@ export function emergencyForceSkipTurn(state: RoomState): RoomState {
   const order = next.turnOrder.length > 0 ? next.turnOrder : (next.seatOrder ?? []);
   if (order.length === 0) return next;
   const dir = next.direction ?? (next.playDirection === 'counterclockwise' ? -1 : 1);
+  // A force-skip still ends the stuck player's turn.
+  clearForcedLoss(next, order[next.currentTurnIndex]);
   next.currentTurnIndex = getNextPlayerIndex(order.length, next.currentTurnIndex, dir);
   const activePlayerId = order[next.currentTurnIndex];
   return beginTurn(next, activePlayerId);

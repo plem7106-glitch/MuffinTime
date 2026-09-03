@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { draw, drawFromBottom, discard, reshuffleDiscardIntoDraw } from './pile';
+import { draw, drawFromBottom, discard, reshuffleDiscardIntoDraw, forceDiscard } from './pile';
 import type { RoomState } from './types';
 
 function baseState(): RoomState {
@@ -158,5 +158,24 @@ describe('reshuffleDiscardIntoDraw', () => {
     const state = { drawPile: [], discardPile: ['A10'] } as unknown as RoomState;
     const next = reshuffleDiscardIntoDraw(state);
     expect(next).toEqual(state);
+  });
+});
+
+describe('forceDiscard', () => {
+  it('discards like discard() and tracks the actual count moved', () => {
+    let state = baseState();
+    state.players.p1.hand = ['A01', 'A02', 'A03'];
+    state = forceDiscard(state, 'p1', 2, ['A01', 'A02']);
+    expect(state.players.p1.hand).toEqual(['A03']);
+    expect(state.discardPile).toEqual(expect.arrayContaining(['A01', 'A02']));
+    expect(state.players.p1.forcedLossSinceLastTurn).toBe(2);
+  });
+
+  it('tracks only the actual (clamped) count when the hand is smaller than requested', () => {
+    let state = baseState();
+    state.players.p1.hand = ['A01'];
+    state = forceDiscard(state, 'p1', 3);
+    expect(state.players.p1.hand).toEqual([]);
+    expect(state.players.p1.forcedLossSinceLastTurn).toBe(1);
   });
 });

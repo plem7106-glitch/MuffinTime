@@ -129,6 +129,13 @@ describe('Insufficient-Card Policy & Effect Primitives', () => {
       expect(next.players.p3.hand).toEqual(['C1', 'A1', 'A2', 'A3']);
     });
 
+    it('tracks the victim\'s forced loss with their full hand count', () => {
+      const state = createMockRoom();
+      const handSizeBefore = state.players.p1.hand.length;
+      const next = executeFullHandTransfer(state, 'p1', 'p3');
+      expect(next.players.p1.forcedLossSinceLastTurn).toBe(handSizeBefore);
+    });
+
     it('swaps and deals hands evenly', () => {
       const state = createMockRoom();
       // p1 (3 cards) and p2 (2 cards) -> total 5 cards. Deal 3 to p1 and 2 to p2

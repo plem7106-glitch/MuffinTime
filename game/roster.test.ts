@@ -41,6 +41,13 @@ describe('rosterDiscards', () => {
     expect(next.players.p1.hand.length).toBe(1);
     expect(next.players.p3.hand.length).toBe(1);
   });
+
+  it('rosterDiscards tracks forced loss for every affected roster member', () => {
+    let state = baseState();
+    state = rosterDiscards(state, ['p2', 'p3'], 1, () => 0);
+    expect(state.players.p2.forcedLossSinceLastTurn).toBe(1);
+    expect(state.players.p3.forcedLossSinceLastTurn).toBe(1);
+  });
 });
 
 describe('rosterStolenBy', () => {
@@ -55,6 +62,14 @@ describe('rosterStolenBy', () => {
     const next = rosterStolenBy(baseState(), 'p1', ['p1', 'p2'], 1);
     expect(next.players.p1.hand.length).toBe(2);
     expect(next.players.p2.hand.length).toBe(1);
+  });
+
+  it('rosterStolenBy tracks forced loss for every victim, never the thief', () => {
+    let state = baseState();
+    state = rosterStolenBy(state, 'p1', ['p2', 'p3'], 1, () => 0);
+    expect(state.players.p2.forcedLossSinceLastTurn).toBe(1);
+    expect(state.players.p3.forcedLossSinceLastTurn).toBe(1);
+    expect(state.players.p1.forcedLossSinceLastTurn).toBeUndefined();
   });
 });
 

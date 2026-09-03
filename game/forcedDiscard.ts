@@ -1,4 +1,4 @@
-import { cloneState } from './util';
+import { cloneState, trackForcedLoss } from './util';
 import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 import type { CardCode, PlayerId, RoomState } from './types';
 import { pushStackFrame } from './reactionStack';
@@ -196,7 +196,11 @@ export function finalizeForcedDiscard(state: RoomState, operation: ForcedDiscard
     intercepted: completed.intercepted,
   }, [operation.targetPlayerId]);
   appendGameEvent(next, event);
-  return checkAndTriggerAutomaticTraps(next, event);
+  // A discard whose declared source IS the person losing the cards is the
+  // self-inflicted cost of their own card (A099), never a forced loss for A091.
+  const selfInflicted = operation.sourcePlayerId === operation.targetPlayerId;
+  const tracked = selfInflicted ? next : trackForcedLoss(next, operation.targetPlayerId, moved.length);
+  return checkAndTriggerAutomaticTraps(tracked, event);
 }
 
 export function completeForcedDiscard(operation: ForcedDiscardOperation, destination: ForcedDiscardDestination = operation.originalDestination) {

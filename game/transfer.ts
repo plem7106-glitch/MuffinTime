@@ -1,4 +1,4 @@
-import { cloneState, pickRandomIndices } from './util';
+import { cloneState, pickRandomIndices, trackForcedLoss } from './util';
 import type { RoomState, PlayerId, CardCode, Rng } from './types';
 
 export function stealRandom(
@@ -19,6 +19,19 @@ export function stealRandom(
   }
   next.players[toId].hand.push(...stolenCards);
   return next;
+}
+
+export function forceSteal(
+  state: RoomState,
+  victimId: PlayerId,
+  thiefId: PlayerId,
+  n: number,
+  rng: Rng = Math.random
+): RoomState {
+  const before = state.players[victimId]?.hand.length ?? 0;
+  const stolen = stealRandom(state, victimId, thiefId, n, rng);
+  const after = stolen.players[victimId]?.hand.length ?? 0;
+  return trackForcedLoss(stolen, victimId, before - after);
 }
 
 export function stealChosen(state: RoomState, fromId: PlayerId, toId: PlayerId, cardCode: CardCode): RoomState {
