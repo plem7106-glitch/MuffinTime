@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { resolveActionEffect, executeActionFrameEffect } from './registry';
-import type { PlayerId, RoomState, StackFrame } from '../types';
+import { resolveActionEffect, executeActionFrameEffect, getActionRule } from './registry';
+import type { CardCode, PlayerId, RoomState, StackFrame } from '../types';
 
 /** Builds a minimal StackFrame carrying customPayload, for roster_select/
  * outcome_entry rules that resolveActionEffect's legacy (code, actorId,
@@ -1399,5 +1399,83 @@ describe('A064 (plant Banana Peel face-up in the draw pile)', () => {
     state.discardPile = ['A064'];
     const next = resolveActionEffect(state, 'A064', 'me');
     expect(next.bananaPeelArmed).toBe(true);
+  });
+});
+
+describe('A017', () => {
+  function stateWithDeck(drawPile: CardCode[], discardPile: CardCode[] = []): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile,
+      discardPile,
+      players: {
+        me: { name: 'Me', hand: ['A017'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+  }
+
+  function testFrame(overrides: Partial<StackFrame> = {}): StackFrame {
+    return {
+      frameId: 'frame-1',
+      parentFrameId: null,
+      sourceType: 'action',
+      sourceCode: 'A017',
+      actorId: 'me',
+      targetIds: ['p2'],
+      targetScope: 'single',
+      eligibleResponderIds: [],
+      responses: {},
+      modifiers: [],
+      status: 'resolving',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      ...overrides,
+    };
+  }
+
+  it('finds the top Action card, discarding Trap/Counter cards drawn along the way', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006', 'T01', 'C01']); // top of pile is last element (array.pop())
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.discardPile).toContain('T01');
+    expect(next.discardPile).toContain('C01');
+  });
+
+  it('makes the CHOSEN player (not the actor) the actor of the found card', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006']);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+    expect(pushed?.actorId).toBe('p2');
+  });
+
+  it('no-ops (no nested frame pushed) when no Action card can be found', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['T01', 'C01']); // only Trap/Counter available anywhere
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('respects an active A040 redirect for the found card\'s own post-play destination', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006']);
+    state.actionRedirect = { toPlayerId: 'p3', remaining: 2 };
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.players.p3.hand).toContain('A006');
+    expect(next.discardPile).not.toContain('A006');
+  });
+
+  it('does not push a further nested frame once chainDepth reaches the cap', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006']);
+    const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
+    expect(next.reactionStack ?? []).toEqual([]);
   });
 });

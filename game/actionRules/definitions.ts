@@ -18,6 +18,10 @@ import { resolveForcedDraw } from '../forcedDraw';
 import type { ActionRuleDefinition } from './types';
 import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame, todayFromFrame, numberInputFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+import { pushStackFrame } from '../reactionStack';
+import { resolvePostPlayDestination } from '../turnFlow';
+import { autoResolveInputFrame } from './autoResolve';
+import { reshuffleDiscardIntoDraw } from '../pile';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
 function stealAllActionCards(state: RoomState, fromId: PlayerId, toId: PlayerId): RoomState {
@@ -1859,6 +1863,55 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       const pos = Math.floor(Math.random() * (next.drawPile.length + 1));
       next.drawPile.splice(pos, 0, 'A064');
       next.bananaPeelArmed = true;
+      return next;
+    },
+  },
+
+  A017: {
+    code: 'A017',
+    name_en: "You're Blind",
+    name_th: 'นายตาบอด',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้จั่วไพ่ใบบนสุดของกองและเล่นใบนั้น หากเป็น Trap หรือ Counter ให้ทิ้งไปจนกว่าจะได้ Action',
+    kind: 'auto',
+    needsTargetSelection: true,
+    needsTodayDate: true,
+    targetPrompt: 'เลือกผู้เล่นให้จั่วไพ่ใบบนสุดของกองและเล่นทันที',
+    executeEffect: (state, frame) => {
+      const chosenPlayerId = frame.targetIds[0];
+      if (!chosenPlayerId || !state.players[chosenPlayerId]) return state;
+      const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
+      if (chainDepth >= 20) return state;
+
+      let next = cloneState(state);
+      let foundCode: CardCode | undefined;
+      const totalCards = next.drawPile.length + next.discardPile.length;
+      let safety = 0;
+      while (safety < totalCards + 1) {
+        safety += 1;
+        if (next.drawPile.length === 0) {
+          next = reshuffleDiscardIntoDraw(next);
+          if (next.drawPile.length === 0) break;
+        }
+        const card = next.drawPile.pop()!;
+        const cardInfo = getCardById(card);
+        if (cardInfo?.type === 'action') {
+          foundCode = card;
+          break;
+        }
+        next.discardPile.push(card);
+      }
+      if (!foundCode) return next;
+
+      next = resolvePostPlayDestination(next, foundCode);
+      const auto = autoResolveInputFrame(next, foundCode, chosenPlayerId, todayFromFrame(frame));
+      if (!auto) return next;
+      next = pushStackFrame(next, {
+        sourceType: 'action',
+        sourceCode: foundCode,
+        actorId: chosenPlayerId,
+        targetIds: auto.targetIds,
+        customPayload: { ...auto.customPayload, chainDepth: chainDepth + 1 },
+      });
       return next;
     },
   },
