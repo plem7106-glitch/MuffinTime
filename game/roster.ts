@@ -1,6 +1,6 @@
 import { cloneState } from './util';
-import { draw, discard } from './pile';
-import { stealRandom } from './transfer';
+import { draw, forceDiscard } from './pile';
+import { forceSteal } from './transfer';
 import { skipTurn } from './turnFlow';
 import type { PlayerId, Rng, RoomState } from './types';
 
@@ -22,7 +22,7 @@ export function rosterDraws(state: RoomState, playerIds: PlayerId[], n: number, 
 export function rosterDiscards(state: RoomState, playerIds: PlayerId[], n: number, rng: Rng = Math.random): RoomState {
   let next = cloneState(state);
   for (const playerId of playerIds) {
-    next = discard(next, playerId, n, null, rng);
+    next = forceDiscard(next, playerId, n, null, rng);
   }
   return next;
 }
@@ -37,7 +37,7 @@ export function rosterStolenBy(
   let next = cloneState(state);
   for (const victimId of victimIds) {
     if (victimId === thiefId) continue;
-    next = stealRandom(next, victimId, thiefId, n, rng);
+    next = forceSteal(next, victimId, thiefId, n, rng);
   }
   return next;
 }
