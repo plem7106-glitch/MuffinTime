@@ -36,8 +36,8 @@ independently).
   not unrelated drift; no code changed). `main` has not moved since the fork —
   `git log --oneline main..origin/main` was empty right before push — so the branch is a
   strict descendant of `main`'s tip and merges as a fast-forward. Final verification on that
-  branch, run directly before wrapping up: `npx vitest run --reporter=dot` → **815 passed
-  (60 files)**, `npx tsc --noEmit` → clean.
+  branch, after the final-review fix wave (commits `8d7d34a`, `e7f54b3` — see below):
+  `npx vitest run --reporter=dot` → **818 passed (60 files)**, `npx tsc --noEmit` → clean.
 - **History, briefly** (full blow-by-blow no longer actionable, kept only for context): this
   branch's life involved reconciling with `main` twice while Cluster C was in flight — once
   before Cluster C started (a large trap/presentation subsystem landed on `main` directly,
@@ -305,38 +305,88 @@ are `docs/superpowers/specs/2026-09-03-group1-cluster-e-design.md` and
 `docs/superpowers/plans/2026-09-03-group1-cluster-e.md`.
 
 - **A064** "เปลือกกล้วย" (Banana Peel) — planted face-up back into the draw pile; whoever
-  draws it keeps it and discards 3 other cards, chosen at random. `game/pile.ts`'s `draw()`
-  gained a one-line hook (`if (card === 'A064') next =
-  discardOthersAfterBananaPeel(next, playerId)`) that fires after every card lands in a
-  hand, regardless of what triggered the draw — a player's own manual draw, another card's
-  forced multi-draw, a bot's draw, all funnel through this one function, so no separate hook
-  was needed anywhere else. A064's `executeEffect` (`game/actionRules/definitions.ts`) is a
-  thin pop-from-discard-pile/splice-into-draw-pile-at-a-random-position delegate, matching
-  A043's existing inline random-splice pattern (`Math.random()` called directly, same
-  established precedent as A007's coin flip — genuine-randomness cards in this codebase
-  aren't required to thread an injectable `rng`). `kind: 'auto'`, no target, no new UI.
-  **Zero new `RoomState`/`PlayerState` fields.**
-- **Turned out simpler than the classification doc originally feared.** That doc flagged
-  this as needing a hook inside `draw()`, "the most-called primitive in the game," and
-  grouped it with the riskiest Phase 2 batch on that basis. The hook is real, but
-  `data/cards.json`'s `action` array lists each code exactly once and `buildCanonicalDeck()`
-  builds the real 231-card deck 1:1 from it — **only one physical copy of A064 exists in the
-  whole deck** — so there was never a "which card is the planted one" position to track,
-  update, or forget to reset anywhere; excluding it by literal card code inside
-  `discardOthersAfterBananaPeel`'s `hand.filter()` is exact, no index-tracking required.
-- Two rulings confirmed with the user (neither resolved by card text alone): **insertion
-  position** is random (matching A043's existing precedent — not fixed top or bottom).
-  **"หงายหน้า" (face-up)** is flavor text only, no new UI — this codebase has no existing
-  mechanism anywhere that announces which card a player just drew (checked: no such
-  event/toast in `game/events.ts` or `lib/presentation/`), so building one here would be new
-  UI work disproportionate to what the card needs — the same scope call already made for
-  A056's card-picker deferral.
+  draws the *planted* copy keeps it and discards 3 other cards, chosen at random.
+  `game/pile.ts`'s `draw()` gained a hook that fires after every card lands in a hand,
+  regardless of what triggered the draw — a player's own manual draw, another card's forced
+  multi-draw, a bot's draw, all funnel through this one function, so no separate hook was
+  needed anywhere else. A064's `executeEffect` (`game/actionRules/definitions.ts`) finds and
+  removes the card from `discardPile` (wherever it sits — see the `lastIndexOf` fix below,
+  not just the top) and splices it into `drawPile` at a random position, matching A043's
+  existing inline random-splice pattern (`Math.random()` called directly, same established
+  precedent as A007's coin flip). `kind: 'auto'`, no target, no new UI.
+- **Turned out simpler than the classification doc originally feared, but not quite as
+  simple as the first implementation pass believed.** That doc flagged this as needing a
+  hook inside `draw()`, "the most-called primitive in the game," and grouped it with the
+  riskiest Phase 2 batch on that basis. The hook is real, and `data/cards.json`'s single
+  listing per code + `buildCanonicalDeck()`'s 1:1 build confirms **only one physical copy of
+  A064 exists in the whole deck** — but the first pass concluded from that alone that "zero
+  new fields" were needed at all, which the final whole-branch review found to be wrong:
+  "only one copy exists" answers card *identity* (which code to match on), not whether that
+  copy is currently *armed* (planted). **One new field was added as a result:
+  `RoomState.bananaPeelArmed?: boolean`** — set `true` by `executeEffect` when it plants the
+  card, cleared to `false` the moment `draw()`'s hook consumes the planted copy, and reset to
+  `false` in `startGame`/`resetForPlayAgain`/`restartGame` (next to each function's
+  `actionRedirect = null` reset line). Without this gate, drawing A064 straight out of the
+  original, never-played shuffled deck would incorrectly trigger the discard-3 penalty —
+  caught only by the final review, not by any of the four per-task reviews, since each task
+  reviewed its own slice correctly in isolation and the bug lived in the *premise* connecting
+  them. **Lesson for a future card with a deferred/delayed trigger**: ask explicitly what
+  arms it, what disarms it, and what else can mutate the state it reads between a card being
+  played and its effect actually resolving — not just "where does this card live."
+- **A second final-review Critical fix**: `executeEffect`'s original guard assumed A064 sat
+  exactly on top of `discardPile` and silently no-oped otherwise. That's unsafe — an
+  `automatic_state` trap (e.g. T45/T46/T09) can push its own card onto `discardPile` between
+  A064 being discarded and its `executeEffect` resolving (via
+  `checkAndTriggerAutomaticTraps`), burying A064 and silently failing the plant with the turn
+  and card both consumed for nothing. Fixed with `discardPile.lastIndexOf('A064')` — finds
+  the single physical copy anywhere in the pile rather than assuming position; only
+  genuinely no-ops when A064 isn't in `discardPile` at all (the real A040-redirect case,
+  where the card went into a hand instead).
+- **A known, documented, non-blocking gap left by the `bananaPeelArmed` fix**: the flag is
+  only kept in sync by `game/pile.ts`'s `draw()`. Two other code paths pull cards directly
+  out of `drawPile` without going through `draw()`: `executeDraw` (`game/primitives.ts`,
+  used by traps **T45**/**T53**) and `takeChosenFromPeek` (`game/deckOps.ts`, used by
+  **A046**/**A026**'s "peek N, take one at random"). If the armed A064 is swept up by either
+  path, the discard-3 penalty simply doesn't fire for that draw (no worse than before this
+  cluster existed) — but `bananaPeelArmed` is left stuck `true` even though the card left
+  `drawPile`. If that same A064 later gets discarded normally and cycles back into `drawPile`
+  via `reshuffleDiscardIntoDraw`, a subsequent *ordinary, unplanted* draw through the real
+  `draw()` path would incorrectly retrigger the penalty — reopening the first Critical bug
+  above through a narrower side door. Reachable but requires a specific sequence (armed A064
+  lands in a T45/T53/A046/A026 draw window, then cycles back through discard → reshuffle →
+  a normal draw) — found during the final review's scoped re-review of the fix, and
+  deliberately parked rather than triggering a second fix wave (this project's process caps
+  a final review's fix-and-re-review at one round; a load-bearing residual would stop the
+  branch, but nothing else in this plan depends on this, so it's parked and documented
+  instead). **Whoever picks this up**: route `executeDraw`/`takeChosenFromPeek` through
+  `draw()`'s `bananaPeelArmed` handling, or more generally clear the flag wherever a card can
+  leave `drawPile` by any path, not just `draw()` itself.
+- **`draw()`'s `rng` parameter is now real, not decorative.** It used to be `_rng?: Rng`
+  (accepted, ignored). The final review caught that `discardOthersAfterBananaPeel` hardcoding
+  `Math.random()` would make any seeded test whose draw happens to hit A064 nondeterministic,
+  silently breaking the contract every existing seeded caller (`rosterDraws`, `everyoneDraws`,
+  `drawUntilCount`) already assumed. Now `rng: Rng = Math.random`, threaded through to
+  `discard()`'s own `rng` parameter — fully backward compatible for every caller that never
+  passed one.
+- Three rulings confirmed with the user (neither the first two nor the third resolved by card
+  text alone): **insertion position** is random (matching A043's existing precedent — not
+  fixed top or bottom). **"หงายหน้า" (face-up)** is flavor text only, no new UI — this
+  codebase has no existing mechanism anywhere that announces which card a player just drew
+  (checked: no such event/toast in `game/events.ts` or `lib/presentation/`), so building one
+  here would be new UI work disproportionate to what the card needs — the same scope call
+  already made for A056's card-picker deferral. **"discards 3 other cards" is random, not
+  player-chosen** — matches the broad existing convention across most "discard N cards"
+  Action cards in this codebase that don't have a dedicated card-picker UI (flagged as an
+  undocumented gap by the final review, since this specific card's discard-3 wasn't
+  explicitly surfaced as a ruling in the original design pass the way the other two were).
 - Checked, not a gap: interaction with A040 "ฉันชอบมัน!"'s `actionRedirect` (Cluster A) — if
   A040 is active when A064 is played, the played card is redirected into A040's target's
-  hand instead of `discardPile`, and A064's own plant-into-deck effect correctly no-ops (its
-  top-of-discard-pile guard catches this) instead of planting the wrong card. Interaction
-  with `restartGame` (Cluster G) — a planted-but-undrawn A064 just gets swept into
-  `restartGame`'s pool-and-reshuffle like every other card, no special-casing needed.
+  hand instead of `discardPile`, and A064's own plant-into-deck effect correctly no-ops
+  (the `lastIndexOf` guard above catches this — the card genuinely isn't in `discardPile`)
+  instead of planting the wrong card. Interaction with `restartGame` (Cluster G) — a
+  planted-but-undrawn A064 just gets swept into `restartGame`'s pool-and-reshuffle like
+  every other card, and `bananaPeelArmed` is reset to `false` there too, so no stale-flag
+  risk survives a restart specifically.
 - Task 2 also fixed a small, unrelated stale gap noticed in passing: updating
   `game/actionRules/registry.test.ts` for A064 left its one test with no remaining
   negative-path (`not_implemented`) assertion — fixed by asserting that against A091 (still
@@ -346,6 +396,10 @@ are `docs/superpowers/specs/2026-09-03-group1-cluster-e-design.md` and
 - Card-conservation tests added in `game/cardInvariant.test.ts` cover A064's full lifecycle
   (played → planted → drawn by someone else → its own discard-3 trigger) and its interaction
   with `restartGame` while sitting mid-`drawPile` at reset time.
+- Final state on `feature/group1-cluster-e`: `npx vitest run` → 818 passed (60 files), `npx
+  tsc --noEmit` → clean. Design spec updated in place (`docs/superpowers/specs/2026-09-03-
+  group1-cluster-e-design.md`, commit `e7f54b3`) to reflect all of the above — read it fresh
+  rather than trusting only this summary.
 
 **Cluster C (A126, A130 — 2-hop delegated targeting) is done.** Its own plan/spec docs are
 `docs/superpowers/specs/2026-09-02-group1-cluster-c-design.md` and
