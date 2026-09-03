@@ -26,7 +26,8 @@ import { NumberInputModal } from '../modals/NumberInputModal';
 import { DateInviteModal } from '../modals/DateInviteModal';
 import { canActivateManualTrap } from '../../game/trapRules/engine';
 import { getTrapRule } from '../../game/trapRules/registry';
-import { getActionRule, getPlayableActions } from '../../game/actionRules/registry';
+import { getActionRule, getPlayableActions, isActionImplemented } from '../../game/actionRules/registry';
+import { isQuantityEffectCard } from '../../game/actionRules/quantityCards';
 import { getSocialCounterConfig, isSocialCounter } from '../../game/socialCounter';
 
 import { TrapModal } from '../modals/TrapModal';
@@ -45,7 +46,7 @@ import { ManualDiscardModal } from './ManualDiscardModal';
 import { ManualGiveModal } from './ManualGiveModal';
 
 
-import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon } from '../ui/Icons';
+import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon, CloseIcon } from '../ui/Icons';
 import type { CardCode, PlayerId } from '../../game/types';
 
 
@@ -59,6 +60,7 @@ export function GameTable() {
     hostSkipTurn,
     declareMuffinTime,
     playAction,
+    playDoubledAction,
     placeTrapCard,
     skipTrapPlacement,
     openTrapCard,
@@ -104,6 +106,15 @@ export function GameTable() {
   // safely disambiguate two distinct roles).
   const [dualPickPhase, setDualPickPhase] = useState<'first' | 'second' | null>(null);
   const [dualPickFirstId, setDualPickFirstId] = useState<PlayerId | null>(null);
+
+  // A028 "Bad Spread" co-play flow: A028 is never played directly (its
+  // executeEffect is an unreachable stub -- see game/actionRules/definitions.ts).
+  // Tapping it opens a picker for a "quantity effect" partner card already in
+  // hand, which then goes through ITS OWN normal input flow (reusing the
+  // existing TargetSelector/OutcomeToggle/etc. below), and on confirm pushes
+  // one doubled frame via playDoubledAction instead of the normal playAction.
+  const [pendingDoublePartner, setPendingDoublePartner] = useState<CardDisplay | null>(null);
+  const [awaitingDoublePartnerPick, setAwaitingDoublePartnerPick] = useState(false);
 
   // Honor-system drink-check flow (A158: outcome toggle, then -- only if
   // "haven't drunk yet" -- a single target pick. No persistent drink
@@ -220,8 +231,22 @@ export function GameTable() {
     return `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   };
 
+  // A028 co-play: which cards currently in hand are eligible partners
+  // (excludes A028 itself, must be a "quantity effect" card per the Task 7
+  // allow-list, and must actually be implemented in the registry).
+  const qualifyingPartnerCandidates = me.hand.filter(
+    (code) => code !== 'A028' && isQuantityEffectCard(code) && isActionImplemented(code)
+  );
+
   const handlePlayActionDirect = (cardCode: CardCode) => {
     if (!canAct) return;
+    // A028 "Bad Spread" must NEVER resolve through the plain single-card
+    // play path -- its executeEffect is an unreachable no-op stub. Route it
+    // to the co-play partner picker instead, and stop here.
+    if (cardCode === 'A028') {
+      setAwaitingDoublePartnerPick(true);
+      return;
+    }
     // A037/A066/A137 need "today" to resolve their birthday comparison.
     // Stamped here (the actor's own device clock) rather than read inside
     // executeEffect, which must stay a pure function of (state, frame).
@@ -230,6 +255,54 @@ export function GameTable() {
       return;
     }
     playAction(cardCode);
+  };
+
+  const handlePickDoublePartner = (partnerCode: CardCode) => {
+    const card = getCardDisplay(partnerCode);
+    setAwaitingDoublePartnerPick(false);
+    setPendingDoublePartner(card);
+    setPendingTargetCard(card); // reuses the existing target-selection UI for the partner card
+    setChosenTarget(null);
+    setChosenTargets([]);
+    // Mirror handleRequestTarget's phase-initialization exactly -- the
+    // partner card may need the dual-pick (A115), drink-check (A158), or
+    // target-then-outcome (A166) flows below, not just the plain single/
+    // roster TargetSelector, and those flows are gated on this phase state.
+    const rule = getActionRule(card.code);
+    setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
+    setDualPickFirstId(null);
+    setDrinkCheckPhase(rule?.needsDrinkCheck ? 'outcome' : null);
+    setTargetThenOutcomePhase(rule?.needsTargetThenOutcome ? 'target' : null);
+  };
+
+  const handleConfirmDoubledTargetAction = () => {
+    if (!pendingDoublePartner) return;
+    const rule = getActionRule(pendingDoublePartner.code);
+    const todayPayload = rule?.needsTodayDate ? { today: todayMMDD() } : undefined;
+    if (rule?.needsRosterSelection) {
+      if (chosenTargets.length === 0) return;
+      if (rule.rosterSelectionCount !== undefined && chosenTargets.length !== rule.rosterSelectionCount) return;
+      playDoubledAction(pendingDoublePartner.code, undefined, { rosterIds: chosenTargets, ...todayPayload });
+    } else if (chosenTarget) {
+      playDoubledAction(pendingDoublePartner.code, chosenTarget, todayPayload);
+    } else {
+      playDoubledAction(pendingDoublePartner.code, undefined, todayPayload);
+    }
+    setPendingDoublePartner(null);
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setChosenTargets([]);
+  };
+
+  const handleCancelDoublePartner = () => {
+    setPendingDoublePartner(null);
+    setPendingTargetCard(null);
+    setChosenTarget(null);
+    setChosenTargets([]);
+    setDualPickPhase(null);
+    setDualPickFirstId(null);
+    setDrinkCheckPhase(null);
+    setTargetThenOutcomePhase(null);
   };
 
   const handlePlaceTrap = (cardCode: CardCode) => {
@@ -275,7 +348,12 @@ export function GameTable() {
       setDualPickPhase('second');
       return;
     }
-    playAction(pendingTargetCard.code, undefined, { firstId: dualPickFirstId, secondId: chosenTarget });
+    if (pendingDoublePartner) {
+      playDoubledAction(pendingTargetCard.code, undefined, { firstId: dualPickFirstId, secondId: chosenTarget });
+    } else {
+      playAction(pendingTargetCard.code, undefined, { firstId: dualPickFirstId, secondId: chosenTarget });
+    }
+    setPendingDoublePartner(null);
     setPendingTargetCard(null);
     setChosenTarget(null);
     setDualPickPhase(null);
@@ -283,6 +361,7 @@ export function GameTable() {
   };
 
   const handleDualPickCancel = () => {
+    setPendingDoublePartner(null);
     setPendingTargetCard(null);
     setChosenTarget(null);
     setDualPickPhase(null);
@@ -291,7 +370,12 @@ export function GameTable() {
 
   const handleOutcomeSelect = (outcome: boolean) => {
     if (!pendingTargetCard) return;
-    playAction(pendingTargetCard.code, undefined, { outcome });
+    if (pendingDoublePartner) {
+      playDoubledAction(pendingTargetCard.code, undefined, { outcome });
+    } else {
+      playAction(pendingTargetCard.code, undefined, { outcome });
+    }
+    setPendingDoublePartner(null);
     setPendingTargetCard(null);
   };
 
@@ -302,6 +386,7 @@ export function GameTable() {
   };
 
   const handleDrinkCheckCancel = () => {
+    setPendingDoublePartner(null);
     setPendingTargetCard(null);
     setChosenTarget(null);
     setDrinkCheckPhase(null);
@@ -310,7 +395,11 @@ export function GameTable() {
   const handleDrinkOutcomeSelect = (alreadyDrunk: boolean) => {
     if (!pendingTargetCard) return;
     if (alreadyDrunk) {
-      playAction(pendingTargetCard.code);
+      if (pendingDoublePartner) {
+        playDoubledAction(pendingTargetCard.code);
+      } else {
+        playAction(pendingTargetCard.code);
+      }
       handleDrinkCheckCancel();
       return;
     }
@@ -319,11 +408,16 @@ export function GameTable() {
 
   const handleDrinkTargetConfirm = () => {
     if (!pendingTargetCard || !chosenTarget) return;
-    playAction(pendingTargetCard.code, chosenTarget);
+    if (pendingDoublePartner) {
+      playDoubledAction(pendingTargetCard.code, chosenTarget);
+    } else {
+      playAction(pendingTargetCard.code, chosenTarget);
+    }
     handleDrinkCheckCancel();
   };
 
   const handleTargetThenOutcomeCancel = () => {
+    setPendingDoublePartner(null);
     setPendingTargetCard(null);
     setChosenTarget(null);
     setTargetThenOutcomePhase(null);
@@ -336,7 +430,11 @@ export function GameTable() {
 
   const handleTargetThenOutcomeSelect = (outcome: boolean) => {
     if (!pendingTargetCard || !chosenTarget) return;
-    playAction(pendingTargetCard.code, chosenTarget, { outcome });
+    if (pendingDoublePartner) {
+      playDoubledAction(pendingTargetCard.code, chosenTarget, { outcome });
+    } else {
+      playAction(pendingTargetCard.code, chosenTarget, { outcome });
+    }
     handleTargetThenOutcomeCancel();
   };
 
@@ -557,6 +655,66 @@ export function GameTable() {
         }}
       />
 
+      {/* 9.5 A028 "Bad Spread" Co-Play Partner Picker (pick a quantity-effect
+          Action card from hand to double -- its own input flow then reuses
+          the TargetSelector/OutcomeToggle/etc. below via pendingDoublePartner) */}
+      {awaitingDoublePartnerPick && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="flex-1" onClick={() => setAwaitingDoublePartnerPick(false)} />
+          <div className="flex max-h-[85vh] w-full max-w-md mx-auto flex-col rounded-t-3xl border-t border-gray-100 bg-white p-4 shadow-2xl animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 shrink-0">
+              <h2 className="text-sm sm:text-base font-black text-ink">
+                เลือก Action การ์ดที่จะเพิ่ม Effect เป็น 2 เท่า
+              </h2>
+              <button
+                type="button"
+                onClick={() => setAwaitingDoublePartnerPick(false)}
+                aria-label="ปิด"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-ink-secondary hover:bg-gray-100 active:scale-95 transition-colors"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-3 min-h-[80px]">
+              {qualifyingPartnerCandidates.length === 0 ? (
+                <p className="text-center text-xs font-bold text-ink-secondary py-4">
+                  ไม่มีการ์ดที่ใช้ร่วมกับ A028 ได้ในมือของคุณ
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {qualifyingPartnerCandidates.map((cardCode) => {
+                    const partnerDisplay = getCardDisplay(cardCode);
+                    return (
+                      <button
+                        key={cardCode}
+                        type="button"
+                        onClick={() => handlePickDoublePartner(cardCode)}
+                        className="w-full rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-left transition-colors hover:bg-gray-100 active:scale-[0.98]"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-ink-secondary">{cardCode}</span>
+                          <span className="text-sm font-black text-ink">{partnerDisplay.th}</span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-ink-secondary leading-relaxed">{partnerDisplay.effect}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAwaitingDoublePartnerPick(false)}
+              className="mt-1 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-gray-200 bg-white text-xs font-bold text-ink-secondary hover:bg-gray-100 transition-colors active:scale-95"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 10. Action Card Target Selector (single target, or multi-select roster
           when the card's rule needs a roster_select -- e.g. "who matches this
           condition" cards like the Family A / classification-doc examples) */}
@@ -582,12 +740,16 @@ export function GameTable() {
             return [...current, id];
           });
         }}
-        onConfirm={handleConfirmTargetAction}
-        onCancel={() => {
-          setPendingTargetCard(null);
-          setChosenTarget(null);
-          setChosenTargets([]);
-        }}
+        onConfirm={pendingDoublePartner ? handleConfirmDoubledTargetAction : handleConfirmTargetAction}
+        onCancel={
+          pendingDoublePartner
+            ? handleCancelDoublePartner
+            : () => {
+                setPendingTargetCard(null);
+                setChosenTarget(null);
+                setChosenTargets([]);
+              }
+        }
         prompt={
           (pendingActionRule?.needsRosterSelection ? pendingActionRule.rosterPrompt : pendingActionRule?.targetPrompt) ??
           pendingTargetCard?.effect ??
@@ -621,7 +783,10 @@ export function GameTable() {
         yesLabel={pendingActionRule?.outcomeYesLabel}
         noLabel={pendingActionRule?.outcomeNoLabel}
         onSelect={handleOutcomeSelect}
-        onCancel={() => setPendingTargetCard(null)}
+        onCancel={() => {
+          setPendingDoublePartner(null);
+          setPendingTargetCard(null);
+        }}
       />
 
       {/* 10.6 Action Card Number Input (free-form number, e.g. A135's new
