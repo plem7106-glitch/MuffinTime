@@ -1,13 +1,13 @@
 import { everyoneDraws, everyoneDiscards, passHands } from '../group';
 import { draw, discard, forceDiscard } from '../pile';
-import { stealRandom, swapHands } from '../transfer';
+import { stealRandom, swapHands, forceSteal } from '../transfer';
 import { executeRandomSteal, executeAllRandomSteal, executeFullHandTransfer, executeHandSwapAndDeal } from '../primitives';
 import { skipTurn, reverseDirection, changeMuffinTarget } from '../turnFlow';
 import { getNextPlayerId, jumpToPlayerTurn, resolveTurnArrival } from '../turn';
 import { restartGame } from '../room';
 import { initiateDelegatedTargetPick } from './delegatedTargetPick';
 import { drawUntilCount } from '../misc';
-import { cloneState, shuffle } from '../util';
+import { cloneState, shuffle, trackForcedLoss } from '../util';
 import { getCardById } from '../../data/cards/index';
 import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrapToHand, forceDiscardTraps, forceDiscardAllTraps } from '../trapPile';
 import { drawFromBottom } from '../pile';
@@ -31,7 +31,7 @@ function stealAllActionCards(state: RoomState, fromId: PlayerId, toId: PlayerId)
     next.players[fromId].hand.splice(pos, 1);
     next.players[toId].hand.push(code);
   }
-  return next;
+  return trackForcedLoss(next, fromId, matching.length);
 }
 
 /** Players tied for the min/max hand size (J1/J2/J3-style "extreme, ties all
@@ -76,24 +76,24 @@ function soonestBirthdayPlayers(state: RoomState, todayMMDD: string): PlayerId[]
 /** Every player not in `recipientIds` gives 1 random card to one of
  * `recipientIds` (round-robin by rng when there's more than one tied
  * recipient), for A066. */
-function everyoneGivesOneTo(state: RoomState, recipientIds: PlayerId[], rng: Rng = Math.random): RoomState {
+function everyoneGivesOneTo(state: RoomState, recipientIds: PlayerId[], actorId: PlayerId, rng: Rng = Math.random): RoomState {
   let next = state;
   for (const giverId of Object.keys(state.players)) {
     if (recipientIds.includes(giverId)) continue;
     const recipientId = recipientIds[Math.floor(rng() * recipientIds.length)];
-    next = stealRandom(next, giverId, recipientId, 1, rng);
+    next = giverId === actorId ? stealRandom(next, giverId, recipientId, 1, rng) : forceSteal(next, giverId, recipientId, 1, rng);
   }
   return next;
 }
 
 /** Every player not in `targetIds` steals 1 random card from one of
  * `targetIds`, for A137. */
-function everyoneStealsOneFrom(state: RoomState, targetIds: PlayerId[], rng: Rng = Math.random): RoomState {
+function everyoneStealsOneFrom(state: RoomState, targetIds: PlayerId[], actorId: PlayerId, rng: Rng = Math.random): RoomState {
   let next = state;
   for (const stealerId of Object.keys(state.players)) {
     if (targetIds.includes(stealerId)) continue;
     const targetId = targetIds[Math.floor(rng() * targetIds.length)];
-    next = stealRandom(next, targetId, stealerId, 1, rng);
+    next = targetId === actorId ? stealRandom(next, targetId, stealerId, 1, rng) : forceSteal(next, targetId, stealerId, 1, rng);
   }
   return next;
 }
@@ -123,7 +123,7 @@ function stealRandomTrapToHand(state: RoomState, fromId: PlayerId, toId: PlayerI
   const traps = state.players[fromId].traps;
   if (traps.length === 0) return state;
   const code = traps[Math.floor(rng() * traps.length)];
-  return stealTrapToHand(state, fromId, toId, code);
+  return trackForcedLoss(stealTrapToHand(state, fromId, toId, code), fromId, 1);
 }
 
 /** A009 "Quickfire" forces every trap-type card straight from hand onto the
@@ -192,7 +192,7 @@ function swapSeats(state: RoomState, idA: PlayerId, idB: PlayerId): RoomState {
 
 /** Everyone simultaneously steals 1 card from their right-seat neighbor,
  * pairing computed from the seat order before any of the steals happen. */
-function stealFromRightNeighbor(state: RoomState, rng: Rng = Math.random): RoomState {
+function stealFromRightNeighbor(state: RoomState, actorId: PlayerId, rng: Rng = Math.random): RoomState {
   const order = getSeatOrder(state);
   const count = order.length;
   let next = state;
@@ -200,7 +200,7 @@ function stealFromRightNeighbor(state: RoomState, rng: Rng = Math.random): RoomS
     const thief = order[i];
     const victim = order[(i + 1) % count];
     if (thief === victim) continue;
-    next = stealRandom(next, victim, thief, 1, rng);
+    next = victim === actorId ? stealRandom(next, victim, thief, 1, rng) : forceSteal(next, victim, thief, 1, rng);
   }
   return next;
 }
@@ -450,7 +450,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
-      return stealRandom(state, targetId, frame.actorId, 4);
+      return forceSteal(state, targetId, frame.actorId, 4);
     },
   },
   A077: {
@@ -459,7 +459,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะขโมยไพ่ 1 ใบ',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 1) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 1) : state;
     },
   },
   A112: {
@@ -468,7 +468,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะขโมยไพ่ 2 ใบ',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 2) : state;
     },
   },
   A141: {
@@ -479,7 +479,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     // steal vs. conditional on completing the drink) -- implemented unconditional.
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 1) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 1) : state;
     },
   },
   A144: {
@@ -488,7 +488,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะขโมยไพ่ 2 ใบ',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 2) : state;
     },
   },
   A051: {
@@ -499,7 +499,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     // reveal-then-pick-one UI exists yet, so this steals 1 random card instead.
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 1) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 1) : state;
     },
   },
   A120: {
@@ -510,7 +510,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     // of any type instead of letting the actor pick Action/Trap/Counter first.
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 1) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 1) : state;
     },
   },
   A052: {
@@ -694,7 +694,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       const targetId = frame.targetIds[0];
       if (!targetId) return state;
       const handedOff = handOffPlayedCard(state, frame.sourceCode, targetId);
-      return stealRandom(handedOff, targetId, frame.actorId, 1);
+      return forceSteal(handedOff, targetId, frame.actorId, 1);
     },
   },
   A164: {
@@ -722,7 +722,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     code: 'A080', name_en: 'Here It Comes!', name_th: 'มาแล้ว!',
     description_th: 'ผู้เล่นทุกคนขโมยไพ่ 1 ใบจากผู้เล่นที่นั่งทางขวาของตัวเอง',
     kind: 'auto',
-    executeEffect: (state) => stealFromRightNeighbor(state),
+    executeEffect: (state, frame) => stealFromRightNeighbor(state, frame.actorId),
   },
   A087: {
     code: 'A087', name_en: 'I Like Trains', name_th: 'ฉันชอบรถไฟ',
@@ -998,7 +998,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'ถ้าคุณยังไม่ได้ดื่มเลยในรอบนี้ ขโมยไพ่ 3 ใบจากผู้เล่นที่ดื่มมากที่สุด',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 3) : state;
     },
   },
 
@@ -1010,7 +1010,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const suggesterId = state.gameSuggesterId;
       if (!suggesterId || !state.players[suggesterId] || suggesterId === frame.actorId) return state;
-      return stealRandom(state, suggesterId, frame.actorId, 3);
+      return forceSteal(state, suggesterId, frame.actorId, 3);
     },
   },
 
@@ -1097,7 +1097,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       if (!today) return state;
       const recipients = soonestBirthdayPlayers(state, today);
       if (recipients.length === 0) return state;
-      return everyoneGivesOneTo(state, recipients);
+      return everyoneGivesOneTo(state, recipients, frame.actorId);
     },
   },
   A137: {
@@ -1109,7 +1109,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       if (!today) return state;
       const targets = soonestBirthdayPlayers(state, today);
       if (targets.length === 0) return state;
-      return everyoneStealsOneFrom(state, targets);
+      return everyoneStealsOneFrom(state, targets, frame.actorId);
     },
   },
 
@@ -1290,7 +1290,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำท่าตามไม่ได้? (ถ้าทุกคนทำได้ ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 3) : state;
     },
   },
   A062: {
@@ -1299,7 +1299,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำไม่ได้? (ถ้าทำได้ ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 3) : state;
     },
   },
   A105: {
@@ -1317,7 +1317,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครไม่รู้ชื่อเต็มของคุณ? (ถ้ารู้หมด ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 3) : state;
     },
   },
   A147: {
@@ -1326,7 +1326,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำไม่ได้? (ถ้าทำได้ ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 3) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 3) : state;
     },
   },
   A149: {
@@ -1335,7 +1335,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครทำสำเร็จ? (ถ้าไม่มี ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 2) : state;
     },
   },
   A170: {
@@ -1344,7 +1344,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ทายถูกไหม? เลือกผู้เล่นที่ทายถูก (ถ้าทายผิด ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 2) : state;
     },
   },
 
@@ -1493,7 +1493,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่น ถ้าเขาเลือก "ดื่ม" (ถ้าเขาตอบคำถาม ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 2) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 2) : state;
     },
   },
   A167: {
@@ -1502,7 +1502,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่น ถ้าเขาตอบคำถาม (ถ้าไม่ตอบ ให้กดยกเลิก)',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? stealRandom(state, targetId, frame.actorId, 1) : state;
+      return targetId ? forceSteal(state, targetId, frame.actorId, 1) : state;
     },
   },
 
@@ -1721,7 +1721,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => {
       const { firstId: tallestId, secondId: shortestId } = dualTargetIdsFromFrame(frame);
       if (!tallestId || !shortestId || tallestId === shortestId) return state;
-      return stealRandom(state, tallestId, shortestId, 3);
+      return forceSteal(state, tallestId, shortestId, 3);
     },
   },
   A172: {

@@ -1426,4 +1426,25 @@ describe('forced-loss tracking (A091 support)', () => {
     expect(next.players.p2.forcedLossSinceLastTurn).toBe(1);
     expect(next.players.p3.forcedLossSinceLastTurn).toBe(1);
   });
+
+  it('A029-style steal (target loses to actor) tracks the target\'s forced loss', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A029', 'me', 'p2');
+    expect(next.players.p2.forcedLossSinceLastTurn).toBeGreaterThan(0);
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A014 (actor chooses to have their own hand stolen from) does not track forced loss', () => {
+    const next = resolveActionEffect(baseState(), 'A014', 'me', 'bot-1');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+  });
+
+  it('A080 (everyone steals from their right neighbor) does not track the actor\'s own loss', () => {
+    const state = threePlayerState();
+    const next = resolveActionEffect(state, 'A080', 'me');
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
+    // p2/p3 are each some other seat's right neighbor -- at least one of them lost a card.
+    const totalTracked = (next.players.p2.forcedLossSinceLastTurn ?? 0) + (next.players.p3.forcedLossSinceLastTurn ?? 0);
+    expect(totalTracked).toBeGreaterThan(0);
+  });
 });
