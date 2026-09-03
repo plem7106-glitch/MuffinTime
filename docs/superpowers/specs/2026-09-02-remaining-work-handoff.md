@@ -12,7 +12,7 @@ React + TypeScript + Supabase). Full project context is in `CLAUDE.md` at the re
 read it first, it's short. `data/cards.json` is the ground-truth card list/text; never
 invent or rephrase a card's effect, only what's written there.
 
-## Status: 168/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G/E are done
+## Status: 172/173 Action cards implemented -- Group 2, Group 3, and Group 1 Clusters A/B/C/G/E/D are done
 
 Implemented cards live in `game/actionRules/definitions.ts` as a big object literal keyed
 by card code (`A001`, `A037`, etc). Each entry is an `ActionRuleDefinition`
@@ -157,7 +157,7 @@ independently).
 8. Verify: `npx vitest run --reporter=dot` and `npx tsc --noEmit`, both clean, before
    committing. Small focused commits, descriptive messages.
 
-## What's next — 5 cards left, all in Group 1 (Group 2 and Group 3 are done)
+## What's next — 1 card left, in Group 1 (Group 2 and Group 3 are done)
 
 ### Group 2 — DONE (159/173 checkpoint)
 
@@ -198,7 +198,7 @@ outcome for that target" (`components/room/GameTable.tsx`'s `targetThenOutcomePh
 state, mirroring A158's `drinkCheckPhase` but in the opposite step order). See its doc comment
 in `game/actionRules/types.ts` and A166's entry in `definitions.ts`.
 
-### Group 1 — Clusters A, B, C, G & E DONE (168/173 checkpoint), 2 clusters / 5 cards remain
+### Group 1 — Clusters A, B, C, G, E & D DONE (172/173 checkpoint), 1 cluster / 1 card remains
 
 Group 1 (13 cards needing real engine changes, not just a single `executeEffect`) was
 decomposed into 7 clusters by shared mechanism during brainstorming — see
@@ -465,42 +465,163 @@ are `docs/superpowers/specs/2026-09-03-group1-cluster-e-design.md` and
 - Zero new `PlayerState`/`RoomState` fields — the whole cluster rides on
   `pendingInteraction`, which already existed.
 
-**Remaining: 2 clusters, 5 cards** — `A017, A028, A091, A094, A108`. Each needs its own spec
-(and likely its own plan) before implementation, following the same brainstorming →
-writing-plans → subagent-driven-development flow used for Clusters A, B, C, G, and E. Per
-the original decomposition:
+**Cluster D (A017, A028, A094, A108 — recursive/forced card resolution) is done.** Its own
+plan/spec docs are `docs/superpowers/specs/2026-09-03-group1-cluster-d-design.md` and
+`docs/superpowers/plans/2026-09-03-group1-cluster-d.md`. This was the last of the original 7
+Group 1 clusters, flagged from the start as the hardest since it's the only one that touches
+the reaction-stack's own resolution loop directly (a card whose effect causes *another* card
+to play, mid-resolution). It went last per the confirmed E → F → D order noted in the prior
+version of this doc, though it actually shipped ahead of F landing on `main` — see
+"Remaining" below for how that plays out.
 
-- **Cluster D** (recursive/forced card resolution — trickiest, touches the reaction-stack
-  system directly): `A017`, `A028`, `A094`, `A108`
-- **Cluster F** (forced-vs-voluntary loss tracking): `A091`
+- **A017** "นายตาบอด" (You're Blind) — choose a player to blind-draw the deck's top card,
+  discarding any Trap/Counter along the way, until an Action card is found; that player
+  becomes its actor. **A028** "ทาเยอะไปหน่อย" (Bad Spread) — play alongside a qualifying
+  "quantity" Action card to double its effect. **A094** "พร้อมเพรียง" (In Sync) — replay the
+  most recently resolved Action card's effect under a new actor (whoever played A094).
+  **A108** "เล่นใบนั้นสิ" (Play That One) — choose a player, force a random Action card out of
+  their hand to be played, with them as its actor.
+- **The shared architectural insight, found during brainstorming and verified by tracing the
+  code by hand (not assumed)**: `lib/session.tsx`'s `resolveCompletedStackFrames` already
+  supports nested `StackFrame`s for free. If a card's `executeEffect` calls the existing
+  `pushStackFrame` to spawn a new frame, `removeStackFrame` still finds the *original* frame
+  by id even with a new one now sitting above it, and the loop's `areAllResponsesComplete`
+  check on the new top frame correctly makes it stop and wait for a real Counter-response
+  window before continuing. **Zero changes were needed to that loop itself** for any of A017/
+  A094/A108 — each card just builds a frame for the card it's triggering and pushes it, and
+  gets Counter-ability, bot-turn-advance handling, and natural recursion (a nested card that
+  is itself another Cluster D card) entirely for free. A028 is the one exception that *does*
+  touch `resolveCompletedStackFrames` — see below.
+- **`autoResolveInputFrame`** (`game/actionRules/autoResolve.ts`, Task 2) — the shared helper
+  A017 and A108 both use to fill in a triggered card's required manual input
+  (target/roster/outcome/dual-target/drink-check/number/today-date) with a random default,
+  for the one real "who do I ask" problem this cluster has: the triggered card's own actor
+  didn't choose to play it, so there's nobody live to prompt through the UI. Takes an
+  injectable `rng: Rng = Math.random` (a plain helper function, unlike `executeEffect`, which
+  must stay pure with no injectable parameters) and a `today: string | undefined` captured
+  once at the *outermost* real play (A017/A108 both set `needsTodayDate: true` on their own
+  definitions purely so `GameTable.tsx`'s existing UI convention stamps wall-clock time at
+  the one legitimate moment, then thread it down through any nested auto-resolved cards
+  rather than re-deriving it). Roster selection with no fixed count defaults to *all* eligible
+  candidates (an auto-triggered "everyone loses a card" reads as fair); with a fixed count, it
+  picks that many at random.
+- **`resolvePostPlayDestination`** (`game/turnFlow.ts`, Task 3) — a lighter sibling of the
+  existing `applyActionRedirect`, for a card that never sat in a hand to begin with. A017's
+  blind-drawn card comes straight out of `drawPile`, so there's no hand to remove it from
+  before deciding where it goes; this still respects an active A040 redirect (Cluster A's
+  ruling: applies to *any* player's Action play) the same way `applyActionRedirect` does, just
+  without the hand-removal step.
+- **A028's scope**: restricted, per a ruling confirmed with the user, to a curated allow-list
+  of "quantity" Action cards — cards whose effect is fundamentally drawing, discarding, or
+  stealing a card count (including roster/multi-target versions). A one-time audit of
+  `definitions.ts` (a small script matching `executeEffect` bodies against known
+  draw/discard/steal primitives, then a manual read of `data/cards.json`'s text for each hit)
+  produced a reviewed **104-code allow-list**, `game/actionRules/quantityCards.ts`'s
+  `QUANTITY_EFFECT_CARDS`. The mechanical script matched 105; **A084** "swap your entire hand
+  with another chosen player's" was manually excluded, since doubling means "invoke the
+  effect twice," and a swap invoked twice swaps back — a no-op that cancels itself out,
+  structurally different from every other matched card (all purely additive). If A028 is in
+  hand with no qualifying partner, it cannot be played at all (not just discouraged) — a
+  persistent UI warning badge surfaces this, gating only A028's own play button, not
+  `endTurn`. **Doubling mechanism**: `resolveCompletedStackFrames` checks
+  `resolvingFrame.customPayload?.doubled` and, when set, invokes `executeActionFrameEffect`
+  on the partner's frame **twice** rather than adding a multiplier field threaded through
+  ~160 other card definitions — since that function already loops over multi-target frames
+  internally, this correctly doubles per-target counts for roster cards too, with zero
+  changes to any other card's definition. A single Counter response cancels the whole doubled
+  effect (both applications, not just one) — the simplest available ruling.
+- **The `chainDepth` recursion-safety cap**: `data/cards.json`'s `action` array lists each of
+  the 173 codes exactly once and `buildCanonicalDeck()` builds 1:1 from it, so there is only
+  ever one physical copy of any Action code in the real game — a chain (A017 finds A028,
+  which finds A094, ...) is structurally bounded by how many distinct codes remain
+  undrawn/unplayed, and genuine infinite recursion isn't possible with the real deck. A
+  defensive cap (`frame.customPayload.chainDepth`, capped at 20, round-trips through
+  `RoomState`'s normal JSON serialization like any other `customPayload` value — no new
+  top-level state) is still added purely so a bug or a test fixture with duplicated codes
+  fails safely (silently stops the chain) instead of hanging; it should never trigger with
+  the real deck.
+- **Real bugs found during review** (six, all fixed and verified):
+  1. **A017's original deck-search safety bound (`totalCards + 1`) was mathematically
+     insufficient.** `reshuffleDiscardIntoDraw` always protects the current top-of-discard
+     card (leaves it in place rather than shuffling it into the fresh draw pile), so if the
+     target Action card the blind draw needs happens to be sitting there, it takes a *second*
+     reshuffle epoch to become reachable — up to `2 * totalCards` iterations in the worst
+     case, not `totalCards + 1`. Fixed by raising the bound; empirically verified with a
+     dedicated stress test (0% failure across 2000 trials post-fix vs. ~30% pre-fix).
+  2. **A028's `doubled` flag was originally persisted verbatim into
+     `RoomState.recentActionPlays`.** Since A094 replays a historical entry's
+     `customPayload` unchanged under a new actor, a previously-doubled play surviving into
+     history meant A094 replaying it would double it *again* — an unintended triple-strength
+     effect. Fixed by stripping `doubled` before the entry is written to history
+     (`lib/session.tsx`, the same spot Task 1 appends to `recentActionPlays`).
+  3. **A108's initial implementation used a circular import** (`definitions.ts` ↔
+     `registry.ts`) to check whether a candidate code was implemented. Functionally safe
+     (module resolution handled it fine, tests passed), but avoidable and fragile; replaced
+     with a direct `code in ACTION_RULES_BATCH_1` check against the object literal already in
+     scope in `definitions.ts` instead of importing back from `registry.ts`.
+  4. **A028's co-play UI initially routed every partner card through the target-picker**,
+     regardless of whether the partner card actually needed any input. This corrupted the
+     resulting frame's data for the 29 of 104 allow-listed cards that need zero input (plain
+     `kind: 'auto'` with no flags) — the picker's forced selection got written into a frame
+     that should have had empty `targetIds`. Fixed by checking the partner's flags first and
+     dispatching flagless partners straight to `playDoubledAction`, skipping the picker step
+     entirely for that subset.
+  5. **Bots could select and "play" A028 alone**, a guaranteed no-op (A028 requires a
+     qualifying partner and can't function by itself), since the bot's candidate-selection
+     logic only filtered on `isActionImplemented` and didn't know A028 needs a second card.
+     Fixed by excluding A028 specifically at the bot-candidate-selection call site
+     (`lib/botTurn.ts`) — bots now simply never select A028, rather than gaining real co-play
+     logic (see "Known gaps" below).
+  6. **The most significant one**: `autoResolveInputFrame` originally checked
+     `needsTodayDate` as an early-return branch *before* `needsTargetSelection`. A017 and
+     A108 are the only two cards in the whole 173-code deck that combine both flags, so
+     whenever either was itself auto-resolved as a nested/found/forced card (e.g. A017
+     blind-drawing A108 as the found card), the `needsTodayDate` branch returned first and
+     the target was silently dropped — breaking the cluster's own core "recursion between its
+     own cards" capability, the exact scenario this cluster exists to support. Found only by
+     a dedicated cross-card recursion test built specifically to exercise A017 finding A108
+     (nothing else in the 878-test suite happened to exercise this combination). Fixed by
+     restructuring `autoResolveInputFrame` to decide the "shape" (target/roster/dual/outcome/
+     etc.) first, then merge `today` into whichever branch's result applies afterward, instead
+     of treating `needsTodayDate` as a competing early-return branch — see the doc comment
+     directly above the merge in `game/actionRules/autoResolve.ts`.
+- `game/cardInvariant.test.ts` gained end-to-end card-conservation coverage for all 4 cards
+  individually, plus two cross-card chains: A017 → A094 (a found card that itself triggers a
+  replay) and A017 → A108 → forced-card (a three-level chain, verifying `chainDepth` reaches
+  2 and every card involved is still accounted for exactly once).
+- **Known, accepted gaps**: no bot-room support for A028's co-play mechanic — bots simply
+  never select A028 now (bug 5 above), rather than gaining real logic to pick a qualifying
+  partner and play both cards together; if bot-room testing of A028 specifically is ever
+  wanted, this is where to start. As with every prior UI-touching cluster in this project, the
+  UI work here (A028's partner-picker, warning badge, and A108's Action-holder candidate
+  filter) was built and unit-tested in a sandboxed environment with no browser access — it has
+  **not** been manually verified in a real browser. Flagged honestly, matching this project's
+  existing pattern (see the "one manual end-to-end check" note in `CLAUDE.md` and prior
+  clusters' own UI caveats) — worth a real playtest pass before fully trusting the UI layer.
+- Last known-good check on `feature/group1-cluster-d`: `npx vitest run --reporter=dot` →
+  **878 passed (63 files)**, `npx tsc --noEmit` → clean.
 
-**Confirmed order: E → F → D** (superseding the plan's original assumption, which had no
-fixed order beyond "C first"). **E is done** (see above); **F is next, D last**. This order
-was set after closer inspection of E and F turned up two corrections to the original
-classification doc's risk estimates:
+**Remaining: 1 cluster, 1 card** — `A091` (Cluster F, forced-vs-voluntary loss tracking).
+**This is not simply "in progress" — checked fresh as of this wrap-up (2026-09-03) via
+`git log --oneline -5 origin/feature/group1-cluster-f` and `git log --oneline -3
+origin/main`**: `origin/feature/group1-cluster-f` has **11 commits past its fork point**
+(`a9e1c85`, the same commit this Cluster D branch forked from) and its own design spec, plan,
+and a full implementation ending in a fix commit (`6848f93 fix: correct
+forcedLossSinceLastTurn reset timing and close remaining tracking gaps`) — i.e. **A091
+appears fully implemented on that branch already**, not merely started. `origin/main` has
+**not moved** since both branches forked from it (still at `a9e1c85`, the Cluster E merge
+commit) — no third-party direct-push has landed on `main` in between, unlike the repeated
+pattern flagged earlier in this doc. Cluster F's own design spec already anticipated this:
+it deliberately touches the same files Cluster D does
+(`definitions.ts`/`transfer.ts`/`primitives.ts`/`roster.ts`/`group.ts`), so **reconciling the
+two branches — most likely via a merge or rebase once one lands on `main` first — is expected
+and is the one remaining step before the project is a genuine 173/173.** Whoever picks this
+up next should diff `feature/group1-cluster-f` against current `main` fresh rather than trust
+this summary by the time they start, the same caution this doc has applied to every other
+branch-state claim.
 
-- **Cluster E (A064) turned out simpler than expected** — see its full write-up above.
-  Lowest-risk of the three remaining clusters at the time, which is exactly why it went
-  first; that assessment held up in practice (zero new state fields, no design surprises).
-- **Cluster F (A091) turned out to need a forced-vs-voluntary distinction threaded through
-  dozens of existing call sites** in the `discard`/steal primitives across
-  `definitions.ts`/`transfer.ts`/`primitives.ts`/`roster.ts`/`group.ts` — comparable risk to
-  Cluster D, **not** the "lower risk" the original classification doc assumed. Still going
-  before D because its surface area, while wide, doesn't touch the reaction-stack's
-  resolution loop directly the way D does.
-- **Cluster D (A017, A028, A094, A108)** remains the hardest and goes last. Its exact
-  approach — specifically, how a forced/replayed card that itself needs further input
-  (e.g. a forced discard that turns out to be a card needing its own target) should be
-  handled — was **deliberately left undecided**; the user chose to defer that design
-  conversation until Cluster D is actually picked up, rather than speculate now. Don't
-  invent an answer to this from first principles — raise it fresh with the user when D
-  starts.
-
-Full per-card reasoning for all of these is in the classification doc's "Phase 2" table
-(`docs/superpowers/specs/2026-09-02-action-card-classification.md`). Don't start any of
-these casually inside a small-batch PR — each wants its own
-`superpowers:brainstorming` + `superpowers:writing-plans` pass given the engine-level
-surface area, the same way Clusters A, B, C, G, and E got one.
+Full per-card reasoning for all 173 codes is in the classification doc's "Phase 2" table
+(`docs/superpowers/specs/2026-09-02-action-card-classification.md`).
 
 ## Known gap, not yet built (unrelated to the above)
 

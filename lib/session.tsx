@@ -56,7 +56,8 @@ import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { resolveSteal } from '../game/steal';
 import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
-import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
+import { isQuantityEffectCard } from '../game/actionRules/quantityCards';
+import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult, RecentActionPlay } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
 import { executeManualRecoveryDiscard, executeManualRecoveryGive } from '../game/recovery';
 import { playSocialCounter as enginePlaySocialCounter } from '../game/socialCounter';
@@ -115,6 +116,7 @@ export interface GameSessionValue {
   endTurn: () => void;
   hostSkipTurn: () => void;
   playAction: (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => void;
+  playDoubledAction: (partnerCode: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => void;
   placeTrapCard: (code: CardCode) => void;
   skipTrapPlacement: () => void;
   openTrapCard: (code: CardCode, targetId?: PlayerId | PlayerId[]) => void;
@@ -139,6 +141,229 @@ function advanceAndCheckWin(room: RoomState): RoomState {
   const advanced = advanceTurn(room);
   const currentId = advanced.turnOrder[advanced.currentTurnIndex];
   return resolveTurnArrival(advanced, currentId);
+}
+
+/**
+ * Resolves every reaction-stack frame whose responses are already complete,
+ * applying each frame's effect (counter/trap/action) and popping it off the
+ * stack, repeating until the top frame still needs responses or the stack is
+ * empty. Hoisted to module scope (out of GameSessionProvider) because it is a
+ * pure function of `state` -- it was previously a `useCallback` with an empty
+ * dependency array, i.e. it never closed over component state/props -- which
+ * also makes it independently testable outside of React.
+ */
+export function resolveCompletedStackFrames(state: RoomState): RoomState {
+  let next = state;
+  let currentTop = getTopFrame(next);
+
+  while (currentTop && areAllResponsesComplete(currentTop)) {
+    const resolvingFrame = currentTop;
+    if (resolvingFrame.status !== 'cancelled') {
+      if (resolvingFrame.sourceType === 'counter') {
+        // 1. Primary Interception: Apply cancellation to parent frame if un-cancelled
+        const parentId = resolvingFrame.parentFrameId ?? (resolvingFrame.customPayload?.parentFrameId as string | undefined);
+        const redirectsParentTarget = ['C34', 'C35', 'C45'].includes(resolvingFrame.sourceCode);
+        if (parentId && !redirectsParentTarget) {
+          next = addModifierToFrame(next, parentId, {
+            modifierId: `mod-${resolvingFrame.sourceCode}-${Date.now()}`,
+            sourceFrameId: resolvingFrame.frameId,
+            type: 'cancel_all',
+            affectedTargetIds: [resolvingFrame.actorId],
+          });
+        }
+
+        // Forced Discard Operation modification for C02, C03, C30
+        const opId = (resolvingFrame.customPayload?.forcedDiscardOperationId as string | undefined)
+          ?? (parentId ? (getStackFrame(next, parentId)?.customPayload?.forcedDiscardOperationId as string | undefined) : undefined)
+          ?? Object.keys(next.pendingForcedDiscards ?? {})[0];
+
+        if (opId && next.pendingForcedDiscards?.[opId]) {
+          const op = next.pendingForcedDiscards[opId];
+          if (resolvingFrame.sourceCode === 'C02') {
+            // C02: Stop another player from discarding their cards.
+            next.pendingForcedDiscards[opId] = { ...op, status: 'canceled' };
+          } else if (resolvingFrame.sourceCode === 'C03') {
+            // C03: If you're being forced to discard cards, keep 2 of them.
+            const newCount = Math.max(0, op.cardCodes.length - 2);
+            const newCardCodes = op.cardCodes.slice(0, newCount);
+            next.pendingForcedDiscards[opId] = {
+              ...op,
+              cardCodes: newCardCodes,
+              requestedCount: newCount,
+              status: newCount === 0 ? 'canceled' : op.status,
+            };
+          } else if (resolvingFrame.sourceCode === 'C30') {
+            // C30: Stop being forced to discard cards and draw that many instead.
+            const drawCount = op.cardCodes.length;
+            next.pendingForcedDiscards[opId] = { ...op, status: 'canceled' };
+            next = draw(next, op.targetPlayerId, drawCount);
+          }
+        }
+
+        // Steal Operation modification for C04, C06, C08, C12, C26, C28
+        const stealOpId = (resolvingFrame.customPayload?.stealOperationId as string | undefined)
+          ?? (parentId ? (getStackFrame(next, parentId)?.customPayload?.stealOperationId as string | undefined) : undefined)
+          ?? Object.keys(next.pendingSteals ?? {})[0];
+
+        if (stealOpId && next.pendingSteals?.[stealOpId]) {
+          const op = next.pendingSteals[stealOpId];
+          if (['C06', 'C12', 'C28'].includes(resolvingFrame.sourceCode)) {
+            // C06, C12, C28: Stop the steal operation
+            next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+          } else if (resolvingFrame.sourceCode === 'C04') {
+            // C04: Stop steal against self + redirect steal to newVictimId
+            const newVictimId = (resolvingFrame.customPayload?.newVictimId as string | undefined)
+              ?? (resolvingFrame.targetIds.find((id) => id !== op.thiefId && id !== op.victimId));
+
+            if (newVictimId && next.players[newVictimId] && newVictimId !== op.thiefId && newVictimId !== op.victimId) {
+              const newVictimHand = next.players[newVictimId].hand.length;
+              const newActualCount = Math.min(op.requestedCount, newVictimHand);
+              next.pendingSteals[stealOpId] = {
+                ...op,
+                victimId: newVictimId,
+                redirectedFromId: op.victimId,
+                selectedCardCode: undefined, // invalidate original victim's card selection
+                actualCount: newActualCount,
+                status: 'redirected', // mark redirected so resumePendingSteal opens new reaction cycle for newVictimId
+              };
+              if (parentId) {
+                const res = removeStackFrame(next, parentId);
+                next = res.state;
+              }
+            } else {
+              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+            }
+          } else if (resolvingFrame.sourceCode === 'C08') {
+            // C08: Stop steal + victim forced discards that many cards instead
+            const countToDiscard = op.actualCount;
+            const victimId = op.victimId;
+            const thiefId = op.thiefId;
+            next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+            next = resolveForcedDiscard(next, victimId, countToDiscard, thiefId);
+          } else if (resolvingFrame.sourceCode === 'C26') {
+            // C26: Stop steal + victim steals that many cards back from thief
+            const countToStealBack = op.actualCount;
+            const victimId = op.victimId;
+            const thiefId = op.thiefId;
+            next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
+            next = resolveSteal(next, thiefId, victimId, countToStealBack, op.stealMode, victimId);
+          }
+        }
+
+        // 2. Deferred Secondary Effect: Execute secondary effect only when surviving
+        next = resolveCounterEffect(next, resolvingFrame.sourceCode, resolvingFrame.actorId, resolvingFrame);
+      } else if (resolvingFrame.sourceType === 'trap') {
+        next = executeTrapFrameEffect(next, resolvingFrame);
+      } else {
+        next = executeActionFrameEffect(next, resolvingFrame);
+        if (resolvingFrame.customPayload?.doubled) {
+          next = executeActionFrameEffect(next, resolvingFrame);
+        }
+        // Strip `doubled` before persisting to history: it's a one-shot
+        // modifier that was already "spent" resolving this play. A later
+        // replay (e.g. A094) should repeat the underlying effect once, not
+        // inherit `doubled` and compound into a double-doubled invocation.
+        const { doubled: _doubled, ...historyPayload } = resolvingFrame.customPayload ?? {};
+        const entry: RecentActionPlay = {
+          code: resolvingFrame.sourceCode,
+          actorId: resolvingFrame.actorId,
+          targetIds: resolvingFrame.targetIds,
+          customPayload: Object.keys(historyPayload).length > 0 ? historyPayload : undefined,
+        };
+        next.recentActionPlays = [entry, ...(next.recentActionPlays ?? [])].slice(0, 5);
+      }
+    }
+
+    next = checkAndTriggerAutomaticTraps(next);
+
+    const { state: removedState, removedFrame } = removeStackFrame(next, resolvingFrame.frameId);
+    const wasActionBase =
+      removedFrame?.sourceType === 'action' &&
+      (!removedState.reactionStack || removedState.reactionStack.length === 0);
+    let finalState = removedState;
+    if (wasActionBase && removedFrame?.actorId && removedFrame.actorId.startsWith('bot-')) {
+      // Bot completed its Action Main Choice — advance turn directly without follow-up draw
+      finalState = advanceAndCheckWin(removedState);
+    }
+
+    next = finalState;
+    const newTop = getTopFrame(next);
+    if (newTop === resolvingFrame) break;
+    currentTop = newTop;
+  }
+
+  return next;
+}
+
+/**
+ * Core logic for playing A028 "ทาเยอะไปหน่อย" (Bad Spread) together with a
+ * qualifying partner Action card. Unlike every other Action, A028 is never
+ * itself the sourceCode of a pushed StackFrame -- playing it discards BOTH
+ * A028 and the chosen partner card, then pushes exactly ONE frame for the
+ * PARTNER's code with customPayload.doubled = true (consumed by
+ * resolveCompletedStackFrames above, which invokes the partner's effect
+ * twice when that flag is set).
+ *
+ * Hoisted to module scope as a pure function of (state, myPlayerId, ...) --
+ * mirroring resolveCompletedStackFrames above -- so it's independently
+ * testable outside of React; the `playDoubledAction` useCallback inside
+ * GameSessionProvider is a thin wrapper that supplies `myPlayerId` and
+ * dispatches the result through `run`.
+ */
+export function applyPlayDoubledAction(
+  state: RoomState,
+  myPlayerId: PlayerId,
+  partnerCode: CardCode,
+  targetId?: PlayerId,
+  customPayload?: Record<string, unknown>
+): RoomState {
+  if (state.reactionStack && state.reactionStack.length > 0) return state;
+  if (state.pendingResponse || state.pendingInteraction) return state;
+  if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
+  if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
+  const actorId = myPlayerId;
+  const player = state.players[actorId];
+  // Same "Main Choice" rule as playAction -- see its comment above.
+  if (player?.hasDrawnThisTurn) return state;
+  const usingBonusPlay = Boolean(player?.hasPlayedActionThisTurn) && (player?.bonusActionPlaysRemaining ?? 0) > 0;
+  if (player?.hasPlayedActionThisTurn && !usingBonusPlay) return state;
+  if (!player?.hand.includes('A028')) return state;
+  if (!isQuantityEffectCard(partnerCode) || partnerCode === 'A028') return state;
+  if (!player.hand.includes(partnerCode)) return state;
+  if (!isActionImplemented(partnerCode) || !getPlayableActions(state, actorId).includes(partnerCode)) return state;
+  if (targetId && !state.players[targetId]) return state;
+
+  let next = state;
+  if (next.turnPhase === 'trap_placement' || !next.turnPhase) {
+    next = engineSkipTrapPlacement(next, actorId);
+  }
+  if (next.turnPhase !== 'main') return state;
+
+  let afterDiscard = applyActionRedirect(next, actorId, 'A028');
+  afterDiscard = applyActionRedirect(afterDiscard, actorId, partnerCode);
+  if (afterDiscard.players[actorId]) {
+    if (usingBonusPlay) {
+      afterDiscard.players[actorId].bonusActionPlaysRemaining = (afterDiscard.players[actorId].bonusActionPlaysRemaining ?? 0) - 1;
+    } else {
+      afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
+    }
+    afterDiscard.players[actorId].hasDrawnThisTurn = false;
+  }
+  const stackState = pushStackFrame(afterDiscard, {
+    sourceType: 'action',
+    sourceCode: partnerCode,
+    actorId,
+    targetIds: targetId ? [targetId] : [],
+    customPayload: { ...(customPayload ?? {}), doubled: true },
+  });
+  const actionEvent = createGameEvent(
+    GAME_EVENT_TYPES.ACTION_PLAYED,
+    actorId,
+    { actorId, actionCode: partnerCode, targetId },
+    [targetId ?? actorId]
+  );
+  appendGameEvent(stackState, actionEvent);
+  return checkAndTriggerAutomaticTraps(stackState, actionEvent);
 }
 
 export function GameSessionProvider({ children }: { children: ReactNode }) {
@@ -517,6 +742,12 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId]
   );
 
+  const playDoubledAction = useCallback(
+    (partnerCode: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) =>
+      run((state) => applyPlayDoubledAction(state, myPlayerId!, partnerCode, targetId, customPayload)),
+    [run, myPlayerId]
+  );
+
   const placeTrapCard = useCallback(
     (code: CardCode) =>
       run((state) => {
@@ -544,134 +775,6 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     [run, myPlayerId]
   );
 
-  const resolveCompletedStackFrames = useCallback((state: RoomState): RoomState => {
-    let next = state;
-    let currentTop = getTopFrame(next);
-
-    while (currentTop && areAllResponsesComplete(currentTop)) {
-      const resolvingFrame = currentTop;
-      if (resolvingFrame.status !== 'cancelled') {
-        if (resolvingFrame.sourceType === 'counter') {
-          // 1. Primary Interception: Apply cancellation to parent frame if un-cancelled
-          const parentId = resolvingFrame.parentFrameId ?? (resolvingFrame.customPayload?.parentFrameId as string | undefined);
-          const redirectsParentTarget = ['C34', 'C35', 'C45'].includes(resolvingFrame.sourceCode);
-          if (parentId && !redirectsParentTarget) {
-            next = addModifierToFrame(next, parentId, {
-              modifierId: `mod-${resolvingFrame.sourceCode}-${Date.now()}`,
-              sourceFrameId: resolvingFrame.frameId,
-              type: 'cancel_all',
-              affectedTargetIds: [resolvingFrame.actorId],
-            });
-          }
-
-          // Forced Discard Operation modification for C02, C03, C30
-          const opId = (resolvingFrame.customPayload?.forcedDiscardOperationId as string | undefined)
-            ?? (parentId ? (getStackFrame(next, parentId)?.customPayload?.forcedDiscardOperationId as string | undefined) : undefined)
-            ?? Object.keys(next.pendingForcedDiscards ?? {})[0];
-
-          if (opId && next.pendingForcedDiscards?.[opId]) {
-            const op = next.pendingForcedDiscards[opId];
-            if (resolvingFrame.sourceCode === 'C02') {
-              // C02: Stop another player from discarding their cards.
-              next.pendingForcedDiscards[opId] = { ...op, status: 'canceled' };
-            } else if (resolvingFrame.sourceCode === 'C03') {
-              // C03: If you're being forced to discard cards, keep 2 of them.
-              const newCount = Math.max(0, op.cardCodes.length - 2);
-              const newCardCodes = op.cardCodes.slice(0, newCount);
-              next.pendingForcedDiscards[opId] = {
-                ...op,
-                cardCodes: newCardCodes,
-                requestedCount: newCount,
-                status: newCount === 0 ? 'canceled' : op.status,
-              };
-            } else if (resolvingFrame.sourceCode === 'C30') {
-              // C30: Stop being forced to discard cards and draw that many instead.
-              const drawCount = op.cardCodes.length;
-              next.pendingForcedDiscards[opId] = { ...op, status: 'canceled' };
-              next = draw(next, op.targetPlayerId, drawCount);
-            }
-          }
-
-          // Steal Operation modification for C04, C06, C08, C12, C26, C28
-          const stealOpId = (resolvingFrame.customPayload?.stealOperationId as string | undefined)
-            ?? (parentId ? (getStackFrame(next, parentId)?.customPayload?.stealOperationId as string | undefined) : undefined)
-            ?? Object.keys(next.pendingSteals ?? {})[0];
-
-          if (stealOpId && next.pendingSteals?.[stealOpId]) {
-            const op = next.pendingSteals[stealOpId];
-            if (['C06', 'C12', 'C28'].includes(resolvingFrame.sourceCode)) {
-              // C06, C12, C28: Stop the steal operation
-              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
-            } else if (resolvingFrame.sourceCode === 'C04') {
-              // C04: Stop steal against self + redirect steal to newVictimId
-              const newVictimId = (resolvingFrame.customPayload?.newVictimId as string | undefined)
-                ?? (resolvingFrame.targetIds.find((id) => id !== op.thiefId && id !== op.victimId));
-
-              if (newVictimId && next.players[newVictimId] && newVictimId !== op.thiefId && newVictimId !== op.victimId) {
-                const newVictimHand = next.players[newVictimId].hand.length;
-                const newActualCount = Math.min(op.requestedCount, newVictimHand);
-                next.pendingSteals[stealOpId] = {
-                  ...op,
-                  victimId: newVictimId,
-                  redirectedFromId: op.victimId,
-                  selectedCardCode: undefined, // invalidate original victim's card selection
-                  actualCount: newActualCount,
-                  status: 'redirected', // mark redirected so resumePendingSteal opens new reaction cycle for newVictimId
-                };
-                if (parentId) {
-                  const res = removeStackFrame(next, parentId);
-                  next = res.state;
-                }
-              } else {
-                next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
-              }
-            } else if (resolvingFrame.sourceCode === 'C08') {
-              // C08: Stop steal + victim forced discards that many cards instead
-              const countToDiscard = op.actualCount;
-              const victimId = op.victimId;
-              const thiefId = op.thiefId;
-              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
-              next = resolveForcedDiscard(next, victimId, countToDiscard, thiefId);
-            } else if (resolvingFrame.sourceCode === 'C26') {
-              // C26: Stop steal + victim steals that many cards back from thief
-              const countToStealBack = op.actualCount;
-              const victimId = op.victimId;
-              const thiefId = op.thiefId;
-              next.pendingSteals[stealOpId] = { ...op, status: 'canceled' };
-              next = resolveSteal(next, thiefId, victimId, countToStealBack, op.stealMode, victimId);
-            }
-          }
-
-          // 2. Deferred Secondary Effect: Execute secondary effect only when surviving
-          next = resolveCounterEffect(next, resolvingFrame.sourceCode, resolvingFrame.actorId, resolvingFrame);
-        } else if (resolvingFrame.sourceType === 'trap') {
-          next = executeTrapFrameEffect(next, resolvingFrame);
-        } else {
-          next = executeActionFrameEffect(next, resolvingFrame);
-        }
-      }
-
-      next = checkAndTriggerAutomaticTraps(next);
-
-      const { state: removedState, removedFrame } = removeStackFrame(next, resolvingFrame.frameId);
-      const wasActionBase =
-        removedFrame?.sourceType === 'action' &&
-        (!removedState.reactionStack || removedState.reactionStack.length === 0);
-      let finalState = removedState;
-      if (wasActionBase && removedFrame?.actorId && removedFrame.actorId.startsWith('bot-')) {
-        // Bot completed its Action Main Choice — advance turn directly without follow-up draw
-        finalState = advanceAndCheckWin(removedState);
-      }
-
-      next = finalState;
-      const newTop = getTopFrame(next);
-      if (newTop === resolvingFrame) break;
-      currentTop = newTop;
-    }
-
-    return next;
-  }, []);
-
   const openTrapCard = useCallback(
     (code: CardCode, targetId?: PlayerId | PlayerId[]) =>
       run((state) => {
@@ -681,7 +784,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         next = resolveCompletedStackFrames(next);
         return next;
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const initiateTrapInteraction = useCallback(
@@ -701,7 +804,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         next = resolveCompletedStackFrames(next);
         return next;
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const respondToDelegatedTargetPick = useCallback(
@@ -777,7 +880,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           },
         };
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const skipCounter = useCallback(
@@ -811,7 +914,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
               : null,
         };
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const declareMuffinTimeFn = useCallback(
@@ -1133,6 +1236,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     endTurn,
     hostSkipTurn,
     playAction,
+    playDoubledAction,
     placeTrapCard,
     skipTrapPlacement,
     openTrapCard,

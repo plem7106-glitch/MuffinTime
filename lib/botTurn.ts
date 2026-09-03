@@ -57,7 +57,14 @@ export function decideBotTurn(
   rng: Rng = Math.random
 ): BotDecision {
   const hand = state.players[botId]?.hand ?? [];
-  const playableActions = getPlayableActions(state, botId);
+  // A028 "Bad Spread" is excluded from bot candidate selection: its
+  // executeEffect is an unreachable no-op stub outside the human-driven
+  // co-play flow in components/room/GameTable.tsx (pick a partner Action
+  // card, then play both together via playDoubledAction) -- bots have no
+  // concept of that flow and would just discard A028 for nothing via
+  // pushStackFrame directly (see lib/session.tsx's bot-auto-play effect,
+  // which bypasses playAction/playDoubledAction entirely).
+  const playableActions = getPlayableActions(state, botId).filter((code) => code !== 'A028');
 
   if (playableActions.length === 0 || rng() >= ACTION_PLAY_PROBABILITY) {
     return { action: 'draw' };

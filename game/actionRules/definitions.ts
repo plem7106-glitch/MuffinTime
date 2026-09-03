@@ -18,6 +18,11 @@ import { resolveForcedDraw } from '../forcedDraw';
 import type { ActionRuleDefinition } from './types';
 import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame, todayFromFrame, numberInputFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
+import { pushStackFrame } from '../reactionStack';
+import { applyActionRedirect, resolvePostPlayDestination } from '../turnFlow';
+import { autoResolveInputFrame } from './autoResolve';
+import { reshuffleDiscardIntoDraw } from '../pile';
+import { pickRandomIndices } from '../util';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
 function stealAllActionCards(state: RoomState, fromId: PlayerId, toId: PlayerId): RoomState {
@@ -1871,6 +1876,138 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       next.bananaPeelArmed = true;
       return next;
     },
+  },
+
+  A017: {
+    code: 'A017',
+    name_en: "You're Blind",
+    name_th: 'นายตาบอด',
+    description_th: 'เลือกผู้เล่นอีก 1 คนให้จั่วไพ่ใบบนสุดของกองและเล่นใบนั้น หากเป็น Trap หรือ Counter ให้ทิ้งไปจนกว่าจะได้ Action',
+    kind: 'auto',
+    needsTargetSelection: true,
+    needsTodayDate: true,
+    targetPrompt: 'เลือกผู้เล่นให้จั่วไพ่ใบบนสุดของกองและเล่นทันที',
+    executeEffect: (state, frame) => {
+      const chosenPlayerId = frame.targetIds[0];
+      if (!chosenPlayerId || !state.players[chosenPlayerId]) return state;
+      const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
+      if (chainDepth >= 20) return state;
+
+      let next = cloneState(state);
+      let foundCode: CardCode | undefined;
+      const totalCards = next.drawPile.length + next.discardPile.length;
+      let safety = 0;
+      // reshuffleDiscardIntoDraw always keeps the current top-of-discard card
+      // out of the reshuffle, so a target sitting at the top when a reshuffle
+      // fires survives that reshuffle untouched -- it only becomes reachable
+      // on a SECOND reshuffle, once something else has been discarded on top
+      // of it. Worst case: two full "epochs" of up to (totalCards - 1)
+      // discards each before the target is finally popped. 2 * totalCards is
+      // a safe, slightly generous bound for that worst case.
+      while (safety < 2 * totalCards) {
+        safety += 1;
+        if (next.drawPile.length === 0) {
+          next = reshuffleDiscardIntoDraw(next);
+          if (next.drawPile.length === 0) break;
+        }
+        const card = next.drawPile.pop()!;
+        const cardInfo = getCardById(card);
+        if (cardInfo?.type === 'action') {
+          foundCode = card;
+          break;
+        }
+        next.discardPile.push(card);
+      }
+      if (!foundCode) return next;
+
+      next = resolvePostPlayDestination(next, foundCode);
+      const auto = autoResolveInputFrame(next, foundCode, chosenPlayerId, todayFromFrame(frame));
+      if (!auto) return next;
+      next = pushStackFrame(next, {
+        sourceType: 'action',
+        sourceCode: foundCode,
+        actorId: chosenPlayerId,
+        targetIds: auto.targetIds,
+        customPayload: { ...auto.customPayload, chainDepth: chainDepth + 1 },
+      });
+      return next;
+    },
+  },
+
+  A108: {
+    code: 'A108',
+    name_en: 'Play That One',
+    name_th: 'เล่นใบนั้นสิ',
+    description_th: 'เลือก Action 1 ใบจากมือของผู้เล่นอีก 1 คน แล้วบังคับให้ผู้เล่นคนนั้นเล่นไพ่ใบนั้น',
+    kind: 'auto',
+    needsTargetSelection: true,
+    needsTodayDate: true,
+    targetPrompt: 'เลือกผู้เล่นที่มี Action การ์ดเพื่อบังคับให้เล่น',
+    // ponytail: real card lets the actor pick a SPECIFIC Action card from the
+    // target's hand -- no reveal-then-pick-one UI exists for that (same gap
+    // as A051/A120/A014 above), so this picks a random implemented Action
+    // card from the target's hand and force-plays that instead.
+    executeEffect: (state, frame) => {
+      const forcedPlayerId = frame.targetIds[0];
+      if (!forcedPlayerId || !state.players[forcedPlayerId]) return state;
+      const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
+      if (chainDepth >= 20) return state;
+
+      const candidates = state.players[forcedPlayerId].hand.filter((code) => code in ACTION_RULES_BATCH_1);
+      if (candidates.length === 0) return state;
+      const idx = pickRandomIndices(candidates.length, 1, Math.random)[0];
+      const chosenCode = candidates[idx];
+
+      let next = applyActionRedirect(state, forcedPlayerId, chosenCode);
+      const auto = autoResolveInputFrame(next, chosenCode, forcedPlayerId, todayFromFrame(frame));
+      if (!auto) return next;
+      next = pushStackFrame(next, {
+        sourceType: 'action',
+        sourceCode: chosenCode,
+        actorId: forcedPlayerId,
+        targetIds: auto.targetIds,
+        customPayload: { ...auto.customPayload, chainDepth: chainDepth + 1 },
+      });
+      return next;
+    },
+  },
+
+  A094: {
+    code: 'A094',
+    name_en: 'In Sync',
+    name_th: 'พร้อมเพรียง',
+    description_th: 'ใช้ Effect ของ Action ใบล่าสุดที่ถูกเล่นซ้ำอีกครั้ง',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
+      if (chainDepth >= 20) return state;
+
+      const history = state.recentActionPlays ?? [];
+      const entry = history.find((play) => play.code !== 'A094');
+      if (!entry) return state;
+
+      return pushStackFrame(state, {
+        sourceType: 'action',
+        sourceCode: entry.code,
+        actorId: frame.actorId,
+        targetIds: entry.targetIds,
+        customPayload: { ...entry.customPayload, chainDepth: chainDepth + 1 },
+      });
+    },
+  },
+
+  A028: {
+    code: 'A028',
+    name_en: 'Bad Spread',
+    name_th: 'ทาเยอะไปหน่อย',
+    description_th: 'เล่นไพ่ใบนี้พร้อมกับ Action อีก 1 ใบ เพื่อเพิ่ม Effect ของ Action ใบนั้นเป็น 2 เท่า',
+    kind: 'no_op',
+    // A028 is never itself the sourceCode of a pushed StackFrame -- playing
+    // it goes through the dedicated playDoubledAction session method
+    // (lib/session.tsx), which pushes a frame for the PAIRED card with
+    // customPayload.doubled = true. This executeEffect exists only so the
+    // registry has a complete entry; it should be unreachable in practice.
+    executeEffect: (state) => state,
   },
 
   // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs

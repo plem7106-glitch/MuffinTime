@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { resolveActionEffect, executeActionFrameEffect } from './registry';
+import { describe, expect, it, vi } from 'vitest';
+import { resolveActionEffect, executeActionFrameEffect, getActionRule, isActionImplemented } from './registry';
 import { advanceTurn } from '../turn';
-import type { PlayerId, RoomState, StackFrame } from '../types';
+import type { CardCode, PlayerId, RecentActionPlay, RoomState, StackFrame } from '../types';
 
 /** Builds a minimal StackFrame carrying customPayload, for roster_select/
  * outcome_entry rules that resolveActionEffect's legacy (code, actorId,
@@ -1400,6 +1400,324 @@ describe('A064 (plant Banana Peel face-up in the draw pile)', () => {
     state.discardPile = ['A064'];
     const next = resolveActionEffect(state, 'A064', 'me');
     expect(next.bananaPeelArmed).toBe(true);
+  });
+});
+
+describe('A017', () => {
+  function stateWithDeck(drawPile: CardCode[], discardPile: CardCode[] = []): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile,
+      discardPile,
+      players: {
+        me: { name: 'Me', hand: ['A017'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+  }
+
+  function testFrame(overrides: Partial<StackFrame> = {}): StackFrame {
+    return {
+      frameId: 'frame-1',
+      parentFrameId: null,
+      sourceType: 'action',
+      sourceCode: 'A017',
+      actorId: 'me',
+      targetIds: ['p2'],
+      targetScope: 'single',
+      eligibleResponderIds: [],
+      responses: {},
+      modifiers: [],
+      status: 'resolving',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      ...overrides,
+    };
+  }
+
+  it('finds the top Action card, discarding Trap/Counter cards drawn along the way', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006', 'T01', 'C01']); // top of pile is last element (array.pop())
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.discardPile).toContain('T01');
+    expect(next.discardPile).toContain('C01');
+  });
+
+  it('makes the CHOSEN player (not the actor) the actor of the found card', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006']);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+    expect(pushed?.actorId).toBe('p2');
+  });
+
+  it('no-ops (no nested frame pushed) when no Action card can be found', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['T01', 'C01']); // only Trap/Counter available anywhere
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('respects an active A040 redirect for the found card\'s own post-play destination', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006']);
+    state.actionRedirect = { toPlayerId: 'p3', remaining: 2 };
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.players.p3.hand).toContain('A006');
+    expect(next.discardPile).not.toContain('A006');
+  });
+
+  it('does not push a further nested frame once chainDepth reaches the cap', () => {
+    const rule = getActionRule('A017')!;
+    const state = stateWithDeck(['A006']);
+    const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  // Regression coverage for a code-review finding: reshuffleDiscardIntoDraw
+  // (game/pile.ts) always protects the CURRENT top-of-discardPile card from
+  // being included in its reshuffle. If the target Action card happens to be
+  // sitting at that top-of-discard position when a reshuffle fires, it
+  // survives that reshuffle untouched and only becomes reachable on a
+  // SECOND reshuffle epoch (once something else has been discarded on top of
+  // it). The old `totalCards + 1` safety bound could terminate one epoch too
+  // early, silently fizzling the effect despite a genuinely findable Action
+  // card. The fix widens the bound to `2 * totalCards`.
+
+  it('reliably finds an Action card sitting at the top of discardPile requiring two reshuffle epochs (regression for the 2x safety-bound fix)', () => {
+    const rule = getActionRule('A017')!;
+    for (let trial = 0; trial < 100; trial++) {
+      const state = stateWithDeck([], ['T01', 'C02', 'C03', 'A006']);
+      const next = rule.executeEffect(state, testFrame());
+      const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+      expect(pushed?.sourceCode).toBe('A006');
+    }
+  });
+
+  it('deterministically finds an Action card that needs the full two-epoch worst case (regression for the 2x safety-bound fix)', () => {
+    // Stubbing Math.random to a constant 0.99 forces game/util.ts's
+    // Fisher-Yates `shuffle` into an IDENTITY permutation for these small
+    // arrays: at each step `i` (counting down from length-1 to 1), the swap
+    // target is `j = floor(rng() * (i + 1))`. With rng() === 0.99 and i <= 3,
+    // 0.99 * (i + 1) always lands in [i, i + 1) (e.g. i=2 -> 0.99*3=2.97,
+    // i=1 -> 0.99*2=1.98), so floor(...) === i every time -- every "swap" is
+    // an element swapped with itself, i.e. a no-op. That makes the whole
+    // trace hand-traceable:
+    //
+    // Start: drawPile=[], discardPile=['T01','C02','C03','A006'] (A006 on top).
+    //
+    // iter1: drawPile empty -> reshuffle epoch 1. top='A006' is protected
+    //        into discardPile=['A006']; rest=['T01','C02','C03'] shuffles to
+    //        itself (identity) -> drawPile=['T01','C02','C03'].
+    //        pop() takes the LAST element -> draws 'C03' (Counter) -> discard.
+    //        discardPile=['A006','C03']
+    // iter2: pop 'C02' (Counter) -> discard. discardPile=['A006','C03','C02']
+    // iter3: pop 'T01' (Trap) -> discard. discardPile=['A006','C03','C02','T01']
+    // iter4: drawPile empty -> reshuffle epoch 2. top='T01' protected;
+    //        rest=['A006','C03','C02'] shuffles to itself (identity) ->
+    //        drawPile=['A006','C03','C02'].
+    //        pop 'C02' (Counter) -> discard.
+    // iter5: pop 'C03' (Counter) -> discard.
+    // iter6: pop 'A006' -> Action found!
+    //
+    // That's 6 while-loop iterations to reach A006: past the OLD
+    // `totalCards + 1` bound (4 + 1 = 5, which would have exited the loop
+    // after iter5 without ever finding A006), but well within the NEW
+    // `2 * totalCards` bound (8).
+    const rule = getActionRule('A017')!;
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      const state = stateWithDeck([], ['T01', 'C02', 'C03', 'A006']);
+      const next = rule.executeEffect(state, testFrame());
+      const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+      expect(pushed?.sourceCode).toBe('A006');
+      expect(next.discardPile).toEqual(expect.arrayContaining(['T01', 'C02', 'C03']));
+    } finally {
+      randomSpy.mockRestore();
+    }
+  });
+});
+
+describe('A108', () => {
+  function stateWithHands(p2Hand: CardCode[], p3Hand: CardCode[] = []): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile: [],
+      discardPile: [],
+      players: {
+        me: { name: 'Me', hand: ['A108'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: p2Hand, traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: p3Hand, traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+  }
+
+  function testFrame(overrides: Partial<StackFrame> = {}): StackFrame {
+    return {
+      frameId: 'frame-1',
+      parentFrameId: null,
+      sourceType: 'action',
+      sourceCode: 'A108',
+      actorId: 'me',
+      targetIds: ['p2'],
+      targetScope: 'single',
+      eligibleResponderIds: [],
+      responses: {},
+      modifiers: [],
+      status: 'resolving',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      ...overrides,
+    };
+  }
+
+  it('removes a random Action card from the target\'s hand and pushes a nested frame for it', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.players.p2.hand).not.toContain('A006');
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+  });
+
+  it('makes the FORCED player (not the actor) the actor of the chosen card', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.actorId).toBe('p2');
+  });
+
+  it('only picks among implemented Action codes, ignoring non-Action cards in hand', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['T01', 'A006']);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+    expect(next.players.p2.hand).toContain('T01');
+  });
+
+  it('no-ops when the target has no implemented Action cards', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['T01']);
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.reactionStack ?? []).toEqual([]);
+    expect(next.players.p2.hand).toEqual(['T01']);
+  });
+
+  it('does not push a further nested frame once chainDepth reaches the cap', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('respects an active A040 redirect for the chosen card\'s own post-play destination', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    state.actionRedirect = { toPlayerId: 'p3', remaining: 2 };
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.players.p3.hand).toContain('A006');
+    expect(next.players.p2.hand).not.toContain('A006');
+    expect(next.discardPile).not.toContain('A006');
+  });
+});
+
+describe('A094', () => {
+  function stateWithHistory(recentActionPlays: RecentActionPlay[]): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile: [],
+      discardPile: [],
+      players: {
+        me: { name: 'Me', hand: ['A094'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      recentActionPlays,
+    } as unknown as RoomState;
+  }
+
+  function testFrame(overrides: Partial<StackFrame> = {}): StackFrame {
+    return {
+      frameId: 'frame-1',
+      parentFrameId: null,
+      sourceType: 'action',
+      sourceCode: 'A094',
+      actorId: 'me',
+      targetIds: [],
+      targetScope: 'single',
+      eligibleResponderIds: [],
+      responses: {},
+      modifiers: [],
+      status: 'resolving',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      ...overrides,
+    };
+  }
+
+  it('replays the most recent non-A094 play, under A094\'s own actor', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([{ code: 'A006', actorId: 'p3', targetIds: ['p2'] }]);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+    expect(pushed?.actorId).toBe('me');
+    expect(pushed?.targetIds).toEqual(['p2']);
+  });
+
+  it('skips a most-recent entry that is itself A094', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([
+      { code: 'A094', actorId: 'p2', targetIds: [] },
+      { code: 'A006', actorId: 'p3', targetIds: ['p2'] },
+    ]);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+  });
+
+  it('no-ops when there is no eligible history', () => {
+    const rule = getActionRule('A094')!;
+    const next = rule.executeEffect(stateWithHistory([]), testFrame());
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('does not push a further nested frame once chainDepth reaches the cap', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([{ code: 'A006', actorId: 'p3', targetIds: ['p2'] }]);
+    const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('reuses the historical customPayload verbatim, merging in the recomputed chainDepth', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([{ code: 'A006', actorId: 'p3', targetIds: ['p2'], customPayload: { outcome: true } }]);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.customPayload?.outcome).toBe(true);
+    expect(pushed?.customPayload?.chainDepth).toBe(1);
+  });
+});
+
+describe('A028', () => {
+  it('is registered as an implemented Action card', () => {
+    expect(isActionImplemented('A028')).toBe(true);
   });
 });
 

@@ -8,6 +8,8 @@ import { Card, CARD_TYPE_THEMES } from '../card/Card';
 import { CloseIcon, CardsIcon, CheckIcon } from '../ui/Icons';
 import { soundManager } from '../../lib/presentation/soundManager';
 import { getSocialCounterConfig, isSocialCounter } from '../../game/socialCounter';
+import { isQuantityEffectCard } from '../../game/actionRules/quantityCards';
+import { isActionImplemented } from '../../game/actionRules/registry';
 
 export function HandTrayModal({
   isOpen,
@@ -66,6 +68,15 @@ export function HandTrayModal({
   const handleCardClick = (code: CardCode) => {
     setSelectedCode(code);
   };
+
+  // A028 "Bad Spread" has no effect of its own -- it must be co-played with a
+  // qualifying "quantity effect" partner card. Warn at a glance in the hand
+  // tray when no such partner is currently in hand (tapping A028 itself
+  // still opens the co-play picker in GameTable, which shows this same
+  // "no qualifying partner" state -- this badge is a passive hint only).
+  const hasA028QualifyingPartner = hand.some(
+    (code) => code !== 'A028' && isQuantityEffectCard(code) && isActionImplemented(code)
+  );
 
   const handleHandCardPress = (code: CardCode) => {
     const now = Date.now();
@@ -258,7 +269,7 @@ export function HandTrayModal({
               return (
                 <div
                   key={`${code}-${idx}`}
-                  className="shrink-0 transition-all duration-200 animate-in fade-in slide-in-from-bottom-3"
+                  className="relative shrink-0 transition-all duration-200 animate-in fade-in slide-in-from-bottom-3"
                   style={{
                     scrollSnapAlign: 'start',
                     animationDelay: `${Math.min(idx * 35, 280)}ms`,
@@ -279,6 +290,11 @@ export function HandTrayModal({
                     }}
                     className="cursor-pointer shadow-xs hover:shadow-md"
                   />
+                  {code === 'A028' && !hasA028QualifyingPartner && (
+                    <span className="absolute -top-1 -right-1 z-10 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">
+                      ต้องมี Action ที่ใช้ร่วมได้
+                    </span>
+                  )}
                 </div>
               );
             })
