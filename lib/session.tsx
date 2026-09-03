@@ -257,11 +257,16 @@ export function resolveCompletedStackFrames(state: RoomState): RoomState {
         if (resolvingFrame.customPayload?.doubled) {
           next = executeActionFrameEffect(next, resolvingFrame);
         }
+        // Strip `doubled` before persisting to history: it's a one-shot
+        // modifier that was already "spent" resolving this play. A later
+        // replay (e.g. A094) should repeat the underlying effect once, not
+        // inherit `doubled` and compound into a double-doubled invocation.
+        const { doubled: _doubled, ...historyPayload } = resolvingFrame.customPayload ?? {};
         const entry: RecentActionPlay = {
           code: resolvingFrame.sourceCode,
           actorId: resolvingFrame.actorId,
           targetIds: resolvingFrame.targetIds,
-          customPayload: resolvingFrame.customPayload,
+          customPayload: Object.keys(historyPayload).length > 0 ? historyPayload : undefined,
         };
         next.recentActionPlays = [entry, ...(next.recentActionPlays ?? [])].slice(0, 5);
       }
@@ -700,7 +705,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         next = resolveCompletedStackFrames(next);
         return next;
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const initiateTrapInteraction = useCallback(
@@ -720,7 +725,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
         next = resolveCompletedStackFrames(next);
         return next;
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const respondToDelegatedTargetPick = useCallback(
@@ -796,7 +801,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           },
         };
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const skipCounter = useCallback(
@@ -830,7 +835,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
               : null,
         };
       }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    [run, myPlayerId]
   );
 
   const declareMuffinTimeFn = useCallback(
