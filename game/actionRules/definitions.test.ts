@@ -1620,4 +1620,14 @@ describe('A108', () => {
     const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
     expect(next.reactionStack ?? []).toEqual([]);
   });
+
+  it('respects an active A040 redirect for the chosen card\'s own post-play destination', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    state.actionRedirect = { toPlayerId: 'p3', remaining: 2 };
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.players.p3.hand).toContain('A006');
+    expect(next.players.p2.hand).not.toContain('A006');
+    expect(next.discardPile).not.toContain('A006');
+  });
 });

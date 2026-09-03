@@ -22,7 +22,6 @@ import { pushStackFrame } from '../reactionStack';
 import { applyActionRedirect, resolvePostPlayDestination } from '../turnFlow';
 import { autoResolveInputFrame } from './autoResolve';
 import { reshuffleDiscardIntoDraw } from '../pile';
-import { isActionImplemented } from './registry';
 import { pickRandomIndices } from '../util';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
@@ -1944,7 +1943,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
       const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
       if (chainDepth >= 20) return state;
 
-      const candidates = state.players[forcedPlayerId].hand.filter((code) => isActionImplemented(code));
+      const candidates = state.players[forcedPlayerId].hand.filter((code) => code in ACTION_RULES_BATCH_1);
       if (candidates.length === 0) return state;
       const idx = pickRandomIndices(candidates.length, 1, Math.random)[0];
       const chosenCode = candidates[idx];
