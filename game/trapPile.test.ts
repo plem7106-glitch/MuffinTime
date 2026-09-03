@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrap, stealTrapToHand } from './trapPile';
+import { discardTraps, discardAllTraps, returnTrapsToHand, stealTrap, stealTrapToHand, forceDiscardTraps, forceDiscardAllTraps } from './trapPile';
 import type { RoomState } from './types';
 
 function baseState(): RoomState {
@@ -83,5 +83,32 @@ describe('stealTrapToHand', () => {
   it('is a no-op if the card is not found', () => {
     const state = baseState();
     expect(stealTrapToHand(state, 'p1', 'p2', 'T99')).toEqual(state);
+  });
+});
+
+describe('forceDiscardTraps', () => {
+  it('forceDiscardTraps discards traps like discardTraps() and tracks the actual count moved', () => {
+    let state = baseState();
+    state.players.p2.traps = ['T001', 'T002', 'T003'];
+    state = forceDiscardTraps(state, 'p2', 2, ['T001', 'T002']);
+    expect(state.players.p2.traps).toEqual(['T003']);
+    expect(state.players.p2.forcedLossSinceLastTurn).toBe(2);
+  });
+});
+
+describe('forceDiscardAllTraps', () => {
+  it('forceDiscardAllTraps discards all traps like discardAllTraps() and tracks the count', () => {
+    let state = baseState();
+    state.players.p2.traps = ['T001', 'T002'];
+    state = forceDiscardAllTraps(state, 'p2');
+    expect(state.players.p2.traps).toEqual([]);
+    expect(state.players.p2.forcedLossSinceLastTurn).toBe(2);
+  });
+
+  it('forceDiscardAllTraps tracks 0 (no-op) when the player has no traps placed', () => {
+    let state = baseState();
+    state.players.p2.traps = []; // baseState() defaults p2 to ['T04']; clear it for this case
+    state = forceDiscardAllTraps(state, 'p2');
+    expect(state.players.p2.forcedLossSinceLastTurn).toBeUndefined();
   });
 });
