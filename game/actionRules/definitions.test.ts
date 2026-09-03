@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { resolveActionEffect, executeActionFrameEffect, getActionRule } from './registry';
-import type { CardCode, PlayerId, RoomState, StackFrame } from '../types';
+import type { CardCode, PlayerId, RecentActionPlay, RoomState, StackFrame } from '../types';
 
 /** Builds a minimal StackFrame carrying customPayload, for roster_select/
  * outcome_entry rules that resolveActionEffect's legacy (code, actorId,
@@ -1629,5 +1629,87 @@ describe('A108', () => {
     expect(next.players.p3.hand).toContain('A006');
     expect(next.players.p2.hand).not.toContain('A006');
     expect(next.discardPile).not.toContain('A006');
+  });
+});
+
+describe('A094', () => {
+  function stateWithHistory(recentActionPlays: RecentActionPlay[]): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile: [],
+      discardPile: [],
+      players: {
+        me: { name: 'Me', hand: ['A094'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      recentActionPlays,
+    } as unknown as RoomState;
+  }
+
+  function testFrame(overrides: Partial<StackFrame> = {}): StackFrame {
+    return {
+      frameId: 'frame-1',
+      parentFrameId: null,
+      sourceType: 'action',
+      sourceCode: 'A094',
+      actorId: 'me',
+      targetIds: [],
+      targetScope: 'single',
+      eligibleResponderIds: [],
+      responses: {},
+      modifiers: [],
+      status: 'resolving',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      ...overrides,
+    };
+  }
+
+  it('replays the most recent non-A094 play, under A094\'s own actor', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([{ code: 'A006', actorId: 'p3', targetIds: ['p2'] }]);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+    expect(pushed?.actorId).toBe('me');
+    expect(pushed?.targetIds).toEqual(['p2']);
+  });
+
+  it('skips a most-recent entry that is itself A094', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([
+      { code: 'A094', actorId: 'p2', targetIds: [] },
+      { code: 'A006', actorId: 'p3', targetIds: ['p2'] },
+    ]);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+  });
+
+  it('no-ops when there is no eligible history', () => {
+    const rule = getActionRule('A094')!;
+    const next = rule.executeEffect(stateWithHistory([]), testFrame());
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('does not push a further nested frame once chainDepth reaches the cap', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([{ code: 'A006', actorId: 'p3', targetIds: ['p2'] }]);
+    const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+
+  it('reuses the historical customPayload verbatim, merging in the recomputed chainDepth', () => {
+    const rule = getActionRule('A094')!;
+    const state = stateWithHistory([{ code: 'A006', actorId: 'p3', targetIds: ['p2'], customPayload: { outcome: true } }]);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.customPayload?.outcome).toBe(true);
+    expect(pushed?.customPayload?.chainDepth).toBe(1);
   });
 });

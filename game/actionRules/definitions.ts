@@ -1962,6 +1962,30 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     },
   },
 
+  A094: {
+    code: 'A094',
+    name_en: 'In Sync',
+    name_th: 'พร้อมเพรียง',
+    description_th: 'ใช้ Effect ของ Action ใบล่าสุดที่ถูกเล่นซ้ำอีกครั้ง',
+    kind: 'auto',
+    executeEffect: (state, frame) => {
+      const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
+      if (chainDepth >= 20) return state;
+
+      const history = state.recentActionPlays ?? [];
+      const entry = history.find((play) => play.code !== 'A094');
+      if (!entry) return state;
+
+      return pushStackFrame(state, {
+        sourceType: 'action',
+        sourceCode: entry.code,
+        actorId: frame.actorId,
+        targetIds: entry.targetIds,
+        customPayload: { ...entry.customPayload, chainDepth: chainDepth + 1 },
+      });
+    },
+  },
+
   // A091 "I'm A Doctor" (Family C3) intentionally NOT included here -- needs
   // a "cards lost since your last turn" counter, but the low-level primitives
   // (stealRandom/stealChosen/rosterStolenBy/executeAllDiscard/etc.) don't know
