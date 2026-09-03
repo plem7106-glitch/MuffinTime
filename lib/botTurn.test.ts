@@ -71,6 +71,24 @@ describe('decideBotTurn', () => {
     }
   });
 
+  it('never plays A028 even when it is the only card in hand -- bots have no concept of its co-play mechanic', () => {
+    const state = baseState();
+    state.players['bot-1'].hand = ['A028'];
+    const decision = decideBotTurn(state, 'bot-1', () => 0);
+    expect(decision).toEqual({ action: 'draw' });
+  });
+
+  it('never selects A028 out of a hand containing other playable actions', () => {
+    const state = baseState();
+    state.players['bot-1'].hand = ['A028', 'A001'];
+    // rng() = 0 both picks "play" (below ACTION_PLAY_PROBABILITY) and,
+    // if A028 were still a candidate, would deterministically index into
+    // whichever candidate sorts first -- with only A001 left after
+    // filtering, this must always resolve to A001.
+    const decision = decideBotTurn(state, 'bot-1', () => 0);
+    expect(decision).toEqual({ action: 'play', code: 'A001' });
+  });
+
   it('handles bot vs bot targeting when no humans remain in candidates', () => {
     const state = baseState();
     state.turnOrder = ['bot-1', 'bot-2', 'bot-3'];

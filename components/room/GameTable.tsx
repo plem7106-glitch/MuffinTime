@@ -27,6 +27,7 @@ import { DateInviteModal } from '../modals/DateInviteModal';
 import { canActivateManualTrap } from '../../game/trapRules/engine';
 import { getTrapRule } from '../../game/trapRules/registry';
 import { getActionRule, getPlayableActions, isActionImplemented } from '../../game/actionRules/registry';
+import type { ActionRuleDefinition } from '../../game/actionRules/types';
 import { isQuantityEffectCard } from '../../game/actionRules/quantityCards';
 import { getSocialCounterConfig, isSocialCounter } from '../../game/socialCounter';
 
@@ -49,6 +50,29 @@ import { ManualGiveModal } from './ManualGiveModal';
 import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon, CloseIcon } from '../ui/Icons';
 import type { CardCode, PlayerId } from '../../game/types';
 
+
+// True if the given ActionRuleDefinition needs ANY of its own UI input
+// (target selection, roster selection, outcome entry, dual-target picks,
+// number input, drink-check, or target-then-outcome) before its effect can
+// resolve. Used by handlePickDoublePartner (A028's co-play partner picker)
+// to decide whether a chosen partner card should open its own normal input
+// flow or, for a flagless card, skip straight to playing it -- exactly
+// mirroring what "normal" (non-doubled) play does for that same card.
+// Deliberately checks the rule's actual flags rather than a hardcoded list
+// of currently-flagless allow-listed codes, so a future card added to
+// QUANTITY_EFFECT_CARDS is handled correctly without touching this file.
+function hasAnyInputFlag(rule: ActionRuleDefinition | undefined): boolean {
+  if (!rule) return false;
+  return Boolean(
+    rule.needsTargetSelection ||
+      rule.needsRosterSelection ||
+      rule.needsOutcomeEntry ||
+      rule.needsDualTargetSelection ||
+      rule.needsNumberInput ||
+      rule.needsDrinkCheck ||
+      rule.needsTargetThenOutcome
+  );
+}
 
 export function GameTable() {
   const router = useRouter();
@@ -260,6 +284,22 @@ export function GameTable() {
   const handlePickDoublePartner = (partnerCode: CardCode) => {
     const card = getCardDisplay(partnerCode);
     setAwaitingDoublePartnerPick(false);
+    const rule = getActionRule(card.code);
+    // Flagless partner (e.g. A127): its normal solo-play flow is "no picker
+    // at all, immediate play" (see handlePlayActionDirect) -- routing it
+    // through pendingTargetCard would open the primary TargetSelector below
+    // regardless, since that selector's `open` condition has no positive
+    // check for needsTargetSelection/needsRosterSelection, only negative
+    // checks for the OTHER flows' flags, all of which are false/undefined
+    // here too. Skip straight to playDoubledAction instead, mirroring
+    // handlePlayActionDirect's flagless branch exactly (no needsTodayDate
+    // check needed: none of the flagless quantity-effect allow-list codes
+    // carry that flag).
+    if (!hasAnyInputFlag(rule)) {
+      setPendingDoublePartner(null);
+      playDoubledAction(card.code);
+      return;
+    }
     setPendingDoublePartner(card);
     setPendingTargetCard(card); // reuses the existing target-selection UI for the partner card
     setChosenTarget(null);
@@ -268,7 +308,6 @@ export function GameTable() {
     // partner card may need the dual-pick (A115), drink-check (A158), or
     // target-then-outcome (A166) flows below, not just the plain single/
     // roster TargetSelector, and those flows are gated on this phase state.
-    const rule = getActionRule(card.code);
     setDualPickPhase(rule?.needsDualTargetSelection ? 'first' : null);
     setDualPickFirstId(null);
     setDrinkCheckPhase(rule?.needsDrinkCheck ? 'outcome' : null);
