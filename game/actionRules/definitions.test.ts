@@ -1375,11 +1375,29 @@ describe('A064 (plant Banana Peel face-up in the draw pile)', () => {
     expect(next.drawPile).toContain('A064');
   });
 
-  it('no-ops if A064 is not actually on top of discardPile (defensive)', () => {
+  it('finds and plants A064 anywhere in discardPile, not just the top (e.g. a trap card landed on top of it first)', () => {
     const state = threePlayerState();
     state.discardPile = ['A064', 'H1'];
     const next = resolveActionEffect(state, 'A064', 'me');
-    expect(next.discardPile).toEqual(['A064', 'H1']);
+    expect(next.discardPile).toEqual(['H1']);
+    expect(next.drawPile.length).toBe(state.drawPile.length + 1);
+    expect(next.drawPile).toContain('A064');
+    expect(next.bananaPeelArmed).toBe(true);
+  });
+
+  it('genuinely no-ops when A064 is not in discardPile at all (e.g. A040 redirected the play into a hand instead)', () => {
+    const state = threePlayerState();
+    state.discardPile = ['H1', 'H2'];
+    const next = resolveActionEffect(state, 'A064', 'me');
+    expect(next.discardPile).toEqual(['H1', 'H2']);
     expect(next.drawPile).toEqual(state.drawPile);
+    expect(next.bananaPeelArmed).toBeUndefined();
+  });
+
+  it('sets bananaPeelArmed when it successfully plants the card', () => {
+    const state = threePlayerState();
+    state.discardPile = ['A064'];
+    const next = resolveActionEffect(state, 'A064', 'me');
+    expect(next.bananaPeelArmed).toBe(true);
   });
 });

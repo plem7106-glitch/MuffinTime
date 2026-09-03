@@ -164,6 +164,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
     resetPlayerPerTurnFlags(next.players[pid]);
   }
   next.actionRedirect = null;
+  next.bananaPeelArmed = false;
   next.pendingActionObligations = undefined;
   next.roundNumber = 1;
   next.sequenceNumber = 1;
@@ -244,6 +245,7 @@ export function resetForPlayAgain(state: RoomState): RoomState {
     resetPlayerPerTurnFlags(next.players[pid]);
   }
   next.actionRedirect = null;
+  next.bananaPeelArmed = false;
   next.pendingActionObligations = undefined;
 
   next.status = 'lobby';
@@ -330,6 +332,7 @@ export function restartGame(state: RoomState, rng: Rng = Math.random): RoomState
   next.pendingWinChecks = [];
   next.pendingActionObligations = undefined;
   next.actionRedirect = null;
+  next.bananaPeelArmed = false;
   next.reactionStack = [];
   next.pendingResponse = null;
   next.pendingInteraction = null;

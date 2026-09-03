@@ -13,14 +13,15 @@ export function reshuffleDiscardIntoDraw(state: RoomState, rng: Rng = Math.rando
   return next;
 }
 
-export function draw(state: RoomState, playerId: PlayerId, n: number, _rng?: Rng): RoomState {
+export function draw(state: RoomState, playerId: PlayerId, n: number, rng: Rng = Math.random): RoomState {
   let next = cloneState(state);
   for (let i = 0; i < n; i++) {
     if (next.drawPile.length === 0) break;
     const card = next.drawPile.pop()!;
     next.players[playerId].hand.push(card);
-    if (card === 'A064') {
-      next = discardOthersAfterBananaPeel(next, playerId);
+    if (card === 'A064' && next.bananaPeelArmed) {
+      next.bananaPeelArmed = false;
+      next = discardOthersAfterBananaPeel(next, playerId, rng);
     }
   }
   return next;
@@ -34,13 +35,13 @@ export function draw(state: RoomState, playerId: PlayerId, n: number, _rng?: Rng
  * index-tracking needed. Clamps to however many other cards they actually
  * hold (0-3) rather than throwing if they have fewer than 3 others.
  */
-function discardOthersAfterBananaPeel(state: RoomState, playerId: PlayerId): RoomState {
+function discardOthersAfterBananaPeel(state: RoomState, playerId: PlayerId, rng: Rng): RoomState {
   const hand = state.players[playerId].hand;
   const others = hand.filter((code) => code !== 'A064');
   const count = Math.min(3, others.length);
-  const indices = pickRandomIndices(others.length, count, Math.random);
+  const indices = pickRandomIndices(others.length, count, rng);
   const toDiscard = indices.map((i) => others[i]);
-  return discard(state, playerId, count, toDiscard);
+  return discard(state, playerId, count, toDiscard, rng);
 }
 
 export function drawFromBottom(state: RoomState, playerId: PlayerId, n: number): RoomState {

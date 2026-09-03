@@ -41,6 +41,7 @@ describe('draw', () => {
       drawPile: ['H1', 'H2', 'H3', 'H4', 'A064'],
       discardPile: [],
       players: { p1: { hand: ['H5', 'H6', 'H7'] } },
+      bananaPeelArmed: true,
     } as unknown as RoomState;
     const next = draw(state, 'p1', 1);
     expect(next.players.p1.hand).toEqual(['A064']);
@@ -54,6 +55,7 @@ describe('draw', () => {
       drawPile: ['A064'],
       discardPile: [],
       players: { p1: { hand: ['H1'] } },
+      bananaPeelArmed: true,
     } as unknown as RoomState;
     const next = draw(state, 'p1', 1);
     expect(next.players.p1.hand).toEqual(['A064']);
@@ -68,11 +70,23 @@ describe('draw', () => {
       drawPile: ['LATER1', 'LATER2', 'A064', 'H1', 'H2'],
       discardPile: [],
       players: { p1: { hand: [] } },
+      bananaPeelArmed: true,
     } as unknown as RoomState;
     const next = draw(state, 'p1', 4);
     expect(next.players.p1.hand).toEqual(['A064', 'LATER2']);
     expect(next.discardPile.length).toBe(2);
     expect(new Set(next.discardPile)).toEqual(new Set(['H1', 'H2']));
+  });
+
+  it('drawing A064 when it has never been planted (bananaPeelArmed unset) is an ordinary draw -- no discard triggered', () => {
+    const state = {
+      drawPile: ['H1', 'H2', 'H3', 'A064'],
+      discardPile: [],
+      players: { p1: { hand: ['K1', 'K2', 'K3'] } },
+    } as unknown as RoomState;
+    const next = draw(state, 'p1', 1);
+    expect(next.players.p1.hand).toEqual(['K1', 'K2', 'K3', 'A064']);
+    expect(next.discardPile).toEqual([]);
   });
 });
 

@@ -1853,10 +1853,12 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto',
     executeEffect: (state) => {
       const next = cloneState(state);
-      if (next.discardPile[next.discardPile.length - 1] !== 'A064') return next;
-      next.discardPile.pop();
+      const i = next.discardPile.lastIndexOf('A064');
+      if (i === -1) return next;
+      next.discardPile.splice(i, 1);
       const pos = Math.floor(Math.random() * (next.drawPile.length + 1));
       next.drawPile.splice(pos, 0, 'A064');
+      next.bananaPeelArmed = true;
       return next;
     },
   },
