@@ -51,16 +51,29 @@ import { CardsIcon, TrapIcon, CardStackIcon, CheckIcon, CloseIcon } from '../ui/
 import type { CardCode, PlayerId } from '../../game/types';
 
 
-// True if the given ActionRuleDefinition needs ANY of its own UI input
-// (target selection, roster selection, outcome entry, dual-target picks,
-// number input, drink-check, or target-then-outcome) before its effect can
-// resolve. Used by handlePickDoublePartner (A028's co-play partner picker)
-// to decide whether a chosen partner card should open its own normal input
-// flow or, for a flagless card, skip straight to playing it -- exactly
-// mirroring what "normal" (non-doubled) play does for that same card.
-// Deliberately checks the rule's actual flags rather than a hardcoded list
-// of currently-flagless allow-listed codes, so a future card added to
-// QUANTITY_EFFECT_CARDS is handled correctly without touching this file.
+// True if the given ActionRuleDefinition needs ANY of its own UI input or
+// auto-stamped value (all 8 needsX flags on ActionRuleDefinition: target
+// selection, roster selection, outcome entry, dual-target picks, today's
+// date, number input, drink-check, and target-then-outcome) before its
+// effect can resolve. Used by handlePickDoublePartner (A028's co-play
+// partner picker) to decide whether a chosen partner card needs special
+// handling at all or, for a truly flagless card, can skip straight to
+// playing it -- exactly mirroring what "normal" (non-doubled) play does for
+// that same card. Deliberately checks the rule's actual flags rather than a
+// hardcoded list of currently-flagless allow-listed codes, so a future card
+// added to QUANTITY_EFFECT_CARDS with a flag this function already checks
+// is handled correctly without touching this file -- that guarantee only
+// holds against the 8 flags checked here today; if ActionRuleDefinition
+// ever grows a 9th needsX flag, this function must be updated too, the same
+// as needsTodayDate had to be added here.
+//
+// needsTodayDate is a special case even though it's included below: it
+// needs a *value* (the actor's device date) stamped into the play payload,
+// not a *picker* UI. handlePickDoublePartner does not use this function's
+// result directly to decide whether to open a picker -- it checks
+// rule?.needsTodayDate separately (see below) so a rule whose only true
+// flag is needsTodayDate still skips the picker, the same way
+// handlePlayActionDirect does for solo (non-doubled) play.
 function hasAnyInputFlag(rule: ActionRuleDefinition | undefined): boolean {
   if (!rule) return false;
   return Boolean(
@@ -68,6 +81,7 @@ function hasAnyInputFlag(rule: ActionRuleDefinition | undefined): boolean {
       rule.needsRosterSelection ||
       rule.needsOutcomeEntry ||
       rule.needsDualTargetSelection ||
+      rule.needsTodayDate ||
       rule.needsNumberInput ||
       rule.needsDrinkCheck ||
       rule.needsTargetThenOutcome
@@ -292,12 +306,26 @@ export function GameTable() {
     // check for needsTargetSelection/needsRosterSelection, only negative
     // checks for the OTHER flows' flags, all of which are false/undefined
     // here too. Skip straight to playDoubledAction instead, mirroring
-    // handlePlayActionDirect's flagless branch exactly (no needsTodayDate
-    // check needed: none of the flagless quantity-effect allow-list codes
-    // carry that flag).
-    if (!hasAnyInputFlag(rule)) {
+    // handlePlayActionDirect's flagless branch exactly.
+    //
+    // needsTodayDate is deliberately excluded from this picker-open check
+    // (via the { needsTodayDate: false } override below) even though
+    // hasAnyInputFlag itself checks it: needsTodayDate needs a stamped
+    // value, not a picker, so a rule whose ONLY true flag is needsTodayDate
+    // must still take this no-picker branch -- it just also needs "today"
+    // stamped into the dispatched payload, mirroring how
+    // handlePlayActionDirect/todayMMDD() already handle needsTodayDate for
+    // solo play. Currently inert: no code in the QUANTITY_EFFECT_CARDS
+    // allow-list is needsTodayDate-only (the only needsTodayDate cards --
+    // A037/A066/A137/A017/A108 -- either aren't in the allow-list or also
+    // carry needsTargetSelection, which already forces the picker branch
+    // below), so this is untested by any real-card test; a fake card code
+    // would test something that can't occur with real data, so it's left
+    // as a documented gap instead.
+    if (!hasAnyInputFlag(rule ? { ...rule, needsTodayDate: false } : rule)) {
       setPendingDoublePartner(null);
-      playDoubledAction(card.code);
+      const todayPayload = rule?.needsTodayDate ? { today: todayMMDD() } : undefined;
+      playDoubledAction(card.code, undefined, todayPayload);
       return;
     }
     setPendingDoublePartner(card);
