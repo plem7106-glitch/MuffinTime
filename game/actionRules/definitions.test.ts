@@ -1542,3 +1542,82 @@ describe('A017', () => {
     }
   });
 });
+
+describe('A108', () => {
+  function stateWithHands(p2Hand: CardCode[], p3Hand: CardCode[] = []): RoomState {
+    return {
+      status: 'playing',
+      hostId: 'me',
+      turnOrder: ['me', 'p2', 'p3'],
+      currentTurnIndex: 0,
+      direction: 1,
+      muffinTimeTarget: 10,
+      drawPile: [],
+      discardPile: [],
+      players: {
+        me: { name: 'Me', hand: ['A108'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: p2Hand, traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: p3Hand, traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+    } as unknown as RoomState;
+  }
+
+  function testFrame(overrides: Partial<StackFrame> = {}): StackFrame {
+    return {
+      frameId: 'frame-1',
+      parentFrameId: null,
+      sourceType: 'action',
+      sourceCode: 'A108',
+      actorId: 'me',
+      targetIds: ['p2'],
+      targetScope: 'single',
+      eligibleResponderIds: [],
+      responses: {},
+      modifiers: [],
+      status: 'resolving',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      ...overrides,
+    };
+  }
+
+  it('removes a random Action card from the target\'s hand and pushes a nested frame for it', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.players.p2.hand).not.toContain('A006');
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+  });
+
+  it('makes the FORCED player (not the actor) the actor of the chosen card', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.actorId).toBe('p2');
+  });
+
+  it('only picks among implemented Action codes, ignoring non-Action cards in hand', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['T01', 'A006']);
+    const next = rule.executeEffect(state, testFrame());
+    const pushed = next.reactionStack?.[next.reactionStack.length - 1];
+    expect(pushed?.sourceCode).toBe('A006');
+    expect(next.players.p2.hand).toContain('T01');
+  });
+
+  it('no-ops when the target has no implemented Action cards', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['T01']);
+    const next = rule.executeEffect(state, testFrame());
+    expect(next.reactionStack ?? []).toEqual([]);
+    expect(next.players.p2.hand).toEqual(['T01']);
+  });
+
+  it('does not push a further nested frame once chainDepth reaches the cap', () => {
+    const rule = getActionRule('A108')!;
+    const state = stateWithHands(['A006']);
+    const next = rule.executeEffect(state, testFrame({ customPayload: { chainDepth: 20 } }));
+    expect(next.reactionStack ?? []).toEqual([]);
+  });
+});

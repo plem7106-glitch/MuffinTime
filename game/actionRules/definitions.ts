@@ -19,9 +19,11 @@ import type { ActionRuleDefinition } from './types';
 import { rosterIdsFromFrame, outcomeFromFrame, dualTargetIdsFromFrame, todayFromFrame, numberInputFromFrame } from './types';
 import type { CardCode, PlayerId, RoomState, Rng } from '../types';
 import { pushStackFrame } from '../reactionStack';
-import { resolvePostPlayDestination } from '../turnFlow';
+import { applyActionRedirect, resolvePostPlayDestination } from '../turnFlow';
 import { autoResolveInputFrame } from './autoResolve';
 import { reshuffleDiscardIntoDraw } from '../pile';
+import { isActionImplemented } from './registry';
+import { pickRandomIndices } from '../util';
 
 /** A105: steals every Action-type card (not the whole hand) from one player to another. */
 function stealAllActionCards(state: RoomState, fromId: PlayerId, toId: PlayerId): RoomState {
@@ -1916,6 +1918,44 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
         sourceType: 'action',
         sourceCode: foundCode,
         actorId: chosenPlayerId,
+        targetIds: auto.targetIds,
+        customPayload: { ...auto.customPayload, chainDepth: chainDepth + 1 },
+      });
+      return next;
+    },
+  },
+
+  A108: {
+    code: 'A108',
+    name_en: 'Play That One',
+    name_th: 'เล่นใบนั้นสิ',
+    description_th: 'เลือก Action 1 ใบจากมือของผู้เล่นอีก 1 คน แล้วบังคับให้ผู้เล่นคนนั้นเล่นไพ่ใบนั้น',
+    kind: 'auto',
+    needsTargetSelection: true,
+    needsTodayDate: true,
+    targetPrompt: 'เลือกผู้เล่นที่มี Action การ์ดเพื่อบังคับให้เล่น',
+    // ponytail: real card lets the actor pick a SPECIFIC Action card from the
+    // target's hand -- no reveal-then-pick-one UI exists for that (same gap
+    // as A051/A120/A014 above), so this picks a random implemented Action
+    // card from the target's hand and force-plays that instead.
+    executeEffect: (state, frame) => {
+      const forcedPlayerId = frame.targetIds[0];
+      if (!forcedPlayerId || !state.players[forcedPlayerId]) return state;
+      const chainDepth = (frame.customPayload?.chainDepth as number | undefined) ?? 0;
+      if (chainDepth >= 20) return state;
+
+      const candidates = state.players[forcedPlayerId].hand.filter((code) => isActionImplemented(code));
+      if (candidates.length === 0) return state;
+      const idx = pickRandomIndices(candidates.length, 1, Math.random)[0];
+      const chosenCode = candidates[idx];
+
+      let next = applyActionRedirect(state, forcedPlayerId, chosenCode);
+      const auto = autoResolveInputFrame(next, chosenCode, forcedPlayerId, todayFromFrame(frame));
+      if (!auto) return next;
+      next = pushStackFrame(next, {
+        sourceType: 'action',
+        sourceCode: chosenCode,
+        actorId: forcedPlayerId,
         targetIds: auto.targetIds,
         customPayload: { ...auto.customPayload, chainDepth: chainDepth + 1 },
       });
