@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stealRandom, stealChosen, giveCard, swapHands } from './transfer';
+import { stealRandom, stealChosen, giveCard, swapHands, forceSteal } from './transfer';
 import type { RoomState } from './types';
 
 function baseState(): RoomState {
@@ -58,5 +58,25 @@ describe('swapHands', () => {
     const next = swapHands(baseState(), 'p1', 'p2');
     expect(next.players.p1.hand).toEqual(['B01']);
     expect(next.players.p2.hand).toEqual(['A01', 'A02', 'A03']);
+  });
+});
+
+describe('forceSteal', () => {
+  it('steals like stealRandom() and tracks the actual count moved', () => {
+    let state = baseState();
+    state.players.p1.hand = ['A001', 'A002'];
+    state.players.p2.hand = [];
+    state = forceSteal(state, 'p1', 'p2', 2, () => 0);
+    expect(state.players.p1.hand).toEqual([]);
+    expect(state.players.p2.hand.length).toBe(2);
+    expect(state.players.p1.forcedLossSinceLastTurn).toBe(2);
+  });
+
+  it('tracks only the actual (clamped) count when the victim has fewer cards than requested', () => {
+    let state = baseState();
+    state.players.p1.hand = ['A001'];
+    state.players.p2.hand = [];
+    state = forceSteal(state, 'p1', 'p2', 5, () => 0);
+    expect(state.players.p1.forcedLossSinceLastTurn).toBe(1);
   });
 });

@@ -1,4 +1,4 @@
-import { cloneState, shuffle, pickRandomIndices } from './util';
+import { cloneState, shuffle, pickRandomIndices, trackForcedLoss } from './util';
 import type { RoomState, PlayerId, CardCode, Rng } from './types';
 import { getCardById } from '../data/cards/index';
 
@@ -83,6 +83,19 @@ export function discard(
     next.discardPile.push(code);
   }
   return next;
+}
+
+export function forceDiscard(
+  state: RoomState,
+  victimId: PlayerId,
+  n: number,
+  cardCodes: CardCode[] | null = null,
+  rng: Rng = Math.random
+): RoomState {
+  const before = state.players[victimId]?.hand.length ?? 0;
+  const discarded = discard(state, victimId, n, cardCodes, rng);
+  const after = discarded.players[victimId]?.hand.length ?? 0;
+  return trackForcedLoss(discarded, victimId, before - after);
 }
 
 /**
