@@ -180,7 +180,12 @@ export function resolveCounterEffect(
       const parentId = resolvingFrame?.parentFrameId ?? (resolvingFrame?.customPayload?.parentFrameId as string | undefined);
       const parentFrame = parentId ? getStackFrame(state, parentId) : undefined;
       if (!parentFrame) return state;
-      const nextPlayerId = getNextPlayerId(state.seatOrder ?? state.turnOrder, actorId);
+      // Same order/direction convention as every other "next player" lookup
+      // (e.g. turn.ts's emergencyForceSkipTurn) -- turnOrder first, and the
+      // table's actual current direction, not always clockwise.
+      const order = state.turnOrder && state.turnOrder.length > 0 ? state.turnOrder : (state.seatOrder ?? []);
+      const dir = state.direction ?? (state.playDirection === 'counterclockwise' ? -1 : 1);
+      const nextPlayerId = getNextPlayerId(order, actorId, dir);
       return redirectFrameTarget(state, parentFrame.frameId, nextPlayerId);
     }
     case 'C35':
@@ -199,7 +204,7 @@ export function resolveCounterEffect(
       return addModifierToFrame(state, parentId, {
         modifierId: `mod-C11-${Date.now()}`,
         sourceFrameId: resolvingFrame?.frameId ?? '',
-        type: 'cancel_all',
+        type: 'protect_target',
         affectedTargetIds: [actorId],
       });
     }
@@ -263,11 +268,16 @@ export function resolveCounterEffect(
       let next = cloneState(state);
       const order = [...(next.turnOrder ?? Object.keys(next.players))];
       const curIdx = next.currentTurnIndex ?? 0;
+      const currentPlayerId = order[curIdx];
       const actorPos = order.indexOf(actorId);
-      if (actorPos !== -1 && actorPos !== (curIdx + 1) % order.length) {
+      const alreadyNext = order[(curIdx + 1) % order.length] === actorId;
+      if (actorPos !== -1 && !alreadyNext) {
         order.splice(actorPos, 1);
-        const insertIdx = (curIdx + 1) % (order.length + 1);
-        order.splice(insertIdx, 0, actorId);
+        // Re-locate the current turn holder by id, not the pre-splice index --
+        // removing an earlier-seated actor shifts every later index down by
+        // one, so reusing curIdx here would insert one seat too early.
+        const currentPos = order.indexOf(currentPlayerId);
+        order.splice(currentPos === -1 ? 0 : currentPos + 1, 0, actorId);
         next.turnOrder = order;
       }
       return next;

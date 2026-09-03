@@ -65,6 +65,11 @@ describe('resolveDelegatedTargetPick', () => {
     expect(next.pendingInteraction).toBeNull();
     expect(next.players.p3.hand).toEqual([]);
     expect(next.discardPile).toEqual(expect.arrayContaining(['H4', 'H5']));
+    // Regression: this must be a forced loss (forceDiscard), not a bare
+    // discard() -- the chosen target didn't choose to lose their hand, so
+    // A091 must credit it, same as A016's identical "discard your whole
+    // hand" mechanic.
+    expect(next.players.p3.forcedLossSinceLastTurn).toBe(2);
   });
 
   it('A130: exactly one card moves from the delegated player to the chosen target', () => {

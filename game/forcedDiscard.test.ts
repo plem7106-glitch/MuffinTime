@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { completeForcedDiscard, finalizeForcedDiscard, finalizePendingForcedDiscard, prepareForcedDiscard, preparePendingForcedDiscard, replacePendingForcedDiscardDestination, resolveForcedDiscard, setPreDiscardReactionResolver } from './forcedDiscard';
 import { cardTitleContains } from './titleMatcher';
 import { pushStackFrame, popStackFrame } from './reactionStack';
+import { resolveT23PreDiscardReaction } from './trapRules/engine';
 import type { RoomState } from './types';
 
 const state = (): RoomState => ({ status: 'playing', hostId: 'p1', turnOrder: ['p1','p2'], currentTurnIndex: 0, direction: 1, muffinTimeTarget: 10,
@@ -42,13 +43,36 @@ describe('forced discard foundation', () => {
     expect(Object.values(pending.pendingForcedDiscards ?? {})[0]?.status).toBe('awaiting_reaction');
     const operationId = Object.keys(pending.pendingForcedDiscards ?? {})[0];
     expect(pending.reactionStack?.[0]?.customPayload?.forcedDiscardOperationId).toBe(operationId);
-    setPreDiscardReactionResolver(null);
+    // Restore the real default (not null) -- forcedDiscard.ts's module-level
+    // resolver defaults to resolveT23PreDiscardReaction in production, and a
+    // later test in this file relying on that real default must not see it
+    // masked by a stale null left behind here.
+    setPreDiscardReactionResolver(resolveT23PreDiscardReaction);
   });
   it('tracks the victim\'s forced loss with the actual moved count', () => {
     const prepared = prepareForcedDiscard(state(), 'p2', 2, 'p1', 'op-track');
     const completed = completeForcedDiscard(prepared);
     const next = finalizeForcedDiscard(state(), completed, completed.finalDestination);
     expect(next.players.p2.forcedLossSinceLastTurn).toBe(2);
+  });
+  it('T23 intercepts a forced discard by default -- regression for T23 being dead in production because nothing but tests ever called setPreDiscardReactionResolver', () => {
+    const withOwner = state();
+    withOwner.players.p3 = { name: 'Three', hand: [], traps: ['T23'], connected: true, hasCalledMuffinTime: false, skipNextTurn: false };
+
+    let next = resolveForcedDiscard(withOwner, 'p2', 2, 'p1');
+    const frame = next.reactionStack?.[0];
+    expect(frame?.sourceCode).toBe('T23');
+    expect(frame?.actorId).toBe('p3');
+    expect(frame?.customPayload?.cardCodes).toEqual(['A001', 'A002']);
+
+    next = popStackFrame(next).state;
+    expect(next.players.p3.hand).toEqual(['A001', 'A002']);
+    expect(next.players.p2.hand).toEqual([]);
+    // The T23 card itself is discarded once its automatic-event half (in
+    // trapRules/definitions.ts) sees the resulting FORCED_DISCARD event and
+    // removes the now-spent trap from p3's placed traps.
+    expect(next.discardPile).toEqual(['T23']);
+    expect(next.players.p3.traps).toEqual([]);
   });
   it('resumes a linked pending operation when its reaction frame completes', () => {
     const operation = prepareForcedDiscard(state(), 'p2', 2, 'p1', 'op-linked');

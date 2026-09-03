@@ -65,6 +65,58 @@ describe('Trap Batch 2 & 3 (T11-T66) Declarative Rules', () => {
     }
   );
 
+  it('T21: punishes the player who forced the discard, not the trap owner -- regression for executeEffect reading frame.actorId (always the owner) instead of the forcer captured in affectedPlayerIds', () => {
+    const state = room();
+    state.players.p1.traps = ['T21'];
+    const event = createGameEvent(
+      GAME_EVENT_TYPES.FORCED_DISCARD,
+      'p2',
+      { victimId: 'p1', actorId: 'p2', count: 2 },
+      ['p1']
+    );
+    const triggered = checkAndTriggerAutomaticTraps(state, event);
+    const top = getTopFrame(triggered)!;
+    expect(top.sourceCode).toBe('T21');
+    expect(top.affectedPlayerIds).toEqual(['p2']);
+    const resolved = executeTrapFrameEffect(triggered, top);
+    expect(resolved.players.p2.hand.length).toBe(3); // forcer p2 discards 2 of their 5
+    expect(resolved.players.p1.hand.length).toBe(5); // owner/victim p1 is untouched by T21 itself
+  });
+
+  it('T29/T30 ("baby" traps) do not trigger on the owner playing their own baby card -- regression for checkBabyPlayTrigger never excluding the owner', () => {
+    for (const code of ['T29', 'T30']) {
+      const state = room();
+      state.players.p1.traps = [code];
+      const event = createGameEvent(
+        GAME_EVENT_TYPES.ACTION_PLAYED,
+        'p1',
+        { actorId: 'p1', actionCode: 'A031', targetId: 'p1' },
+        ['p1']
+      );
+      const triggered = checkAndTriggerAutomaticTraps(state, event);
+      expect(getTopFrame(triggered)).toBeUndefined();
+      expect(triggered.players.p1.traps).toEqual([code]);
+    }
+  });
+
+  it('T29/T30 still trigger normally when another player plays the baby card', () => {
+    const state = room();
+    state.players.p1.traps = ['T29'];
+    const event = createGameEvent(
+      GAME_EVENT_TYPES.ACTION_PLAYED,
+      'p2',
+      { actorId: 'p2', actionCode: 'A031', targetId: 'p1' },
+      ['p1']
+    );
+    const triggered = checkAndTriggerAutomaticTraps(state, event);
+    const top = getTopFrame(triggered)!;
+    expect(top.sourceCode).toBe('T29');
+    expect(top.triggerPlayerIds).toEqual(['p2']);
+    const resolved = executeTrapFrameEffect(triggered, top);
+    expect(resolved.players.p2.hand.length).toBe(2); // started with 5, stole 3
+    expect(resolved.players.p1.hand.length).toBe(8); // started with 5, gained 3
+  });
+
   it('T31: Action played on T31 owner triggers automatic trap and applies effect to actor', () => {
     const state = room();
     state.players.p1.traps = ['T31'];

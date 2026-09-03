@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { resolveCompletedStackFrames, applyPlayDoubledAction, applySkipCounter, applyPlayCounter, visibleFingerprint } from './session';
 import { getActionRule } from '../game/actionRules/registry';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
-import { getTopFrame } from '../game/reactionStack';
+import { getTopFrame, getStackFrame } from '../game/reactionStack';
+import { resolveCounterEffect } from '../game/counterRules/engine';
 import type { RoomState } from '../game/types';
 
 describe('resolveCompletedStackFrames', () => {
@@ -141,6 +142,63 @@ describe('resolveCompletedStackFrames', () => {
     } as unknown as Parameters<typeof a094Rule.executeEffect>[1]);
     const pushedFrame = replayed.reactionStack?.[replayed.reactionStack.length - 1];
     expect(pushedFrame?.customPayload?.doubled).toBeFalsy();
+  });
+
+  it('C07 ("also be affected") lets the parent action frame still execute with the added target, instead of being wiped by the generic counter cancellation -- regression for a bug where cancel_all fired before resolveCounterEffect\'s target addition ever mattered', () => {
+    // A038 "Die Potato" force-discards 3 cards from each of frame.targetIds.
+    const state = {
+      status: 'playing', hostId: 'p1', turnOrder: ['p1', 'p2', 'p3'], currentTurnIndex: 0,
+      direction: 1, muffinTimeTarget: 10, drawPile: [], discardPile: [],
+      players: {
+        p1: { name: 'One', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: ['X1', 'X2', 'X3', 'X4'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: ['Y1', 'Y2', 'Y3', 'Y4'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      reactionStack: [
+        {
+          frameId: 'f1', parentFrameId: null, sourceType: 'action', sourceCode: 'A038',
+          actorId: 'p1', targetIds: ['p2'], targetScope: 'single', eligibleResponderIds: [], responses: {},
+          modifiers: [], status: 'pending_responses',
+          turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+        },
+        {
+          frameId: 'f2', parentFrameId: 'f1', sourceType: 'counter', sourceCode: 'C07',
+          actorId: 'p3', targetIds: [], targetScope: 'single', eligibleResponderIds: [], responses: {},
+          modifiers: [], status: 'pending_responses',
+          turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+        },
+      ],
+    } as unknown as RoomState;
+    const next = resolveCompletedStackFrames(state);
+    expect(next.players.p2.hand.length).toBe(1); // 4 - 3
+    expect(next.players.p3.hand.length).toBe(1); // 4 - 3, added as a target by C07
+  });
+
+  it('C11 ("not affected by the current trap") only excludes the actor from the parent frame\'s targets, it does not cancel the effect for everyone else -- regression for engine.ts using cancel_all (which zeroes the whole frame) instead of protect_target', () => {
+    let state = {
+      status: 'playing', hostId: 'p1', turnOrder: ['p1', 'p2', 'p3'], currentTurnIndex: 0,
+      direction: 1, muffinTimeTarget: 10, drawPile: [], discardPile: [],
+      players: {
+        p1: { name: 'One', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p2: { name: 'Two', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+        p3: { name: 'Three', hand: [], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      },
+      reactionStack: [{
+        frameId: 'f1', parentFrameId: null, sourceType: 'trap', sourceCode: 'T21',
+        actorId: 'p1', targetIds: ['p2', 'p3'], targetScope: 'multi', eligibleResponderIds: [], responses: {},
+        modifiers: [], status: 'pending_responses',
+        turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+      }],
+    } as unknown as RoomState;
+    state = resolveCounterEffect(state, 'C11', 'p3', {
+      frameId: 'f2', parentFrameId: 'f1', sourceType: 'counter', sourceCode: 'C11',
+      actorId: 'p3', targetIds: [], targetScope: 'single', eligibleResponderIds: [], responses: {},
+      modifiers: [], status: 'pending_responses',
+      turnContext: { turnIndex: 0, phase: 'main', roundNumber: 1 },
+    } as unknown as Parameters<typeof resolveCounterEffect>[3]);
+    const parent = getStackFrame(state, 'f1');
+    expect(parent?.targetIds).toEqual(['p2']);
+    expect(parent?.status).not.toBe('cancelled');
   });
 });
 

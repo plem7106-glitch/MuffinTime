@@ -1,5 +1,5 @@
 import { cloneState } from '../util';
-import { discard } from '../pile';
+import { forceDiscard } from '../pile';
 import { stealRandom } from '../transfer';
 import type { RoomState, PlayerId, StackFrame, Rng } from '../types';
 
@@ -52,7 +52,7 @@ export function resolveDelegatedTargetPick(
   next.pendingInteraction = null;
 
   if (interaction.sourceCardCode === 'A126') {
-    return discard(next, chosenTargetId, next.players[chosenTargetId].hand.length);
+    return forceDiscard(next, chosenTargetId, next.players[chosenTargetId].hand.length);
   }
   if (interaction.sourceCardCode === 'A130') {
     if (next.players[delegatedPlayerId].hand.length === 0) return next;

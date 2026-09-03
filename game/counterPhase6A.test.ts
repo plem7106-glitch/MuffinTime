@@ -253,6 +253,23 @@ describe('Counter Phase 6A — Special Digital Counters (C01, C13, C19, C23, C32
     expect(state.turnOrder[1]).toBe('p3');
   });
 
+  it('C13 still jumps the actor to right after the current turn holder when the actor was seated BEFORE them -- regression for an off-by-one that used the pre-splice current-turn index', () => {
+    let state = setupTestState();
+    state.turnOrder = ['p1', 'p2', 'p3'];
+    state.currentTurnIndex = 2; // P3's turn; P2 (index 1) is seated before P3
+    state.players['p2'].hand.push('C13');
+
+    state = resolveActionWithCounterWindow(state, 'p3', 'A001', []);
+    const f1 = getTopFrame(state)!.frameId;
+
+    state = playCounterEngine(state, 'p2', 'C13', f1);
+    state = skipCounterEngine(state);
+
+    // P2 must land immediately after P3 (the current turn holder), not
+    // wherever a stale pre-removal index would put them.
+    expect(state.turnOrder).toEqual(['p1', 'p3', 'p2']);
+  });
+
   it('C19 — Chase Me! (Stealing C19 Forces Thief to Discard Entire Hand)', () => {
     let state = setupTestState();
     state.players['p2'].hand = ['C19']; // P2 only has C19

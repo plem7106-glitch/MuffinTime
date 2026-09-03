@@ -291,7 +291,7 @@ export function resolveT23PreDiscardReaction(
   operation: ForcedDiscardOperation
 ): PreDiscardReaction | null {
   const ownerId = Object.keys(state.players).find((id) =>
-    id !== operation.targetPlayerId && state.players[id]?.traps.includes('T23')
+    id !== operation.targetPlayerId && state.players[id]?.traps?.includes('T23')
   );
   if (!ownerId) return null;
   return {

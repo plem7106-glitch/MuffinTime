@@ -147,10 +147,18 @@ function placeAllTrapsFromHand(state: RoomState, playerId: PlayerId): RoomState 
 }
 
 /** Seating order used for "left/right neighbor" cards, falling back the same
- * way GameTable.tsx's own seatOrder computation does. Convention chosen here
- * (not verified against the seating UI's visual layout): index+1 = "right
- * neighbor", index-1 = "left neighbor". Flip the sign below if it turns out
- * backwards once seen on screen. */
+ * way GameTable.tsx's own seatOrder computation does.
+ *
+ * seatOrder is entered by the host in TurnOrderSetup.tsx as a plain list
+ * walking the table in "clockwise" order (its own comment: "Pure physical
+ * seat order"; playDirection is a separate field for which way turns
+ * currently flow, and doesn't affect this fixed physical layout). For
+ * players seated around a table facing the center, walking clockwise passes
+ * to each person's LEFT -- stand at the 12-o'clock seat facing the center
+ * (i.e. facing south) and the 3-o'clock seat, next going clockwise, is on
+ * your left hand side. So: index+1 = left neighbor, index-1 = right
+ * neighbor. (This is also the standard "clockwise = pass to the left"
+ * convention most tabletop card games use.) */
 function getSeatOrder(state: RoomState): PlayerId[] {
   const ids = Object.keys(state.players);
   if (state.seatOrder && state.seatOrder.length === ids.length && state.seatOrder.every((id) => state.players[id])) {
@@ -196,14 +204,16 @@ function swapSeats(state: RoomState, idA: PlayerId, idB: PlayerId): RoomState {
 }
 
 /** Everyone simultaneously steals 1 card from their right-seat neighbor,
- * pairing computed from the seat order before any of the steals happen. */
+ * pairing computed from the seat order before any of the steals happen.
+ * Right neighbor = index-1 -- see getSeatOrder's comment on the seating
+ * convention. */
 function stealFromRightNeighbor(state: RoomState, actorId: PlayerId, rng: Rng = Math.random): RoomState {
   const order = getSeatOrder(state);
   const count = order.length;
   let next = state;
   for (let i = 0; i < count; i++) {
     const thief = order[i];
-    const victim = order[(i + 1) % count];
+    const victim = order[(i - 1 + count) % count];
     if (thief === victim) continue;
     next = victim === actorId ? stealRandom(next, victim, thief, 1, rng) : forceSteal(next, victim, thief, 1, rng);
   }
@@ -264,6 +274,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ จั่วไพ่คนละ 2 ใบ',
     kind: 'roster_select',
     needsRosterSelection: true,
+    includeSelfAsCandidate: true,
     rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อาศัยอยู่ที่นี่',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
   },
@@ -649,7 +660,9 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     kind: 'auto', needsTargetSelection: true, targetPrompt: 'เลือกผู้เล่นที่จะรับไพ่ทั้งหมดในมือคุณ',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
-      return targetId ? executeFullHandTransfer(state, frame.actorId, targetId) : state;
+      // Self-inflicted by choice, not a forced loss -- A091 must not credit
+      // the actor for giving their own hand away (see misc.ts's convention).
+      return targetId ? executeFullHandTransfer(state, frame.actorId, targetId, false) : state;
     },
   },
   A079: {
@@ -730,7 +743,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     // ponytail: real card leaves placed Traps pinned to the seat rather than
     // following the player -- that reassignment isn't implemented, traps just
     // move with their owner like normal.
-    executeEffect: (state) => rotateSeatOrder(state, 1),
+    executeEffect: (state) => rotateSeatOrder(state, -1),
   },
   A080: {
     code: 'A080', name_en: 'Here It Comes!', name_th: 'มาแล้ว!',
@@ -742,19 +755,19 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     code: 'A087', name_en: 'I Like Trains', name_th: 'ฉันชอบรถไฟ',
     description_th: 'ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางซ้าย',
     kind: 'auto',
-    executeEffect: (state) => passHands(state, -1),
+    executeEffect: (state) => passHands(state, 1),
   },
   A110: {
     code: 'A110', name_en: 'Skateboards', name_th: 'สเกตบอร์ด',
     description_th: 'ผู้เล่นทุกคนส่งไพ่ทั้งหมดในมือให้ผู้เล่นทางขวา',
     kind: 'auto',
-    executeEffect: (state) => passHands(state, 1),
+    executeEffect: (state) => passHands(state, -1),
   },
   A156: {
     code: 'A156', name_en: 'Musical Chairs, Muffin Style', name_th: 'เก้าอี้ดนตรีฉบับมัฟฟิน',
     description_th: 'ทุกคนสลับที่นั่งไปทางซ้าย 1 ที่ พร้อมยกแก้วไปด้วย',
     kind: 'auto',
-    executeEffect: (state) => rotateSeatOrder(state, -1),
+    executeEffect: (state) => rotateSeatOrder(state, 1),
   },
   A044: {
     code: 'A044', name_en: 'Grow Up Fast', name_th: 'โตไว ๆ',
@@ -771,8 +784,13 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'ผู้เล่นทุกคนทิ้งไพ่จนเหลือไพ่ในมือเพียงคนละ 1 ใบ',
     kind: 'auto',
     executeEffect: (state, frame) => {
+      // Discard-only per the card text -- a player already at or under 1
+      // card must stay put, not draw up to 1 (drawUntilCount is symmetric,
+      // built for A044's genuinely two-way "top up or trim to 7").
       let next = state;
-      for (const id of Object.keys(next.players)) next = drawUntilCount(next, id, 1, Math.random, frame.actorId);
+      for (const id of Object.keys(next.players)) {
+        if (next.players[id].hand.length > 1) next = drawUntilCount(next, id, 1, Math.random, frame.actorId);
+      }
       return next;
     },
   },
@@ -1137,43 +1155,43 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A002: {
     code: 'A002', name_en: 'Oh No! Babies!', name_th: 'โอ้ไม่นะ! เด็กใหม่!',
     description_th: 'ผู้เล่นทุกคนที่ไม่เคยเล่นเกมนี้มาก่อน จั่วไพ่คนละ 3 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่เคยเล่นเกมนี้มาก่อน',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่เคยเล่นเกมนี้มาก่อน',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
   },
   A011: {
     code: 'A011', name_en: 'I Am Lonely', name_th: 'ฉันเหงา',
     description_th: 'ผู้เล่นทุกคนที่ไม่ได้อยู่ในความสัมพันธ์ จั่วไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อยู่ในความสัมพันธ์',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อยู่ในความสัมพันธ์',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
   },
   A065: {
     code: 'A065', name_en: 'Big Bee', name_th: 'ผึ้งยักษ์',
     description_th: 'ผู้เล่นทุกคนที่มีตัวอักษร "b" อยู่ในชื่อเต็ม จั่วไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่มีตัวอักษร "b" ในชื่อเต็ม',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่มีตัวอักษร "b" ในชื่อเต็ม',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
   },
   A069: {
     code: 'A069', name_en: 'Cool Hat', name_th: 'หมวกเท่จัง',
     description_th: 'ผู้เล่นทุกคนที่สวมหมวก จั่วไพ่คนละ 3 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมหมวก',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่สวมหมวก',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 3),
   },
   A098: {
     code: 'A098', name_en: 'Medication', name_th: 'ยา',
     description_th: 'ผู้เล่นทุกคนที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา จั่วไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่กินยาภายใน 24 ชั่วโมงที่ผ่านมา',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
   },
   A138: {
     code: 'A138', name_en: "You're A Nerd", name_th: 'นายมันเด็กเนิร์ด',
     description_th: 'ผู้เล่นทุกคนที่สวมแว่น จั่วไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมแว่น',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่สวมแว่น',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 2),
   },
   A139: {
     code: 'A139', name_en: 'Bottoms Up', name_th: 'หมดแก้ว!',
     description_th: 'ผู้เล่นทุกคนที่ยังดื่มไม่หมดแก้วในมือ ดื่มให้หมด แล้วจั่วไพ่คนละ 1 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ยังดื่มไม่หมดแก้ว',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ยังดื่มไม่หมดแก้ว',
     executeEffect: (state, frame) => rosterDraws(state, rosterIdsFromFrame(frame), 1),
   },
 
@@ -1181,37 +1199,37 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A012: {
     code: 'A012', name_en: 'Nice Hat', name_th: 'หมวกสวยนะ',
     description_th: 'ผู้เล่นทุกคนที่สวมหมวก ทิ้งไพ่คนละ 3 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่สวมหมวก',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่สวมหมวก',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
   },
   A013: {
     code: 'A013', name_en: 'Parked Car', name_th: 'รถจอดอยู่',
     description_th: 'ผู้เล่นทุกคนที่ขับรถเป็น ทิ้งไพ่คนละ 1 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ขับรถเป็น',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ขับรถเป็น',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 1),
   },
   A042: {
     code: 'A042', name_en: 'Get Off My Property', name_th: 'ออกไปจากบ้านฉัน!',
     description_th: 'ผู้เล่นทุกคนที่ไม่ได้อาศัยอยู่ที่นี่ ทิ้งไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อาศัยอยู่ที่นี่',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้อาศัยอยู่ที่นี่',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
   },
   A068: {
     code: 'A068', name_en: 'Cat Allergy', name_th: 'แพ้แมว',
     description_th: 'ผู้เล่นทุกคนที่เลี้ยงแมว ทิ้งไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เลี้ยงแมว',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่เลี้ยงแมว',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
   },
   A102: {
     code: 'A102', name_en: 'No Dog?!', name_th: 'ไม่มีหมาเหรอ?!',
     description_th: 'ผู้เล่นทุกคนที่ไม่ได้เลี้ยงสุนัข ทิ้งไพ่คนละ 2 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้เลี้ยงสุนัข',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ไม่ได้เลี้ยงสุนัข',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
   },
   A131: {
     code: 'A131', name_en: 'Rainbows', name_th: 'สายรุ้ง',
     description_th: 'เลือกสีของสายรุ้ง 1 สี ผู้เล่นทุกคนที่สวมใส่สีนั้นทิ้งไพ่คนละ 1 ใบ',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกสีก่อน แล้วเลือกผู้เล่นที่สวมใส่สีนั้น',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกสีก่อน แล้วเลือกผู้เล่นที่สวมใส่สีนั้น',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 1),
   },
 
@@ -1219,19 +1237,19 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A081: {
     code: 'A081', name_en: 'Hey, Are You An Angel?', name_th: 'เฮ้ เธอเป็นนางฟ้าเหรอ?',
     description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นผู้หญิงทุกคน',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เป็นผู้หญิง',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่เป็นผู้หญิง',
     executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
   },
   A103: {
     code: 'A103', name_en: 'No Llama No!', name_th: 'ไม่นะ ลามะ ไม่!',
     description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นทุกคนที่ขับรถไม่เป็น',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ขับรถไม่เป็น',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ขับรถไม่เป็น',
     executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
   },
   A111: {
     code: 'A111', name_en: 'Snake Arms', name_th: 'แขนงู',
     description_th: 'ขโมยไพ่ 1 ใบจากผู้เล่นผู้ชายทุกคน',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่เป็นผู้ชาย',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่เป็นผู้ชาย',
     executeEffect: (state, frame) => rosterStolenBy(state, frame.actorId, rosterIdsFromFrame(frame), 1),
   },
 
@@ -1239,7 +1257,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A089: {
     code: 'A089', name_en: 'I Used To Be A Cow', name_th: 'ฉันเคยเป็นวัว',
     description_th: 'ผู้เล่นทุกคนที่กินเนื้อสัตว์ ข้ามเทิร์นถัดไป',
-    kind: 'roster_select', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่กินเนื้อสัตว์',
+    kind: 'roster_select', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่กินเนื้อสัตว์',
     executeEffect: (state, frame) => rosterSkipTurn(state, rosterIdsFromFrame(frame)),
   },
 
@@ -1290,7 +1308,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A160: {
     code: 'A160', name_en: 'Duel of Sips', name_th: 'คู่ดวลดื่ม',
     description_th: 'ท้าผู้เล่นอีกคนดื่มแข่งกัน คนที่ดื่มหมดก่อนจั่วไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครดื่มหมดก่อน?',
+    kind: 'outcome_entry', needsTargetSelection: true, includeSelfAsCandidate: true, targetPrompt: 'ใครดื่มหมดก่อน?',
     executeEffect: (state, frame) => {
       const winnerId = frame.targetIds[0];
       return winnerId ? draw(state, winnerId, 3) : state;
@@ -1452,7 +1470,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A083: {
     code: 'A083', name_en: 'Hit The Apple', name_th: 'ตีแอปเปิล!',
     description_th: 'Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องแตะไพ่ใบนี้ คนสุดท้ายที่แตะต้องทิ้งไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่แตะช้าสุด',
+    kind: 'outcome_entry', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่แตะช้าสุด',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
   },
   A104: {
@@ -1464,7 +1482,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A134: {
     code: 'A134', name_en: 'Standing Up School', name_th: 'โรงเรียนยืนขึ้น',
     description_th: 'Mini-Game: ผู้เล่นทุกคนรวมถึงคุณต้องยืนขึ้น คนสุดท้ายที่ยืนต้องทิ้งไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ยืนช้าสุด',
+    kind: 'outcome_entry', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ยืนช้าสุด',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 3),
   },
   A143: {
@@ -1476,7 +1494,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A163: {
     code: 'A163', name_en: 'Hands Up', name_th: 'ยกมือขึ้น!',
     description_th: 'ทุกคนต้องยกแก้วขึ้นเหนือหัวไปจนจบรอบนี้ คนที่ลืมทิ้งไพ่ 2 ใบ',
-    kind: 'outcome_entry', needsRosterSelection: true, rosterPrompt: 'เลือกผู้เล่นที่ลืมยกแก้ว',
+    kind: 'outcome_entry', needsRosterSelection: true, includeSelfAsCandidate: true, rosterPrompt: 'เลือกผู้เล่นที่ลืมยกแก้ว',
     executeEffect: (state, frame) => rosterDiscards(state, rosterIdsFromFrame(frame), 2),
   },
 
@@ -1484,7 +1502,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
   A142: {
     code: 'A142', name_en: "Who's the Drunkest", name_th: 'ใครเมาสุด',
     description_th: 'โหวตกันว่าใครดูเมาที่สุดตอนนี้ คนนั้นทิ้งไพ่ 3 ใบ',
-    kind: 'outcome_entry', needsTargetSelection: true, targetPrompt: 'ใครโดนโหวตว่าเมาสุด?',
+    kind: 'outcome_entry', needsTargetSelection: true, includeSelfAsCandidate: true, targetPrompt: 'ใครโดนโหวตว่าเมาสุด?',
     executeEffect: (state, frame) => {
       const targetId = frame.targetIds[0];
       return targetId ? forceDiscard(state, targetId, 3) : state;
@@ -1732,6 +1750,7 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     description_th: 'ผู้เล่นที่สูงที่สุดต้องมอบไพ่ 3 ใบให้ผู้เล่นที่เตี้ยที่สุด',
     kind: 'auto',
     needsDualTargetSelection: true,
+    includeSelfAsCandidate: true,
     dualTargetPrompts: { first: 'เลือกผู้เล่นที่สูงที่สุด', second: 'เลือกผู้เล่นที่เตี้ยที่สุด' },
     executeEffect: (state, frame) => {
       const { firstId: tallestId, secondId: shortestId } = dualTargetIdsFromFrame(frame);

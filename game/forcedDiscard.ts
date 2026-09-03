@@ -3,7 +3,7 @@ import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 import type { CardCode, PlayerId, RoomState } from './types';
 import { pushStackFrame } from './reactionStack';
 import type { CreateFrameParams } from './reactionStack';
-import { checkAndTriggerAutomaticTraps } from './trapRules/engine';
+import { checkAndTriggerAutomaticTraps, resolveT23PreDiscardReaction } from './trapRules/engine';
 
 export type ForcedDiscardDestination = 'discard_pile' | { playerId: PlayerId };
 export type ForcedDiscardStatus = 'prepared' | 'awaiting_reaction' | 'ready_to_finalize' | 'completed' | 'canceled';
@@ -13,7 +13,10 @@ export interface PreDiscardReaction {
 }
 export type PreDiscardReactionResolver = (state: RoomState, operation: ForcedDiscardOperation) => PreDiscardReaction | null;
 
-let preDiscardReactionResolver: PreDiscardReactionResolver | null = null;
+// Defaults to T23 ("You Fool") -- the only trap that needs to intercept a
+// forced discard before it lands. setPreDiscardReactionResolver exists so
+// tests can substitute a stub without depending on real trap state.
+let preDiscardReactionResolver: PreDiscardReactionResolver | null = resolveT23PreDiscardReaction;
 
 export function setPreDiscardReactionResolver(resolver: PreDiscardReactionResolver | null): void {
   preDiscardReactionResolver = resolver;

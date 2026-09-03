@@ -204,8 +204,12 @@ export function resolveCompletedStackFrames(state: RoomState): RoomState {
       if (resolvingFrame.sourceType === 'counter') {
         // 1. Primary Interception: Apply cancellation to parent frame if un-cancelled
         const parentId = resolvingFrame.parentFrameId ?? (resolvingFrame.customPayload?.parentFrameId as string | undefined);
-        const redirectsParentTarget = ['C34', 'C35', 'C45'].includes(resolvingFrame.sourceCode);
-        if (parentId && !redirectsParentTarget) {
+        // Counters whose effect modifies/redirects the parent frame in place
+        // (via resolveCounterEffect below) instead of just stopping it --
+        // cancelling the parent here would wipe out that modification before
+        // it ever runs.
+        const parentSurvives = ['C07', 'C11', 'C15', 'C22', 'C23', 'C34', 'C35', 'C36', 'C39', 'C40', 'C45', 'C47'].includes(resolvingFrame.sourceCode);
+        if (parentId && !parentSurvives) {
           next = addModifierToFrame(next, parentId, {
             modifierId: `mod-${resolvingFrame.sourceCode}-${Date.now()}`,
             sourceFrameId: resolvingFrame.frameId,

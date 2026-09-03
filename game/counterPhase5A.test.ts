@@ -173,6 +173,23 @@ describe('Counter Phase 5A — Target Mutation Redirect Foundation (C34, C35, C4
     expect(state.players['p2'].hand.length).toBe(4);
   });
 
+  it('C34 deflects to the player behind (P1), not P3, once play direction is reversed -- regression for hardcoding clockwise regardless of state.direction', () => {
+    let state = setupTestState();
+    state.direction = -1;
+    state.players['p2'].hand.push('C34');
+
+    state = resolveActionWithCounterWindow(state, 'p1', 'A124', ['p2']);
+    const f1 = getTopFrame(state)!.frameId;
+
+    state = playCounterEngine(state, 'p2', 'C34', f1);
+    state = skipCounterEngine(state);
+
+    // Counterclockwise from P2 in ['p1','p2','p3'] is P1, not P3.
+    expect(state.players['p1'].hand.length).toBe(4 + 5);
+    expect(state.players['p3'].hand.length).toBe(4);
+    expect(state.players['p2'].hand.length).toBe(4);
+  });
+
   it('Test C — Redirect Countered (C35 Countered by C29 -> Target Remains Original Victim P2)', () => {
     let state = setupTestState();
     state.players['p2'].hand.push('C35');

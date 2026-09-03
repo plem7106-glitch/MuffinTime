@@ -214,7 +214,8 @@ export function executeAllRandomSteal(
 export function executeFullHandTransfer(
   state: RoomState,
   victimId: PlayerId,
-  receiverId: PlayerId
+  receiverId: PlayerId,
+  trackLoss = true
 ): RoomState {
   const next = cloneState(state);
   const victim = next.players[victimId];
@@ -229,7 +230,7 @@ export function executeFullHandTransfer(
     appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.CARD_STOLEN, receiverId, {
       victimId, thiefId: receiverId, count, stolenCards: stolen,
     }, [victimId]));
-    return trackForcedLoss(next, victimId, count);
+    return trackLoss ? trackForcedLoss(next, victimId, count) : next;
   }
   return next;
 }

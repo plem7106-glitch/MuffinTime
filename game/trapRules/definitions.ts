@@ -50,11 +50,11 @@ function checkForcedDiscardTrigger(ownerId: string, event?: { type: string; payl
   return { triggered: false };
 }
 
-function checkBabyPlayTrigger(event?: { type: string; payload: unknown }): TrapTriggerResult {
+function checkBabyPlayTrigger(ownerId: string, event?: { type: string; payload: unknown }): TrapTriggerResult {
   if (!event || event.type !== GAME_EVENT_TYPES.ACTION_PLAYED) return { triggered: false };
   const payload = event.payload as { actorId?: string; actionCode?: string };
   const title = payload.actionCode ? getCardByCode(payload.actionCode)?.name_en ?? '' : '';
-  if (!payload.actorId || !title.toLowerCase().includes('baby')) return { triggered: false };
+  if (!payload.actorId || payload.actorId === ownerId || !title.toLowerCase().includes('baby')) return { triggered: false };
   return { triggered: true, triggerPlayerIds: [payload.actorId], note: `Card title matched baby: ${title}` };
 }
 
@@ -298,7 +298,7 @@ export const TRAP_RULES_BATCH_1: Record<string, TrapRuleDefinition> = {
     description_th: 'หากผู้เล่นคนอื่นบังคับให้คุณทิ้งไพ่ ผู้เล่นคนนั้นต้องทิ้งไพ่ในจำนวนเท่ากันด้วย',
     checkTrigger: (_state, ownerId, event) => checkForcedDiscardTrigger(ownerId, event),
     resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
-    executeEffect: (state, frame) => executeDiscard(state, frame.actorId, Number(frame.customPayload?.count ?? 0)).state,
+    executeEffect: (state, frame) => executeDiscard(state, frame.affectedPlayerIds?.[0] ?? frame.actorId, Number(frame.customPayload?.count ?? 0)).state,
   },
   T23: {
     code: 'T23', name_en: 'You Fool', name_th: 'เจ้าโง่!', mode: 'automatic_event',
@@ -322,14 +322,14 @@ export const TRAP_RULES_BATCH_1: Record<string, TrapRuleDefinition> = {
   T29: {
     code: 'T29', name_en: 'Love you, Baby', name_th: 'รักนะ เบบี๋', mode: 'automatic_event',
     description_th: 'หากผู้เล่นคนอื่นเล่นไพ่ที่มีคำว่า “baby” อยู่ในชื่อ ขโมยไพ่จากผู้เล่นคนนั้น 3 ใบ',
-    checkTrigger: (_state, _ownerId, event) => checkBabyPlayTrigger(event),
+    checkTrigger: (_state, ownerId, event) => checkBabyPlayTrigger(ownerId, event),
     resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
     executeEffect: (state, frame) => executeRandomSteal(state, frame.affectedPlayerIds?.[0] ?? '', frame.actorId, 3).state,
   },
   T30: {
     code: 'T30', name_en: 'Baby on Fire', name_th: 'เด็กไฟลุก', mode: 'automatic_event',
     description_th: 'หากผู้เล่นคนอื่นเล่นไพ่ที่มีคำว่า “baby” อยู่ในชื่อ ผู้เล่นคนนั้นต้องทิ้งไพ่ 3 ใบ',
-    checkTrigger: (_state, _ownerId, event) => checkBabyPlayTrigger(event),
+    checkTrigger: (_state, ownerId, event) => checkBabyPlayTrigger(ownerId, event),
     resolveAffectedPlayers: (_state, _ownerId, triggerPlayerIds) => triggerPlayerIds,
     executeEffect: (state, frame) => executeDiscard(state, frame.affectedPlayerIds?.[0] ?? '', 3).state,
   },

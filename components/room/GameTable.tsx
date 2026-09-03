@@ -844,7 +844,10 @@ export function GameTable() {
           two roles can never be silently swapped by click order) */}
       <TargetSelector
         open={pendingTargetCard !== null && dualPickPhase !== null}
-        candidates={dualPickPhase === 'second' ? opponentCandidates.filter((c) => c.id !== dualPickFirstId) : opponentCandidates}
+        candidates={
+          (pendingActionRule?.includeSelfAsCandidate ? tableCandidates : opponentCandidates)
+            .filter((c) => dualPickPhase !== 'second' || c.id !== dualPickFirstId)
+        }
         selectedId={chosenTarget}
         onSelect={(id) => setChosenTarget(id)}
         onConfirm={handleDualPickConfirm}

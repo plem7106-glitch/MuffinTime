@@ -6,7 +6,7 @@ import { resolveCounterEffect } from './counterRules/engine';
 import { executeActionFrameEffect } from './actionRules/registry';
 import { executeTrapFrameEffect } from './trapRules/engine';
 import { discard, draw } from './pile';
-import { checkAndTriggerAutomaticTraps } from './trapRules/engine';
+import { checkAndTriggerAutomaticTraps, resolveT23PreDiscardReaction } from './trapRules/engine';
 import { resolveForcedDiscard, setPreDiscardReactionResolver } from './forcedDiscard';
 import { executeManualRecoveryDiscard } from './recovery';
 import type { RoomState, PlayerId, CardCode } from './types';
@@ -262,7 +262,11 @@ describe('Counter Phase 2 — Forced Discard Integration (C02, C03, C30)', () =>
     expect(state.players['p1'].hand).toContain('A004');
     expect(state.discardPile.includes('A003')).toBe(false);
 
-    setPreDiscardReactionResolver(null);
+    // Restore the real default (not null) -- forcedDiscard.ts's module-level
+    // resolver defaults to resolveT23PreDiscardReaction in production, and a
+    // later test/file relying on that real default must not see it masked
+    // by a stale null left behind here.
+    setPreDiscardReactionResolver(resolveT23PreDiscardReaction);
   });
 
   it('Test H — Manual Recovery Isolation (Manual Discard does NOT open counter window)', () => {

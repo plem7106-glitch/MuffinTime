@@ -267,6 +267,9 @@ describe('Family D batch (via resolveActionEffect)', () => {
     const next = resolveActionEffect(state, 'A060', 'me', 'p2');
     expect(next.players.me.hand).toEqual([]);
     expect(next.players.p2.hand).toEqual(expect.arrayContaining(['a', 'b', 'H2', 'H3', 'H4']));
+    // Regression: giving your own hand away by choice is not a forced loss --
+    // A091 must not credit the actor a free draw for playing this card.
+    expect(next.players.me.forcedLossSinceLastTurn).toBeUndefined();
   });
 
   it('A079 gives 1 random card from the actor to the target', () => {
@@ -346,7 +349,7 @@ function seatedState(): RoomState {
 describe('Family F batch (via resolveActionEffect)', () => {
   it('A010 rotates the seat order one step right and leaves hands alone', () => {
     const next = resolveActionEffect(seatedState(), 'A010', 'p1');
-    expect(next.seatOrder).toEqual(['p3', 'p1', 'p2']);
+    expect(next.seatOrder).toEqual(['p2', 'p3', 'p1']);
     expect(next.players.p1.hand).toEqual(['a1']);
   });
 
@@ -364,7 +367,7 @@ describe('Family F batch (via resolveActionEffect)', () => {
 
   it('A156 rotates the seat order one step left', () => {
     const next = resolveActionEffect(seatedState(), 'A156', 'p1');
-    expect(next.seatOrder).toEqual(['p2', 'p3', 'p1']);
+    expect(next.seatOrder).toEqual(['p3', 'p1', 'p2']);
   });
 
   it('A156 also leaves currentTurnIndex/turnOrder untouched', () => {
@@ -385,16 +388,16 @@ describe('Family F batch (via resolveActionEffect)', () => {
 
   it('A087 sends every hand one seat over (consistently opposite of A110)', () => {
     const next = resolveActionEffect(seatedState(), 'A087', 'p1');
-    expect(next.players.p3.hand).toEqual(['a1']);
-    expect(next.players.p1.hand).toEqual(['b1', 'b2']);
-    expect(next.players.p2.hand).toEqual(['c1', 'c2', 'c3']);
+    expect(next.players.p2.hand).toEqual(['a1']);
+    expect(next.players.p3.hand).toEqual(['b1', 'b2']);
+    expect(next.players.p1.hand).toEqual(['c1', 'c2', 'c3']);
   });
 
   it('A110 sends every hand the opposite way around from A087', () => {
     const next = resolveActionEffect(seatedState(), 'A110', 'p1');
-    expect(next.players.p2.hand).toEqual(['a1']);
-    expect(next.players.p3.hand).toEqual(['b1', 'b2']);
-    expect(next.players.p1.hand).toEqual(['c1', 'c2', 'c3']);
+    expect(next.players.p3.hand).toEqual(['a1']);
+    expect(next.players.p1.hand).toEqual(['b1', 'b2']);
+    expect(next.players.p2.hand).toEqual(['c1', 'c2', 'c3']);
   });
 
   it('A044 draws hands up to 7 and discards hands down to 7', () => {
@@ -409,6 +412,15 @@ describe('Family F batch (via resolveActionEffect)', () => {
   it('A129 discards every hand down to exactly 1 card', () => {
     const next = resolveActionEffect(seatedState(), 'A129', 'p1');
     expect(next.players.p1.hand.length).toBe(1);
+    expect(next.players.p2.hand.length).toBe(1);
+    expect(next.players.p3.hand.length).toBe(1);
+  });
+
+  it('A129 leaves an empty-handed player at 0 -- discard-only, must not draw up to 1', () => {
+    const state = seatedState();
+    state.players.p1.hand = [];
+    const next = resolveActionEffect(state, 'A129', 'p1');
+    expect(next.players.p1.hand.length).toBe(0);
     expect(next.players.p2.hand.length).toBe(1);
     expect(next.players.p3.hand.length).toBe(1);
   });
@@ -1852,15 +1864,25 @@ describe('A091', () => {
 
 describe('includeSelfAsCandidate — the actor must be a valid answer to their own card', () => {
   /**
-   * Two shapes need the actor in their own picker: a mini-game the actor is
-   * competing in, and a factual superlative about the whole table. Leaving them
-   * out of the opponents-only default silently decided outcomes -- the actor
-   * could never win a staring contest they started (A006), and was permanently
-   * immune to every "the most X loses cards" card (A031/A054/A058/A104/A173).
+   * Three shapes need the actor in their own picker: a mini-game the actor is
+   * competing in, a factual superlative about the whole table, and a
+   * condition-filtered roster ("everyone who X, do Y") where the actor is
+   * just as much a member of "everyone in the room" as any opponent. Leaving
+   * them out of the opponents-only default silently decided outcomes -- the
+   * actor could never win a staring contest they started (A006), was
+   * permanently immune to every "the most X loses cards" card
+   * (A031/A054/A058/A104/A173), and could never honestly mark themselves as
+   * matching a real-world condition they actually meet (A001: "doesn't live
+   * here", A065: "has a 'b' in their name", etc.).
    */
   const MUST_INCLUDE_SELF = [
     'A006', 'A067', 'A096', 'A114', // mini-games the actor plays in
     'A031', 'A054', 'A058', 'A070', 'A095', 'A104', 'A173', // table-wide superlatives
+    'A001', 'A002', 'A011', 'A012', 'A013', 'A042', 'A065', 'A068', 'A069', 'A081', 'A089', // condition-filtered rosters
+    'A098', 'A102', 'A103', 'A111', 'A131', 'A138', 'A139', // same family, later-numbered batch
+    'A083', 'A134', 'A163', // "everyone including you" mini-games/challenges
+    'A142', 'A160', // single-target contests/votes the actor is a valid answer to
+    'A115', // dual-role superlative (tallest/shortest) -- the actor is a valid answer to either role
   ];
 
   it.each(MUST_INCLUDE_SELF)('%s lets the actor pick themselves', (code) => {
