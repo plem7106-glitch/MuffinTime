@@ -126,6 +126,16 @@ describe('startGame', () => {
     expect(next.pendingActionObligations ?? []).toEqual([]);
   });
 
+  it('resets recentActionPlays left over from a prior game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    room.recentActionPlays = [{ code: 'A006', actorId: 'p3', targetIds: ['p2'] }];
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const next = startGame(room, allCodes, () => 0);
+    expect(next.recentActionPlays ?? []).toEqual([]);
+  });
+
   it('resets a leftover mustPlayActionThisTurn flag from a prior game', () => {
     let room = createRoom('host1', 'P1', 4);
     room = addPlayer(room, 'p2', 'P2');
@@ -199,6 +209,18 @@ describe('resetForPlayAgain', () => {
     const next = resetForPlayAgain(started);
     expect(next.actionRedirect).toBeFalsy();
     expect(next.pendingActionObligations ?? []).toEqual([]);
+  });
+
+  it('resets recentActionPlays left over from the finished game', () => {
+    let room = createRoom('host1', 'P1', 4);
+    room = addPlayer(room, 'p2', 'P2');
+    room = addPlayer(room, 'p3', 'P3');
+    const allCodes = Array.from({ length: 20 }, (_, i) => `A${i + 1}`);
+    const started = startGame(room, allCodes, () => 0);
+    started.recentActionPlays = [{ code: 'A006', actorId: 'p3', targetIds: ['p2'] }];
+    started.status = 'finished';
+    const next = resetForPlayAgain(started);
+    expect(next.recentActionPlays ?? []).toEqual([]);
   });
 
   it('resets a leftover mustPlayActionThisTurn flag from the finished game', () => {
@@ -334,6 +356,7 @@ describe('restartGame (A092)', () => {
       pendingResponse: { responseId: 'r1', kind: 'action', code: 'A092', actorId: 'host1' },
       pendingInteraction: { interactionId: 'i1', type: 'date_invite', sourceCardCode: 'T10', initiatorId: 'host1', targetPlayerId: 'p2', timestamp: 0 },
       lastResult: { kind: 'action', code: 'A092', actorId: 'host1', countered: false },
+      recentActionPlays: [{ code: 'A006', actorId: 'host1', targetIds: ['p2'] }],
       isShufflingDrawPile: true,
       shuffleSequence: 5,
       placedTrapMeta: { fake: { ownerId: 'p3', placedSequence: 1, placedRound: 1, placedByPlayerTurnIndex: 0 } },
@@ -355,6 +378,7 @@ describe('restartGame (A092)', () => {
     expect(next.pendingWinChecks).toEqual([]);
     expect(next.pendingActionObligations).toBeUndefined();
     expect(next.actionRedirect).toBeNull();
+    expect(next.recentActionPlays ?? []).toEqual([]);
     expect(next.reactionStack).toEqual([]);
     expect(next.pendingResponse).toBeNull();
     expect(next.pendingInteraction).toBeNull();

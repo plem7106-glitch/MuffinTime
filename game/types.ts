@@ -63,6 +63,13 @@ export interface StackFrame {
   customPayload?: Record<string, unknown>;
 }
 
+export interface RecentActionPlay {
+  code: CardCode;
+  actorId: PlayerId;
+  targetIds: PlayerId[];
+  customPayload?: Record<string, unknown>;
+}
+
 export type UnderCountPolicy =
   | 'clamp_to_available'
   | 'all_or_nothing'
@@ -240,6 +247,15 @@ export interface RoomState {
    * when it plants the card; cleared to false the moment draw() (game/pile.ts)
    * pops it back out, since it's no longer "planted" once it leaves the pile. */
   bananaPeelArmed?: boolean;
+
+  /** A094 "พร้อมเพรียง": a capped ring buffer (newest first, max 5) of the
+   * most recent Action plays that actually RESOLVED (a Countered play is
+   * never appended here, since its effect never happened). A094's
+   * executeEffect walks this looking for the most recent entry whose code
+   * isn't 'A094' itself, then replays it under a new actor. Appended by
+   * lib/session.tsx's resolveCompletedStackFrames right where it already
+   * branches on sourceType === 'action'. */
+  recentActionPlays?: RecentActionPlay[];
 
   // Backward-compatibility bridge
   pendingResponse?: PendingResponse | null;

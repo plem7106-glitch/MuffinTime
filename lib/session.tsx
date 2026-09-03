@@ -56,7 +56,7 @@ import { resolveCounterEffect } from '../game/counterRules/engine';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { resolveSteal } from '../game/steal';
 import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
-import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
+import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult, RecentActionPlay } from '../game/types';
 import { buildCanonicalDeck } from '../data/cards/deck';
 import { executeManualRecoveryDiscard, executeManualRecoveryGive } from '../game/recovery';
 import { playSocialCounter as enginePlaySocialCounter } from '../game/socialCounter';
@@ -648,6 +648,13 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           next = executeTrapFrameEffect(next, resolvingFrame);
         } else {
           next = executeActionFrameEffect(next, resolvingFrame);
+          const entry: RecentActionPlay = {
+            code: resolvingFrame.sourceCode,
+            actorId: resolvingFrame.actorId,
+            targetIds: resolvingFrame.targetIds,
+            customPayload: resolvingFrame.customPayload,
+          };
+          next.recentActionPlays = [entry, ...(next.recentActionPlays ?? [])].slice(0, 5);
         }
       }
 

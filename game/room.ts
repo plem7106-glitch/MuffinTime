@@ -165,6 +165,7 @@ export function startGame(state: RoomState, allCardCodes: CardCode[], rng: Rng =
   }
   next.actionRedirect = null;
   next.bananaPeelArmed = false;
+  next.recentActionPlays = [];
   next.pendingActionObligations = undefined;
   next.roundNumber = 1;
   next.sequenceNumber = 1;
@@ -246,6 +247,7 @@ export function resetForPlayAgain(state: RoomState): RoomState {
   }
   next.actionRedirect = null;
   next.bananaPeelArmed = false;
+  next.recentActionPlays = [];
   next.pendingActionObligations = undefined;
 
   next.status = 'lobby';
@@ -333,6 +335,7 @@ export function restartGame(state: RoomState, rng: Rng = Math.random): RoomState
   next.pendingActionObligations = undefined;
   next.actionRedirect = null;
   next.bananaPeelArmed = false;
+  next.recentActionPlays = [];
   next.reactionStack = [];
   next.pendingResponse = null;
   next.pendingInteraction = null;
