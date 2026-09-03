@@ -10,12 +10,14 @@ replacing the originally-planned Firebase backend — see
 
 As of 2026-09-01 the app is feature-complete for real multiplayer play and merged to `main`:
 
-- **Auth**: real accounts via Supabase Auth magic-link email login (`lib/auth.tsx`, `app/login/page.tsx`) — a
-  friend signs up once and logs back in as the same person from any device. `supabase/migrations/0002_require_auth_for_rooms.sql`
-  requires an authenticated session (`auth.uid() is not null`) to read/write the `rooms` table; the older
-  "no accounts" scope note in `docs/superpowers/specs/2026-08-31-muffin-time-web-design.md` (v1 design spec) is
-  **superseded** by this — that spec's game rules/data model/turn-effect handling are still accurate, only its
-  account-less assumption is not.
+- **Identity**: no accounts at all. Magic-link auth was built and then removed — `lib/auth.tsx` and
+  `app/login/page.tsx` no longer exist, and `supabase/migrations/0003_open_rooms_for_anon_access.sql` reverts
+  0002's authenticated-only RLS policies because `auth.uid()` is now always null. A player is a `crypto.randomUUID()`
+  held in `localStorage` under `muffintime_player_id` (`lib/player.tsx`); anyone with the anon key and a room code
+  can read/write that room. This matches the original account-less scope in
+  `docs/superpowers/specs/2026-08-31-muffin-time-web-design.md` (v1 design spec).
+  Practical consequence for testing: several players need several browser *origins*, not just several tabs —
+  tabs on one origin share the same localStorage identity and so are the same person.
 - **Multiplayer sync**: `lib/session.tsx` is a full Supabase-backed `GameSessionProvider` — every game action
   writes to Postgres via `multiplayer/room.ts`'s `updateRoomWithRetry` (optimistic concurrency, no local-only
   state), and all connected clients receive updates via a `multiplayer/realtime.ts` Realtime subscription. Rooms
@@ -27,22 +29,23 @@ As of 2026-09-01 the app is feature-complete for real multiplayer play and merge
   `components/room/*`) and wired to the real backend above — none of this is placeholder/mock data anymore.
 
 **Known gaps, not yet built:**
-- No presence/reconnect tracking (`PlayerState.connected` exists in the type but nothing writes `false` yet) —
-  `leaveRoom` only tears down the local subscription, it doesn't remove the player server-side. A host-only
+- Presence is tracked (`onlinePlayerIds`, via Supabase Presence) but only *consumed* in `WaitingRoom.tsx`;
+  nothing in `GameTable.tsx` reads it during play, so an absent player is never auto-skipped and an absent
+  host is never replaced. `leaveRoom` DOES now remove the player server-side (`lib/session.tsx`'s
+  `removePlayer` call), which migrates the host — but only when they press the leave button; a closed tab or
+  a dead network leaves them seated. A host-only
   "unstick" button (`GameSettingsModal.tsx`'s `onHostUnstick`, backed by `lib/session.tsx`'s `hostSkipTurn` and
   the existing `skipCounter`) is a stopgap for a departed player stalling the current turn or a response window —
   real presence tracking is deferred to a follow-up spec.
-- No sign-out UI affordance (`lib/auth.tsx` exports `signOut()`, nothing calls it yet) — a mistyped display name
-  at first signup is permanently stuck (Supabase's `user_metadata` only sets on first-ever signup).
-- The one manual end-to-end check this multiplayer rewrite has (two real accounts, live join + Realtime sync +
-  gameplay across two browser sessions) has not been fully run — completed: real magic-link login, real room
-  creation, `WaitingRoom` rendering live Supabase state. Not yet completed: a second account joining and observed
-  live sync, mid-game refresh/resume, host-controlled shuffle sync. Worth a real two-device playtest before
-  trusting this fully.
+- A Realtime drop is only surfaced as "ลองรีเฟรชหน้านี้อีกครั้ง" — there is no automatic refetch, reconnect
+  resync, or polling fallback, so a player whose channel dies must reload by hand to see anything new.
+- Live Realtime sync across two real devices has still not been exercised end to end. What IS verified: three
+  distinct players creating/joining/starting a game and taking turns, turn-order enforcement, response windows
+  reaching the right player, and card conservation holding at 289 through play. Not verified: Realtime push
+  itself, presence drop-out, and mid-game refresh/resume. Worth a real two-device playtest before trusting it.
 - Deployed to Vercel at `https://muffin-time-ruddy.vercel.app` — its Supabase env vars
   (`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`) need to be set in the Vercel project settings
-  separately from local `.env.local` (which isn't committed); the Supabase Auth Redirect URLs allowlist already
-  includes this domain.
+  separately from local `.env.local` (which isn't committed).
 
 ## What this project is
 
@@ -55,7 +58,7 @@ Read that file for game rules, data model, turn/effect handling, and v1 scope (c
 
 ## Game content data
 
-`data/cards.json` is the full, real card list for the game (138 Action, 40 Counter, 53 Trap — 231 total), each with English name, Thai name, and Thai effect text. This is the authoritative content source the app should read from — do not invent or rephrase card effects; treat this file as ground truth. `data/cards.csv` is a plain export of the same data for spreadsheet use and is not consumed by the app.
+`data/cards.json` is the full, real card list for the game (173 Action, 50 Counter, 66 Trap — 289 total), each with English name, Thai name, and Thai effect text. This is the authoritative content source the app should read from — do not invent or rephrase card effects; treat this file as ground truth. `data/cards.csv` is a plain export of the same data for spreadsheet use and is not consumed by the app.
 
 Per the design spec, each card still needs to be classified into one of three effect-handling tiers (fully automatable / mini-game with manual outcome entry / social-honor-system) as part of implementation — this classification does not exist yet in `cards.json`.
 

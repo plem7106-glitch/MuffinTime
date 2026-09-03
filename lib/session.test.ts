@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCompletedStackFrames, applyPlayDoubledAction, applySkipCounter, applyPlayCounter } from './session';
+import { resolveCompletedStackFrames, applyPlayDoubledAction, applySkipCounter, applyPlayCounter, visibleFingerprint } from './session';
 import { getActionRule } from '../game/actionRules/registry';
 import { resolveForcedDiscard } from '../game/forcedDiscard';
 import { getTopFrame } from '../game/reactionStack';
@@ -237,6 +237,9 @@ describe('applySkipCounter', () => {
     const next = applySkipCounter(stateWithTopFrame('action'), 'f1');
     expect(next.lastResult).toEqual({
       responseId: 'f1', kind: 'action', code: 'A127', actorId: 'me', targetId: 'p2', countered: false,
+      // this fixture's frame resolves without changing the table, so the popup
+      // is expected to say so rather than look identical to a card that worked
+      hadNoEffect: true,
     });
   });
 
@@ -244,6 +247,7 @@ describe('applySkipCounter', () => {
     const next = applySkipCounter(stateWithTopFrame('trap'), 'f1');
     expect(next.lastResult).toEqual({
       responseId: 'f1', kind: 'trap', code: 'T01', actorId: 'me', targetId: 'p2', countered: false,
+      hadNoEffect: true,
     });
   });
 
@@ -276,5 +280,41 @@ describe('applyPlayCounter', () => {
     expect(next.players.p2.hand.sort()).toEqual(['X2', 'X3', 'X4'].sort());
     expect(next.discardPile).toEqual(['C03', 'X1']);
     expect(next.pendingForcedDiscards ?? {}).toEqual({});
+  });
+});
+
+describe('visibleFingerprint (drives LastResult.hadNoEffect)', () => {
+  const base = (): RoomState => ({
+    status: 'playing', hostId: 'p1', turnOrder: ['p1', 'p2'], currentTurnIndex: 0,
+    direction: 1, muffinTimeTarget: 10, drawPile: ['X1', 'X2'], discardPile: ['A001'],
+    players: {
+      p1: { name: 'P1', hand: ['A002'], traps: [] },
+      p2: { name: 'P2', hand: ['A003'], traps: [] },
+    },
+  } as unknown as RoomState);
+
+  it('ignores bookkeeping that moves on every resolve, so a no-op card reads as unchanged', () => {
+    const before = base();
+    const after = { ...base(), sequenceNumber: 99, gameEvents: [{ id: 'e' }], reactionStack: [] } as unknown as RoomState;
+    expect(visibleFingerprint(after)).toBe(visibleFingerprint(before));
+  });
+
+  it('DOES notice a card that actually moved something -- a working card must not be labelled "no effect"', () => {
+    const before = base();
+    const drew = base();
+    drew.players.p1.hand.push(drew.drawPile.pop()!);
+    expect(visibleFingerprint(drew)).not.toBe(visibleFingerprint(before));
+
+    const discarded = base();
+    discarded.discardPile.push('A004');
+    expect(visibleFingerprint(discarded)).not.toBe(visibleFingerprint(before));
+
+    const turned = base();
+    turned.currentTurnIndex = 1;
+    expect(visibleFingerprint(turned)).not.toBe(visibleFingerprint(before));
+
+    const trapped = base();
+    trapped.players.p2.traps.push('T01');
+    expect(visibleFingerprint(trapped)).not.toBe(visibleFingerprint(before));
   });
 });

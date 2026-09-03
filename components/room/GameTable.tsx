@@ -97,6 +97,7 @@ export function GameTable() {
     drawCard,
     endTurn,
     hostSkipTurn,
+    canActAsHost,
     declareMuffinTime,
     playAction,
     playDoubledAction,
@@ -1109,6 +1110,7 @@ export function GameTable() {
       <GameSettingsModal
         isOpen={isSettingsOpen}
         isHost={isHost}
+        canActAsHost={canActAsHost}
         onClose={() => setIsSettingsOpen(false)}
         onOpenCardGallery={() => setIsCardGalleryOpen(true)}
         onOpenShuffleConfirm={() => setIsShuffleConfirmOpen(true)}

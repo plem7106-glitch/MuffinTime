@@ -27,6 +27,11 @@ export function ActionResultModal({
           </h2>
           {targetName && <p className="text-sm text-ink">เป้าหมาย: {targetName}</p>}
           <p className="text-sm text-ink-secondary">{card.effect}</p>
+          {result?.hadNoEffect && (
+            <p className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-bold text-amber-800">
+              ไม่มีอะไรเปลี่ยนแปลง — เงื่อนไขของการ์ดใบนี้ไม่เข้าในสถานการณ์ตอนนี้
+            </p>
+          )}
           <PrimaryButton tone="action" onClick={onClose}>
             ปิด
           </PrimaryButton>

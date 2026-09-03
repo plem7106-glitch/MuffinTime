@@ -111,6 +111,12 @@ export interface LastResult {
   countered: boolean;
   counteredBy?: PlayerId;
   counterCode?: CardCode;
+  /** The card resolved normally but its condition wasn't met, so nothing on the
+   * table changed (A118 with no game-suggester picked, A116/A117 on an empty
+   * discard pile, A021 with Magical Pony not in the discard, A091 with nothing
+   * taken from you, ...). Without this the result popup is identical to a card
+   * that worked, and players re-read the card wondering what they did wrong. */
+  hadNoEffect?: boolean;
 }
 
 export interface PlayerState {
