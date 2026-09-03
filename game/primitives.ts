@@ -1,4 +1,4 @@
-import { cloneState } from './util';
+import { cloneState, trackForcedLoss } from './util';
 import { reshuffleDiscardIntoDraw } from './pile';
 import type {
   RoomState,
@@ -223,6 +223,7 @@ export function executeFullHandTransfer(
     appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.CARD_STOLEN, receiverId, {
       victimId, thiefId: receiverId, count, stolenCards: stolen,
     }, [victimId]));
+    return trackForcedLoss(next, victimId, count);
   }
   return next;
 }

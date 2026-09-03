@@ -1,4 +1,4 @@
-import { cloneState } from './util';
+import { cloneState, trackForcedLoss } from './util';
 import { appendGameEvent, createGameEvent, GAME_EVENT_TYPES } from './events';
 import type { CardCode, PlayerId, RoomState } from './types';
 import { pushStackFrame } from './reactionStack';
@@ -196,7 +196,8 @@ export function finalizeForcedDiscard(state: RoomState, operation: ForcedDiscard
     intercepted: completed.intercepted,
   }, [operation.targetPlayerId]);
   appendGameEvent(next, event);
-  return checkAndTriggerAutomaticTraps(next, event);
+  const tracked = trackForcedLoss(next, operation.targetPlayerId, moved.length);
+  return checkAndTriggerAutomaticTraps(tracked, event);
 }
 
 export function completeForcedDiscard(operation: ForcedDiscardOperation, destination: ForcedDiscardDestination = operation.originalDestination) {
