@@ -272,6 +272,13 @@ export const ACTION_RULES_BATCH_1: Record<string, ActionRuleDefinition> = {
     executeEffect: (state, frame) => draw(state, frame.actorId, state.players[frame.actorId].hand.length),
   },
 
+  A091: {
+    code: 'A091', name_en: "I'm A Doctor", name_th: 'ฉันเป็นหมอ',
+    description_th: 'จั่วไพ่เท่ากับจำนวนไพ่ที่ถูกขโมยหรือถูกบังคับให้ทิ้งจากคุณ นับตั้งแต่เทิร์นก่อนหน้าของคุณ',
+    kind: 'auto',
+    executeEffect: (state, frame) => draw(state, frame.actorId, state.players[frame.actorId].forcedLossSinceLastTurn ?? 0),
+  },
+
   A008: {
     code: 'A008',
     name_en: 'Throw The Cheese',

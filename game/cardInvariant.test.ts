@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { buildCanonicalDeck } from '../data/cards/deck';
 import { addPlayer, createRoom, restartGame, startGame } from './room';
 import { inspectCardConservation, assertCardConservation } from './cardInvariant';
-import { draw, discard } from './pile';
+import { draw, discard, forceDiscard } from './pile';
 import { resolveActionEffect } from './actionRules/registry';
 import { placeTrap, removeTrap } from './trap';
-import { stealRandom, swapHands } from './transfer';
+import { stealRandom, swapHands, forceSteal } from './transfer';
 import { pushStackFrame, popStackFrame } from './reactionStack';
 
 function startedRoom() {
@@ -121,5 +121,27 @@ describe('card conservation invariant', () => {
     const next = restartGame(state, () => 0.5);
     assertCardConservation(next);
     expect(next.reactionStack).toEqual([]);
+  });
+
+  it('preserves every card through a forced discard, a forced steal, and an A091 draw', () => {
+    let state = startedRoom();
+    const [p1, p2] = state.turnOrder;
+    assertCardConservation(state);
+
+    state = forceDiscard(state, p2, Math.min(1, state.players[p2].hand.length));
+    assertCardConservation(state);
+
+    if (state.players[p1].hand.length > 0) {
+      state = forceSteal(state, p1, p2, 1, () => 0);
+      assertCardConservation(state);
+    }
+
+    const expectedDraw = state.players[p2].forcedLossSinceLastTurn ?? 0;
+    const drawPileBefore = state.drawPile.length;
+    const handBefore = state.players[p2].hand.length;
+    state = resolveActionEffect(state, 'A091', p2);
+    assertCardConservation(state);
+    const actualDrawn = state.players[p2].hand.length - handBefore;
+    expect(actualDrawn).toBe(Math.min(expectedDraw, drawPileBefore));
   });
 });

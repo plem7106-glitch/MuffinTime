@@ -1448,3 +1448,26 @@ describe('forced-loss tracking (A091 support)', () => {
     expect(totalTracked).toBeGreaterThan(0);
   });
 });
+
+describe('A091', () => {
+  it('A091 draws 0 cards when the actor has no tracked forced loss', () => {
+    const next = resolveActionEffect(threePlayerState(), 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(1);
+  });
+
+  it('A091 draws exactly forcedLossSinceLastTurn cards', () => {
+    const state = threePlayerState();
+    state.players.me.forcedLossSinceLastTurn = 3;
+    const next = resolveActionEffect(state, 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(4);
+  });
+
+  it('A091 clamps to however many cards remain in the draw pile', () => {
+    const state = threePlayerState();
+    state.drawPile = ['A001', 'A002'];
+    state.players.me.forcedLossSinceLastTurn = 5;
+    const next = resolveActionEffect(state, 'A091', 'me');
+    expect(next.players.me.hand.length).toBe(1 + 2);
+    expect(next.drawPile).toEqual([]);
+  });
+});
