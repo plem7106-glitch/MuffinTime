@@ -1,8 +1,8 @@
 'use client';
 
 import type { Card as CardModel } from '../../data/cards/index';
-import { Card } from './Card';
 import { CloseIcon } from '../ui/Icons';
+import { Card } from './Card';
 
 export function CardDetailModal({
   card,
@@ -17,7 +17,7 @@ export function CardDetailModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={card.name_th || 'รายละเอียดไพ่'}
+      aria-label={card.name_th || 'รายละเอียดไพ่ๆ'}
       className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 p-4 animate-in fade-in duration-150"
     >
       <div className="relative max-h-[90vh] w-full max-w-xs flex-col items-center rounded-3xl bg-white p-4 shadow-2xl">
