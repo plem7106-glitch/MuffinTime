@@ -38,11 +38,11 @@ describe('canonical deck composition', () => {
     expect([...allLiveCards].sort()).toEqual([...EXPECTED_CANONICAL_CODES].sort());
   });
 
-  it('uses the shared canonical deck builder for session game starts instead of the demo deck', () => {
+  it('uses the supported deck for live session game starts', () => {
     const sessionSource = readFileSync(join(process.cwd(), 'lib', 'session.tsx'), 'utf8');
 
-    expect(sessionSource).toContain("../data/cards/deck");
-    expect(sessionSource).toContain('buildCanonicalDeck');
+    expect(sessionSource).toContain("../game/playableCards");
+    expect(sessionSource).toContain('buildPlayableDeck');
     expect(sessionSource).not.toContain('buildDemoDeck');
   });
 });

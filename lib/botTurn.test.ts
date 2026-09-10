@@ -39,9 +39,9 @@ describe('decideBotTurn', () => {
 
   it('plays a no-target action without picking a targetId', () => {
     const state = baseState();
-    state.players['bot-1'].hand = ['A001'];
+    state.players['bot-1'].hand = ['A097'];
     const decision = decideBotTurn(state, 'bot-1', () => 0);
-    expect(decision).toEqual({ action: 'play', code: 'A001' });
+    expect(decision).toEqual({ action: 'play', code: 'A097' });
   });
 
   it('falls back to draw when there is nobody eligible to target', () => {
@@ -86,4 +86,16 @@ describe('decideBotTurn', () => {
       expect(['bot-2', 'bot-3']).toContain(decision.targetId);
     }
   });
+});
+
+it('does not play actions while actions are prohibited', () => {
+  const state = baseState();
+  state.globalRestrictions = [{ type: 'no_actions', sourcePlayerId: 'me' }];
+  expect(decideBotTurn(state, 'bot-1', () => 0)).toEqual({ action: 'draw' });
+});
+
+it('leaves cards requiring human input for human play', () => {
+  const state = baseState();
+  state.players['bot-1'].hand = ['A172'];
+  expect(decideBotTurn(state, 'bot-1', () => 0)).toEqual({ action: 'draw' });
 });

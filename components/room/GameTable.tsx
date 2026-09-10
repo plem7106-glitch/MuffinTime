@@ -157,7 +157,7 @@ export function GameTable() {
   const isLocalTrapTarget = Boolean(
     pendingResponse?.kind === 'trap' &&
       pendingResponse.actorId !== myPlayerId &&
-      (!pendingResponse.targetId || pendingResponse.targetId === myPlayerId) &&
+      pendingResponse.eligibleResponderIds?.includes(myPlayerId) &&
       pendingResponse.responses?.[myPlayerId]?.status !== 'skipped' &&
       pendingResponse.responses?.[myPlayerId]?.status !== 'countered'
   );
@@ -291,8 +291,11 @@ export function GameTable() {
 
   // Legally valid Counter response cards available in local hand for the active pendingResponse
   const validCounterCards = useMemo(() => {
+    if (!pendingResponse?.eligibleResponderIds?.includes(myPlayerId) ||
+        pendingResponse.responses?.[myPlayerId]?.status !== 'pending' ||
+        state.globalRestrictions?.some(r => r.type === 'no_counters')) return [];
     return getPlayableCounters(me.hand, pendingResponse);
-  }, [me.hand, pendingResponse]);
+  }, [me.hand, pendingResponse, myPlayerId, state.globalRestrictions]);
 
 
   return (
@@ -336,6 +339,7 @@ export function GameTable() {
           hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
           onDraw={drawCard}
           onOpenDiscardPile={() => setIsDiscardPileOpen(true)}
+          hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
         />
 
       </div>
@@ -378,7 +382,7 @@ export function GameTable() {
         const canEndTurn =
           isMyTurn &&
           state.turnPhase === 'main' &&
-          hasDrawnThisTurn &&
+          (hasDrawnThisTurn || me.hasPlayedActionThisTurn) &&
           !pendingResponse &&
           !state.pendingInteraction &&
           (!state.reactionStack || state.reactionStack.length === 0) &&
@@ -428,7 +432,7 @@ export function GameTable() {
         isMyTurn={isMyTurn}
         canAct={canAct}
         hasDrawnThisTurn={Boolean(me.hasDrawnThisTurn)}
-        hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
+          hasPlayedActionThisTurn={Boolean(me.hasPlayedActionThisTurn)}
         isTrapPlacementPhase={state.turnPhase === 'trap_placement'}
         trapsCount={me.traps.length}
         onClose={() => setIsHandTrayOpen(false)}

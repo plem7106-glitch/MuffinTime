@@ -1,5 +1,5 @@
 import { cloneState } from './util';
-import { reshuffleDiscardIntoDraw } from './pile';
+import { draw } from './pile';
 import type {
   RoomState,
   PlayerId,
@@ -45,29 +45,15 @@ export function evaluateCardCount(
 
 /**
  * Pure draw primitive: draws N cards from drawPile into player's hand.
- * Automatically reshuffles discard pile into draw pile if draw pile runs out.
+ * Stops at deck exhaustion, matching normal draws and Action effects.
  */
 export function executeDraw(
   state: RoomState,
   playerId: PlayerId,
   count: number
 ): RoomState {
-  if (count <= 0) return state;
-  let next = cloneState(state);
-  const player = next.players[playerId];
-  if (!player) return next;
-
-  for (let i = 0; i < count; i++) {
-    if (next.drawPile.length === 0) {
-      if (next.discardPile.length === 0) break;
-      next = reshuffleDiscardIntoDraw(next);
-    }
-    const card = next.drawPile.pop();
-    if (card) {
-      next.players[playerId].hand.push(card);
-    }
-  }
-  return next;
+  if (count <= 0 || !state.players[playerId]) return state;
+  return draw(state, playerId, count);
 }
 
 /**

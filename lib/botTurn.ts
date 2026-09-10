@@ -1,6 +1,7 @@
+import { isCardSupported } from '../game/playableCards';
 import type { RoomState, PlayerId, CardCode, Rng, PendingResponse, PendingInteraction } from '../game/types';
 import { getPlayableCounters } from '../game/counterRules/registry';
-import { getTrapRule, isTrapImplemented } from '../game/trapRules/registry';
+import { getTrapRule } from '../game/trapRules/registry';
 import { getActionRule, getPlayableActions } from '../game/actionRules/registry';
 import { getCardsByType } from '../data/cards/index';
 
@@ -37,7 +38,7 @@ export function decideBotTrapPlacement(
   }
 
   const trapCodes = new Set(getCardsByType('trap').map((c) => c.id));
-  const handTraps = player.hand.filter((code) => trapCodes.has(code) || code.startsWith('T'));
+  const handTraps = player.hand.filter((code) => trapCodes.has(code) && isCardSupported(code));
 
   if (handTraps.length === 0 || rng() > TRAP_PLACE_PROBABILITY) {
     return { action: 'skip' };
@@ -55,8 +56,11 @@ export function decideBotTurn(
   botId: PlayerId,
   rng: Rng = Math.random
 ): BotDecision {
-  const hand = state.players[botId]?.hand ?? [];
-  const playableActions = getPlayableActions(state, botId);
+  if (state.globalRestrictions?.some(r => r.type === 'no_actions')) return { action: 'draw' };
+  const playableActions = getPlayableActions(state, botId).filter(code => {
+    const rule = getActionRule(code);
+    return isCardSupported(code) && !rule?.needsRosterSelection && !rule?.needsOutcomeEntry && !rule?.needsDualTargetSelection;
+  });
 
   if (playableActions.length === 0 || rng() >= ACTION_PLAY_PROBABILITY) {
     return { action: 'draw' };

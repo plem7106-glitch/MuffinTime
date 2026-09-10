@@ -1,5 +1,7 @@
 'use client';
 
+import { resolveCompletedStackFrames, respondToFrame, drawTurnCard, endPlayerTurn, playTurnAction } from '../game/sessionFlow';
+
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from './supabase';
 import { usePlayer } from './player';
@@ -16,37 +18,25 @@ import {
   finishGame as engineFinishGame,
   resetForPlayAgain as engineResetForPlayAgain,
 } from '../game/room';
-import { draw, discard, balancedShuffleDrawPile } from '../game/pile';
-import { placeTrap as enginePlaceTrap, removeTrap, skipTrapPlacement as engineSkipTrapPlacement } from '../game/trap';
+import { balancedShuffleDrawPile } from '../game/pile';
+import { placeTrap as enginePlaceTrap, skipTrapPlacement as engineSkipTrapPlacement } from '../game/trap';
 import {
-  advanceTurn,
   emergencyForceSkipTurn,
-  checkWinnerAtTurnStart,
   declareMuffinTime as engineDeclareMuffinTime,
   finishByDeckExhaustion,
 } from '../game/turn';
 import {
-  pushStackFrame,
-  popStackFrame,
-  submitResponse,
   areAllResponsesComplete,
   getTopFrame,
-  addModifierToFrame,
-  syncPendingResponseBridge,
 } from '../game/reactionStack';
 import {
   activateManualTrap,
-  checkAndTriggerAutomaticTraps,
   initiateTrapInteraction as engineInitiateTrapInteraction,
   respondToTrapInteraction as engineRespondToTrapInteraction,
-  executeTrapFrameEffect,
 } from '../game/trapRules/engine';
-import { createGameEvent, appendGameEvent, GAME_EVENT_TYPES } from '../game/events';
 import { getPlayableCounters } from '../game/counterRules/registry';
-import { resolveCounterEffect } from '../game/counterRules/engine';
-import { getPlayableActions, isActionImplemented, executeActionFrameEffect } from '../game/actionRules/registry';
 import type { RoomState, PlayerId, CardCode, PlayDirection, PendingResponse, LastResult } from '../game/types';
-import { buildCanonicalDeck } from '../data/cards/deck';
+import { buildPlayableDeck } from '../game/playableCards';
 import {
   decideBotTurn,
   decideBotTrapPlacement,
@@ -117,15 +107,6 @@ export interface GameSessionValue {
 
 const GameSessionContext = createContext<GameSessionValue | null>(null);
 
-function advanceAndCheckWin(room: RoomState): RoomState {
-  const advanced = advanceTurn(room);
-  const currentId = advanced.turnOrder[advanced.currentTurnIndex];
-  if (checkWinnerAtTurnStart(advanced, currentId)) {
-    return { ...advanced, status: 'finished', winnerId: currentId, finishReason: 'normal' };
-  }
-  return advanced;
-}
-
 export function GameSessionProvider({ children }: { children: ReactNode }) {
   const { playerId, playerName } = usePlayer();
   const [localHostId, setLocalHostId] = useState<string>('host-me');
@@ -170,7 +151,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       if (roomCode.startsWith('bot-')) {
         setRoomState((prev) => {
           if (!prev) return prev;
-          const next = updater(prev);
+          const next = finishByDeckExhaustion(updater(prev));
           if (typeof window !== 'undefined') {
             try {
               sessionStorage.setItem(
@@ -189,7 +170,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       isWritingRef.current = true;
       setError(null);
       try {
-        await updateRoomWithRetry(supabase, roomCode, updater);
+        await updateRoomWithRetry(supabase, roomCode, (state) => finishByDeckExhaustion(updater(state)));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
       } finally {
@@ -365,47 +346,18 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     () =>
       run((state) => {
         if (myPlayerId !== state.hostId) return state;
-        return engineStartGame(state, buildCanonicalDeck());
+        return engineStartGame(state, buildPlayableDeck());
       }),
     [run, myPlayerId]
   );
 
   const drawCard = useCallback(
-    () =>
-      run((state) => {
-        if (state.reactionStack && state.reactionStack.length > 0) return state;
-        if (state.pendingResponse || state.pendingInteraction) return state;
-        if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
-        const pid = myPlayerId!;
-        const player = state.players[pid];
-        if (player?.hasDrawnThisTurn) return state;
-        let next = state;
-        if (next.drawPile.length === 0) {
-          return finishByDeckExhaustion(next);
-        }
-        next = draw(next, pid, 1);
-        if (next.players[pid]) {
-          next.players[pid].hasDrawnThisTurn = true;
-        }
-        next.turnPhase = 'main';
-        // Check automatic state traps (e.g. T09 Card Sick > 10 cards)
-        next = checkAndTriggerAutomaticTraps(next);
-        return next;
-      }),
+    () => run((state) => drawTurnCard(state, myPlayerId!)),
     [run, myPlayerId]
   );
 
   const endTurn = useCallback(
-    () =>
-      run((state) => {
-        if (state.reactionStack && state.reactionStack.length > 0) return state;
-        if (state.pendingResponse || state.pendingInteraction) return state;
-        if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
-        const pid = myPlayerId!;
-        const player = state.players[pid];
-        if (!player?.hasDrawnThisTurn) return state;
-        return advanceAndCheckWin(state);
-      }),
+    () => run((state) => endPlayerTurn(state, myPlayerId!)),
     [run, myPlayerId]
   );
 
@@ -421,32 +373,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const playAction = useCallback(
-    (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) =>
-      run((state) => {
-        if (state.reactionStack && state.reactionStack.length > 0) return state;
-        if (state.pendingResponse || state.pendingInteraction) return state;
-        if (state.turnOrder[state.currentTurnIndex] !== myPlayerId) return state;
-        if (state.globalRestrictions?.some((r) => r.type === 'no_actions')) return state;
-        const actorId = myPlayerId!;
-        const player = state.players[actorId];
-        if (player?.hasPlayedActionThisTurn) return state;
-        if (!isActionImplemented(code) || !getPlayableActions(state, actorId).includes(code)) return state;
-        if ((code === 'A014' || code === 'A016') && !targetId) return state;
-        if (targetId && !state.players[targetId]) return state;
-        const afterDiscard = discard(state, actorId, 1, [code]);
-        if (afterDiscard.players[actorId]) {
-          afterDiscard.players[actorId].hasPlayedActionThisTurn = true;
-        }
-        const next = pushStackFrame(afterDiscard, {
-          sourceType: 'action',
-          sourceCode: code,
-          actorId,
-          targetIds: targetId ? [targetId] : [],
-          ...(customPayload ? { customPayload } : {}),
-        });
-        appendGameEvent(next, createGameEvent(GAME_EVENT_TYPES.ACTION_PLAYED, actorId, { actorId, actionCode: code }, [actorId]));
-        return next;
-      }),
+    (code: CardCode, targetId?: PlayerId, customPayload?: Record<string, unknown>) => run((state) => playTurnAction(state, myPlayerId!, code, targetId, customPayload)),
     [run, myPlayerId]
   );
 
@@ -476,44 +403,6 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
       }),
     [run, myPlayerId]
   );
-
-  const resolveCompletedStackFrames = useCallback((state: RoomState): RoomState => {
-    let next = state;
-    let currentTop = getTopFrame(next);
-
-    while (currentTop && areAllResponsesComplete(currentTop)) {
-      if (currentTop.status !== 'cancelled') {
-        if (currentTop.sourceType === 'trap') {
-          next = executeTrapFrameEffect(next, currentTop);
-        } else {
-          next = executeActionFrameEffect(next, currentTop);
-        }
-      }
-
-      next = checkAndTriggerAutomaticTraps(next);
-
-      const { state: poppedState, poppedFrame } = popStackFrame(next);
-      const wasActionBase =
-        poppedFrame?.sourceType === 'action' &&
-        (!poppedState.reactionStack || poppedState.reactionStack.length === 0);
-      let finalState = poppedState;
-      if (wasActionBase && poppedFrame?.actorId && poppedFrame.actorId.startsWith('bot-')) {
-        let botNext = draw(poppedState, poppedFrame.actorId, 1);
-        if (botNext.players[poppedFrame.actorId]) {
-          botNext.players[poppedFrame.actorId].hasDrawnThisTurn = true;
-        }
-        botNext = checkAndTriggerAutomaticTraps(botNext);
-        finalState = advanceAndCheckWin(botNext);
-      }
-
-      next = finalState;
-      const newTop = getTopFrame(next);
-      if (newTop === currentTop) break;
-      currentTop = newTop;
-    }
-
-    return next;
-  }, []);
 
   const openTrapCard = useCallback(
     (code: CardCode, targetId?: PlayerId | PlayerId[]) =>
@@ -547,81 +436,13 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const playCounter = useCallback(
-    (code: CardCode, responseId: string) =>
-      run((state) => {
-        const top = getTopFrame(state);
-        if (!top || top.frameId !== responseId) return state;
-        if (state.globalRestrictions?.some((r) => r.type === 'no_counters')) return state;
-        const counterActorId = myPlayerId!;
-        if (!state.pendingResponse || !getPlayableCounters(state.players[counterActorId]?.hand ?? [], state.pendingResponse).includes(code)) return state;
-        const afterDiscard = discard(state, counterActorId, 1, [code]);
-
-        // Submit counter response to top frame
-        let next = submitResponse(afterDiscard, responseId, counterActorId, {
-          status: 'countered',
-          counterCode: code,
-        });
-
-        // Resolve counter card effect (e.g. demo draws)
-        next = resolveCounterEffect(next, code, counterActorId);
-
-        // Add modifier to target frame
-        next = addModifierToFrame(next, responseId, {
-          modifierId: `mod-${code}-${Date.now()}`,
-          sourceFrameId: responseId,
-          type: 'cancel_all',
-          affectedTargetIds: [counterActorId],
-        });
-
-        next = resolveCompletedStackFrames(next);
-
-        return {
-          ...next,
-          lastResult: {
-            responseId,
-            kind: top.sourceType === 'trap' ? 'trap' : 'action',
-            code: top.sourceCode,
-            actorId: top.actorId,
-            targetId: top.targetIds[0],
-            countered: true,
-            counteredBy: counterActorId,
-            counterCode: code,
-          },
-        };
-      }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    (code: CardCode, responseId: string) => run((state) => respondToFrame(state, responseId, myPlayerId!, code)),
+    [run, myPlayerId]
   );
 
   const skipCounter = useCallback(
-    (responseId: string) =>
-      run((state) => {
-        const top = getTopFrame(state);
-        if (!top || top.frameId !== responseId) return state;
-        const responderId = myPlayerId ?? top.eligibleResponderIds[0];
-
-        // Submit skip response for this player
-        let next = submitResponse(state, responseId, responderId, {
-          status: 'skipped',
-        });
-
-        next = resolveCompletedStackFrames(next);
-
-        return {
-          ...next,
-          lastResult:
-            top.sourceType === 'trap'
-              ? {
-                  responseId,
-                  kind: 'trap',
-                  code: top.sourceCode,
-                  actorId: top.actorId,
-                  targetId: top.targetIds[0],
-                  countered: false,
-                }
-              : null,
-        };
-      }),
-    [run, myPlayerId, resolveCompletedStackFrames]
+    (responseId: string) => run((state) => respondToFrame(state, responseId, myPlayerId!)),
+    [run, myPlayerId]
   );
 
   const declareMuffinTimeFn = useCallback(
@@ -689,119 +510,33 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
   const executedBotTurnKeyRef = useRef<string | null>(null);
 
-  // Auto-skip or bot-respond to counter windows
+  // Each client handles its own response; the local host also handles bot responses.
   useEffect(() => {
-    const pendingResponse = roomState?.pendingResponse;
-    if (!pendingResponse || !myPlayerId || !roomState) return;
-    if (myPlayerId !== roomState.hostId) return;
-
-    const isBot = roomCode?.startsWith('bot-');
-
-    if (isBot) {
-      // In local bot mode, check if human has an active interaction to decide
-      const isHumanActor = pendingResponse.actorId === myPlayerId;
-      const isHumanTarget = !pendingResponse.targetId || pendingResponse.targetId === myPlayerId;
-      const noCounters = roomState.globalRestrictions?.some((r) => r.type === 'no_counters') ?? false;
-      const humanHand = roomState.players[myPlayerId]?.hand ?? [];
-      const humanCanCounter = !noCounters && getPlayableCounters(humanHand, pendingResponse).length > 0;
-
-      // 1. If human was hit by a trap, human sees TrapAlertModal to decide counter/decline
-      if (!isHumanActor && isHumanTarget && pendingResponse.kind === 'trap') {
-        return;
+    if (!roomState || roomState.status !== 'playing' || !myPlayerId) return;
+    const top = getTopFrame(roomState);
+    if (!top) return;
+    const pendingIds = top.eligibleResponderIds.filter(id => top.responses[id]?.status === 'pending');
+    const botId = roomCode?.startsWith('bot-') && myPlayerId === roomState.hostId
+      ? pendingIds.find(id => id.startsWith('bot-')) : undefined;
+    const responderId = botId ?? (pendingIds.includes(myPlayerId) ? myPlayerId : undefined);
+    const noCounters = roomState.globalRestrictions?.some(r => r.type === 'no_counters');
+    if (!responderId) {
+      if (areAllResponsesComplete(top) && myPlayerId === roomState.hostId) {
+        const timer = setTimeout(() => run(resolveCompletedStackFrames), 400);
+        return () => clearTimeout(timer);
       }
-      // 2. If human can counter an action, human sees CounterModal to decide play/skip
-      if (!isHumanActor && humanCanCounter && pendingResponse.kind === 'action') {
-        return;
-      }
-
-      // 3. Otherwise (bot-on-bot action/trap, human's own action/trap, or human has no valid counters):
-      // Check if an eligible bot responder can play a counter
-      const responseId = pendingResponse.responseId;
-      const top = getTopFrame(roomState);
-      const eligibleBotIds = top?.eligibleResponderIds.filter((id) => id.startsWith('bot-')) ?? [];
-
-      const timer = setTimeout(() => {
-        // Evaluate bot counter decisions
-        let botCounterActorId: string | null = null;
-        let botCounterCode: string | null = null;
-        if (!noCounters) {
-          for (const botId of eligibleBotIds) {
-            const decision = decideBotCounter(roomState, botId, pendingResponse);
-            if (decision.action === 'counter') {
-              botCounterActorId = botId;
-              botCounterCode = decision.code;
-              break;
-            }
-          }
-        }
-
-        if (botCounterActorId && botCounterCode) {
-          const actorId = botCounterActorId;
-          const code = botCounterCode;
-          run((state) => {
-            const currentTop = getTopFrame(state);
-            if (!currentTop || currentTop.frameId !== responseId) return state;
-
-            const afterDiscard = discard(state, actorId, 1, [code]);
-            let next = submitResponse(afterDiscard, responseId, actorId, {
-              status: 'countered',
-              counterCode: code,
-            });
-            next = resolveCounterEffect(next, code, actorId);
-            next = addModifierToFrame(next, responseId, {
-              modifierId: `mod-${code}-${Date.now()}`,
-              sourceFrameId: responseId,
-              type: 'cancel_all',
-              affectedTargetIds: [actorId],
-            });
-
-            const updatedTop = getTopFrame(next);
-            if (updatedTop && areAllResponsesComplete(updatedTop)) {
-              const { state: poppedState, poppedFrame } = popStackFrame(next);
-              const wasActionBase =
-                poppedFrame?.sourceType === 'action' &&
-                (!poppedState.reactionStack || poppedState.reactionStack.length === 0);
-              let finalState = wasActionBase ? advanceAndCheckWin(poppedState) : poppedState;
-              finalState = checkAndTriggerAutomaticTraps(finalState);
-              return {
-                ...finalState,
-                lastResult: {
-                  responseId,
-                  kind: poppedFrame?.sourceType === 'trap' ? 'trap' : 'action',
-                  code: poppedFrame?.sourceCode ?? code,
-                  actorId: poppedFrame?.actorId ?? actorId,
-                  targetId: poppedFrame?.targetIds[0],
-                  countered: true,
-                  counteredBy: actorId,
-                  counterCode: code,
-                },
-              };
-            }
-            return next;
-          });
-        } else {
-          skipCounter(responseId);
-        }
-      }, 450);
-      return () => clearTimeout(timer);
+      return;
     }
-
-    // Multiplayer room logic (all human players):
-    const eligibleIds =
-      pendingResponse.kind === 'trap' && pendingResponse.targetId
-        ? [pendingResponse.targetId]
-        : Object.keys(roomState.players).filter((id) => id !== pendingResponse.actorId);
-
-    const anyoneCanRespond = eligibleIds.some((id) => {
-      const hand = roomState.players[id]?.hand ?? [];
-      return getPlayableCounters(hand, pendingResponse).length > 0;
-    });
-    if (anyoneCanRespond) return;
-
-    const responseId = pendingResponse.responseId;
-    const timer = setTimeout(() => skipCounter(responseId), 400);
+    if (!botId && !noCounters && getPlayableCounters(roomState.players[responderId].hand, roomState.pendingResponse ?? null).length > 0) return;
+    const timer = setTimeout(() => run(state => {
+      const current = getTopFrame(state);
+      if (current?.frameId !== top.frameId) return state;
+      const decision = botId && !state.globalRestrictions?.some(r => r.type === 'no_counters') && state.pendingResponse
+        ? decideBotCounter(state, botId, state.pendingResponse) : { action: 'skip' as const };
+      return respondToFrame(state, top.frameId, responderId, decision.action === 'counter' ? decision.code : undefined);
+    }), 450);
     return () => clearTimeout(timer);
-  }, [roomState, myPlayerId, skipCounter, run, roomCode]);
+  }, [roomState, myPlayerId, run, roomCode]);
 
   // Auto-play bot turns in local bot rooms
   useEffect(() => {
@@ -813,7 +548,7 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
     if (!botId || !botId.startsWith('bot-')) return;
 
     // Unique turn key per turn state to prevent duplicate scheduling
-    const turnKey = `${roomState.sequenceNumber ?? 0}-${roomState.roundNumber ?? 1}-${roomState.currentTurnIndex}-${roomState.turnPhase ?? 'trap_placement'}-${botId}-${roomState.players[botId]?.hand.length}-${roomState.players[botId]?.traps?.length}-${roomState.drawPile.length}`;
+    const turnKey = `${roomState.sequenceNumber ?? 0}-${roomState.roundNumber ?? 1}-${roomState.currentTurnIndex}-${roomState.turnPhase ?? 'trap_placement'}-${botId}-${roomState.players[botId]?.hand.length}-${roomState.players[botId]?.traps?.length}-${roomState.drawPile.length}-${Boolean(roomState.players[botId]?.hasDrawnThisTurn)}-${Boolean(roomState.players[botId]?.hasPlayedActionThisTurn)}`;
     if (executedBotTurnKeyRef.current === turnKey) return;
 
     // Set ref at SCHEDULE TIME, not inside the timer callback.
@@ -846,6 +581,11 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const bot = state.players[currentBotId];
+        if (bot.hasDrawnThisTurn || bot.hasPlayedActionThisTurn) {
+          return endPlayerTurn(state, currentBotId);
+        }
+
         // Phase 2: Main Phase
         // Evaluate manual trap activation opportunity
         const manualTrapDecision = decideBotManualTrapActivation(state, currentBotId);
@@ -861,27 +601,15 @@ export function GameSessionProvider({ children }: { children: ReactNode }) {
 
         const decision = decideBotTurn(state, currentBotId);
         if (decision.action === 'draw') {
-          let next = draw(state, currentBotId, 1);
-          next = checkAndTriggerAutomaticTraps(next);
-          return advanceAndCheckWin(next);
+          return drawTurnCard(state, currentBotId);
         }
-        // Verify card is still in hand before discarding
-        if (!state.players[currentBotId]?.hand.includes(decision.code)) {
-          // Card gone (stale decision), just draw instead
-          let next = draw(state, currentBotId, 1);
-          next = checkAndTriggerAutomaticTraps(next);
-          return advanceAndCheckWin(next);
-        }
-        const afterDiscard = discard(state, currentBotId, 1, [decision.code]);
-        return pushStackFrame(afterDiscard, {
-          sourceType: 'action',
-          sourceCode: decision.code,
-          actorId: currentBotId,
-          targetIds: decision.targetId ? [decision.targetId] : [],
-        });
+        return playTurnAction(state, currentBotId, decision.code, decision.targetId);
       });
     }, 600);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (executedBotTurnKeyRef.current === turnKey) executedBotTurnKeyRef.current = null;
+    };
   }, [roomCode, roomState, run]);
 
   // Auto-respond to interactive invitations (e.g. T10 date invite) for bot targets

@@ -172,3 +172,13 @@ describe('Insufficient-Card Policy & Effect Primitives', () => {
     });
   });
 });
+
+it('does not recycle discarded cards when a Trap exhausts the deck', () => {
+  const state = createMockRoom();
+  state.drawPile = ['last'];
+  state.discardPile = ['old1', 'old2'];
+  const next = executeDraw(state, 'p1', 3);
+  expect(next.players.p1.hand).toHaveLength(state.players.p1.hand.length + 1);
+  expect(next.drawPile).toEqual([]);
+  expect(next.discardPile).toEqual(['old1', 'old2']);
+});

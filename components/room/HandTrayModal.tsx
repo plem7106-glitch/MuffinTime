@@ -1,5 +1,7 @@
 'use client';
 
+import { isCardSupported } from '../../game/playableCards';
+
 import { useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import type { CardCode } from '../../game/types';
 import { getCardById } from '../../data/cards/index';
@@ -291,7 +293,9 @@ export function HandTrayModal({
 
             {/* Action Buttons */}
             <div className="mt-1 flex items-center gap-2">
-              {isMyTurn && canAct ? (
+              {!isCardSupported(selectedCardInfo.code) ? (
+                <p className="text-xs text-ink-secondary">การ์ดนี้ยังไม่รองรับในเกมปัจจุบัน</p>
+              ) : isMyTurn && canAct ? (
                 selectedCardInfo.type === 'action' ? (
                   hasDrawnThisTurn ? (
                     <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
@@ -299,7 +303,7 @@ export function HandTrayModal({
                     </div>
                   ) : hasPlayedActionThisTurn ? (
                     <div className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-700">
-                      คุณใช้แอ็กชันประจำเทิร์นไปแล้ว (แตะกองจั่วเพื่อจั่วไพ่)
+                      คุณใช้แอ็กชันประจำเทิร์นแล้ว (กด จบเทิร์น เพื่อเปลี่ยนตา)
                     </div>
                   ) : (
                     <button

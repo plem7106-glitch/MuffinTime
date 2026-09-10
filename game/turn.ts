@@ -99,7 +99,7 @@ export function advanceTurn(state: RoomState): RoomState {
 }
 
 export function finishByDeckExhaustion(state: RoomState): RoomState {
-  if (state.drawPile.length > 0) return state;
+  if (state.status !== 'playing' || state.drawPile.length > 0 || state.reactionStack?.length || state.pendingResponse || state.pendingInteraction || Object.keys(state.pendingForcedDiscards ?? {}).length > 0) return state;
   const next = cloneState(state);
   const playerIds = Object.keys(next.players);
   if (playerIds.length === 0) return next;

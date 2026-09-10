@@ -26,7 +26,7 @@ function createMockRoom(): RoomState {
     discardPile: [],
     players: {
       p1: { name: 'Player 1', hand: ['H1', 'H2'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
-      'bot-1': { name: 'Tee (Bot)', hand: ['T01', 'A001', 'C09'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
+      'bot-1': { name: 'Tee (Bot)', hand: ['T01', 'A097', 'C09'], traps: [], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
       'bot-2': { name: 'Bank (Bot)', hand: ['T06', 'A008', 'C16'], traps: ['T04'], connected: true, hasCalledMuffinTime: false, skipNextTurn: false },
     },
     turnPhase: 'trap_placement',
@@ -77,7 +77,7 @@ describe('Complete Bot Automation Suite', () => {
     const playDecision = decideBotTurn(state, 'bot-1', () => 0.1); // low RNG -> play action
     expect(playDecision.action).toBe('play');
     if (playDecision.action === 'play') {
-      expect(playDecision.code).toBe('A001');
+      expect(playDecision.code).toBe('A097');
     }
   });
 
